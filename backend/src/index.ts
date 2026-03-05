@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { PORT, NODE_ENV, LOG_LEVEL } from './config/constants';
+import { errorHandler } from './middleware/error-handler';
 
 const app = express();
 
@@ -20,12 +21,16 @@ app.get('/api/health', (_req, res) => {
 // --- Routes (Faz 1-4'te eklenecek) ---
 import { rssRouter } from './modules/rss';
 import { mlRouter } from './modules/ml';
+import { llmRouter } from './modules/llm';
 
 app.use('/api/rss', rssRouter);
 app.use('/api/ml', mlRouter);
-// app.use('/api/llm', llmRouter);
+app.use('/api/llm', llmRouter);
 // app.use('/api/news', newsRouter);
 // app.use('/api/render', renderRouter);
+
+// --- Centralized Error Handler (EN SON middleware olmalı) ---
+app.use(errorHandler);
 
 // --- Start Server ---
 app.listen(PORT, () => {
