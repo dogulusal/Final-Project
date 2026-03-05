@@ -25,9 +25,9 @@ export interface INewsService {
     isDuplicate(baslik: string): Promise<{ duplicate: boolean; similarity?: number; matchedTitle?: string }>;
 
     /**
-     * Son haberleri listeleme (Kategori, durum filtresiyle)
+     * Son haberleri listeleme (Kategori, durum filtresi, arama ve sayfalama)
      */
-    getRecentNews(limit?: number, status?: string): Promise<any[]>;
+    getRecentNews(page?: number, limit?: number, status?: string, search?: string): Promise<{ data: any[], total: number, totalPages: number }>;
 
     /**
      * Slug değerine göre haber detayını getir

@@ -11,15 +11,20 @@ const newsService = new NewsService();
  */
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     try {
+        const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 20;
         const status = req.query.status as string;
+        const search = req.query.search as string;
 
-        const items = await newsService.getRecentNews(limit, status);
+        const result = await newsService.getRecentNews(page, limit, status, search);
 
         res.json({
             success: true,
-            count: items.length,
-            data: items
+            count: result.data.length,
+            total: result.total,
+            totalPages: result.totalPages,
+            page,
+            data: result.data
         });
     } catch (error) {
         next(error); // Error middleware'e yönlendir
@@ -57,7 +62,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
             throw ValidationError('Geçerli bir kategoriId veya kategoriAd gereklidir.');
         }
 
-        let parsedConfidence = null;
+        let parsedConfidence: number | undefined = undefined;
         if (req.body.mlConfidence !== undefined && req.body.mlConfidence !== null) {
             parsedConfidence = parseFloat(req.body.mlConfidence);
         }

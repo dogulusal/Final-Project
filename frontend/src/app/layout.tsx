@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import CookieConsent from "@/components/CookieConsent";
 
 export const metadata: Metadata = {
   title: "AI Haber Ajansı — Yapay Zeka Destekli Haber Platformu",
@@ -22,6 +23,7 @@ export default function RootLayout({
       <body className="antialiased">
         <div className="animated-bg" />
         {children}
+        <CookieConsent />
       </body>
     </html>
   );

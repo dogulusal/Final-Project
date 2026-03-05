@@ -6,7 +6,10 @@ import { errorHandler } from './middleware/error-handler';
 const app = express();
 
 // --- Middleware ---
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:3001', 'http://localhost:3002'],
+    credentials: true,
+}));
 app.use(express.json());
 
 // --- Health Check ---
@@ -24,12 +27,14 @@ import { mlRouter } from './modules/ml';
 import { llmRouter } from './modules/llm';
 import { renderRouter } from './modules/render';
 import { newsRouter } from './modules/news';
+import { socialRouter } from './modules/social';
 
 app.use('/api/rss', rssRouter);
 app.use('/api/ml', mlRouter);
 app.use('/api/llm', llmRouter);
 app.use('/api/news', newsRouter);
 app.use('/api/render', renderRouter);
+app.use('/api/social', socialRouter);
 
 // --- Centralized Error Handler (EN SON middleware olmalı) ---
 app.use(errorHandler);

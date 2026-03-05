@@ -81,18 +81,38 @@ export class NewsService implements INewsService {
         return { duplicate: false };
     }
 
-    async getRecentNews(limit = 20, status?: string): Promise<any[]> {
+    async getRecentNews(page = 1, limit = 20, status?: string, search?: string): Promise<{ data: any[], total: number, totalPages: number }> {
         const filters: any = {};
         if (status) {
             filters.durum = status;
         }
 
-        return prisma.haber.findMany({
-            where: filters,
-            take: limit,
-            orderBy: { yayinlanmaTarihi: 'desc' },
-            include: { kategori: true }
-        });
+        if (search) {
+            filters.OR = [
+                { baslik: { contains: search, mode: 'insensitive' } },
+                { icerik: { contains: search, mode: 'insensitive' } },
+                { metaAciklama: { contains: search, mode: 'insensitive' } }
+            ];
+        }
+
+        const skip = (page - 1) * limit;
+
+        const [data, total] = await Promise.all([
+            prisma.haber.findMany({
+                where: filters,
+                skip,
+                take: limit,
+                orderBy: { yayinlanmaTarihi: 'desc' },
+                include: { kategori: true }
+            }),
+            prisma.haber.count({ where: filters })
+        ]);
+
+        return {
+            data,
+            total,
+            totalPages: Math.ceil(total / limit)
+        };
     }
 
     async getNewsBySlug(slug: string): Promise<any | null> {
