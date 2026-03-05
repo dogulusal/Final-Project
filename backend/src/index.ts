@@ -22,12 +22,13 @@ app.get('/api/health', (_req, res) => {
 import { rssRouter } from './modules/rss';
 import { mlRouter } from './modules/ml';
 import { llmRouter } from './modules/llm';
+import { renderRouter } from './modules/render';
 
 app.use('/api/rss', rssRouter);
 app.use('/api/ml', mlRouter);
 app.use('/api/llm', llmRouter);
 // app.use('/api/news', newsRouter);
-// app.use('/api/render', renderRouter);
+app.use('/api/render', renderRouter);
 
 // --- Centralized Error Handler (EN SON middleware olmalı) ---
 app.use(errorHandler);
