@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+build/
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker
+docker-compose.override.yml
+
+# n8n credentials (sensitive)
+n8n/credentials/
+
+# Training outputs
+training/naive-bayes/*.model
+training/fine-tune/output/
+
+# Generated images
+backend/assets/generated/
+
+# Coverage
+coverage/
