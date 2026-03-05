@@ -32,6 +32,15 @@ function sentimentIcon(sentiment: string | null): string {
     }
 }
 
+function getHostname(url: string | null): string {
+    if (!url) return "Ajans";
+    try {
+        return new URL(url).hostname.replace('www.', '');
+    } catch {
+        return "Ajans";
+    }
+}
+
 interface Props {
     news: NewsItem;
 }
@@ -72,7 +81,7 @@ export default function NewsCard({ news }: Props) {
                             {news.kaynakUrl ? "🔗" : "📰"}
                         </span>
                         <span className="text-xs font-medium text-[var(--text-secondary)]">
-                            {news.kaynakUrl ? new URL(news.kaynakUrl).hostname.replace('www.', '') : "Ajans"}
+                            {getHostname(news.kaynakUrl)}
                         </span>
                     </div>
                 </div>

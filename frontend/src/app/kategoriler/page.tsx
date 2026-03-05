@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -24,7 +24,7 @@ const BADGE_MAP: Record<string, string> = {
     Siyaset: "badge-siyaset", Dünya: "badge-dunya", Sağlık: "badge-saglik", Genel: "badge-genel",
 };
 
-export default function KategorilerPage() {
+function KategorilerContent() {
     const searchParams = useSearchParams();
     const initialCat = searchParams.get("cat") || null;
 
@@ -125,5 +125,20 @@ export default function KategorilerPage() {
             </section>
             <Footer />
         </main>
+    );
+}
+
+export default function KategorilerPage() {
+    return (
+        <Suspense fallback={
+            <main className="min-h-screen">
+                <Navbar />
+                <div className="max-w-[1500px] w-full mx-auto px-6 lg:px-12 py-16 text-center">
+                    Yükleniyor...
+                </div>
+            </main>
+        }>
+            <KategorilerContent />
+        </Suspense>
     );
 }
