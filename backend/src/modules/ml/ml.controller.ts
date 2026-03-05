@@ -24,11 +24,11 @@ router.post('/train', async (_req: Request, res: Response) => {
     }
 });
 
-router.get('/categorize', async (req: Request, res: Response) => {
-    const title = req.query.title as string;
+router.post('/categorize', async (req: Request, res: Response) => {
+    const title = (req.body.title || req.query.title) as string;
 
     if (!title) {
-        res.status(400).json({ success: false, error: 'Lütfen tahmin edilecek başlığı (title) query parametresi olarak gönderin.' });
+        res.status(400).json({ success: false, error: 'Lütfen tahmin edilecek başlığı (title) body (veya query) içerisinde gönderin.' });
         return;
     }
 
