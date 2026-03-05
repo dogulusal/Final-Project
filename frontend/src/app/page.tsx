@@ -6,7 +6,6 @@ import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
 import NewsGrid from "@/components/NewsGrid";
 import CategoryFilter from "@/components/CategoryFilter";
-import StatsBar from "@/components/StatsBar";
 import Footer from "@/components/Footer";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
@@ -68,20 +67,19 @@ export default function Home() {
     <main className="min-h-screen">
       <Navbar />
       <HeroSection />
-      <StatsBar newsCount={news.length} />
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <section className="max-w-[1500px] w-full mx-auto px-6 lg:px-12 py-12">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold">
-              <span className="gradient-text">Son Haberler</span>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 gap-4">
+            <h2 className="text-3xl font-extrabold tracking-tight">
+              Güney <span className="gradient-text">Gündemi</span>
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <span className="pulse-dot" />
-              <span className="text-sm text-[var(--text-secondary)]">Canlı güncelleniyor</span>
+              <span className="text-sm font-medium text-[var(--text-secondary)]">Gerçek Zamanlı Akış</span>
             </div>
           </div>
           <CategoryFilter

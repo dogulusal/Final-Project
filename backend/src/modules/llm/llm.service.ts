@@ -1,6 +1,7 @@
 import { IContentGenerationService, ILLMProvider, RawNewsInput, GeneratedNewsContent } from './llm.interface';
 import { OllamaProvider } from './providers/ollama.provider';
 import { OpenAiProvider } from './providers/openai.provider';
+import { GeminiProvider } from './providers/gemini.provider';
 import { LLM_PROVIDER, LLM_FALLBACK_PROVIDER, LLMProviderType } from '../../config/constants';
 
 export class ContentGenerationService implements IContentGenerationService {
@@ -22,8 +23,7 @@ export class ContentGenerationService implements IContentGenerationService {
             case LLMProviderType.OPENAI:
                 return new OpenAiProvider();
             case LLMProviderType.GEMINI:
-                // TODO: Gemini Provider (ileride)
-                return new OllamaProvider();
+                return new GeminiProvider();
             case LLMProviderType.ANTHROPIC:
                 // TODO: Anthropic Provider (ileride)
                 return new OllamaProvider();

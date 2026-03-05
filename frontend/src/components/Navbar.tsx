@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
+import Link from "next/link";
 
 export default function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false);
@@ -11,31 +12,32 @@ export default function Navbar() {
             initial={{ y: -40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="glass sticky top-0 z-50"
+            className="glass sticky top-0 z-50 w-full"
         >
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
+            <div className="max-w-[1500px] w-full mx-auto px-6 lg:px-12">
+                <div className="flex items-center justify-between h-20">
                     {/* Logo */}
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg"
+                    <Link href="/" className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
                             style={{ background: "var(--gradient-hero)" }}>
                             📡
                         </div>
-                        <span className="text-lg font-bold tracking-tight">
+                        <span className="text-xl font-bold tracking-tight">
                             <span className="gradient-text">AI</span>{" "}
                             <span className="text-[var(--text-primary)]">Haber Ajansı</span>
                         </span>
-                    </div>
+                    </Link>
 
                     {/* Desktop Menu */}
-                    <div className="hidden md:flex items-center gap-6">
-                        <NavLink href="/" label="Ana Sayfa" active />
+                    <div className="hidden md:flex items-center gap-8">
+                        <NavLink href="/" label="Ana Sayfa" />
                         <NavLink href="/kategoriler" label="Kategoriler" />
                         <NavLink href="/hakkinda" label="Hakkında" />
-                        <button className="ml-4 px-5 py-2 rounded-xl text-sm font-medium text-white transition-all duration-300 hover:scale-105"
-                            style={{ background: "var(--gradient-hero)" }}>
-                            Dashboard
-                        </button>
+                        <Link href="http://localhost:5678" target="_blank" rel="noopener noreferrer"
+                            className="ml-4 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-300 hover:scale-105"
+                            style={{ background: "var(--gradient-hero)", boxShadow: "var(--shadow-glow)" }}>
+                            n8n Dashboard
+                        </Link>
                     </div>
 
                     {/* Mobile Hamburger */}
@@ -44,7 +46,7 @@ export default function Navbar() {
                         onClick={() => setMenuOpen(!menuOpen)}
                         aria-label="Menü aç/kapat"
                     >
-                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             {menuOpen ? (
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             ) : (
@@ -59,9 +61,9 @@ export default function Navbar() {
                     <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
-                        className="md:hidden pb-4 flex flex-col gap-3"
+                        className="md:hidden pb-6 flex flex-col gap-4"
                     >
-                        <NavLink href="/" label="Ana Sayfa" active />
+                        <NavLink href="/" label="Ana Sayfa" />
                         <NavLink href="/kategoriler" label="Kategoriler" />
                         <NavLink href="/hakkinda" label="Hakkında" />
                     </motion.div>
@@ -71,16 +73,13 @@ export default function Navbar() {
     );
 }
 
-function NavLink({ href, label, active }: { href: string; label: string; active?: boolean }) {
+function NavLink({ href, label }: { href: string; label: string }) {
     return (
-        <a
+        <Link
             href={href}
-            className={`text-sm font-medium transition-colors duration-200 ${active
-                    ? "text-[var(--text-primary)]"
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                }`}
+            className="text-base font-medium transition-colors duration-200 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
         >
             {label}
-        </a>
+        </Link>
     );
 }

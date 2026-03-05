@@ -33,25 +33,45 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
  */
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { baslik, kategoriId, status } = req.body;
+        const { baslik, kategoriId, kategoriAd, status } = req.body;
 
         if (!baslik || typeof baslik !== 'string') {
             throw ValidationError('baslik alani gereklidir.');
         }
-        if (!kategoriId || isNaN(parseInt(kategoriId))) {
-            throw ValidationError('Geçerli bir kategoriId gereklidir.');
+
+        let dbKategoriId = parseInt(kategoriId);
+
+        // n8n'den gelen string kategori adını (örn: "Teknoloji") ID'ye dönüştür
+        if (isNaN(dbKategoriId) && kategoriAd) {
+            const { PrismaClient } = require('@prisma/client');
+            const prisma = new PrismaClient();
+            const foundCat = await prisma.kategori.findFirst({ where: { ad: kategoriAd } });
+            if (foundCat) {
+                dbKategoriId = foundCat.id;
+            } else {
+                dbKategoriId = 7; // 7 = 'Genel' kategorisi fallback olarak
+            }
+        }
+
+        if (isNaN(dbKategoriId)) {
+            throw ValidationError('Geçerli bir kategoriId veya kategoriAd gereklidir.');
+        }
+
+        let parsedConfidence = null;
+        if (req.body.mlConfidence !== undefined && req.body.mlConfidence !== null) {
+            parsedConfidence = parseFloat(req.body.mlConfidence);
         }
 
         const savedNews = await newsService.createNews({
             baslik: req.body.baslik,
             icerik: req.body.icerik,
             metaAciklama: req.body.metaAciklama,
-            kategoriId: parseInt(kategoriId),
+            kategoriId: dbKategoriId,
             kaynakUrl: req.body.kaynakUrl,
             gorselUrl: req.body.gorselUrl,
             sentiment: req.body.sentiment,
-            durum: status || 'hazir',
-            mlConfidence: req.body.mlConfidence,
+            durum: status || 'ham',
+            mlConfidence: parsedConfidence,
             llmProvider: req.body.llmProvider
         });
 
@@ -67,7 +87,32 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
- * 3) GET /api/news/:slug
+ * 3) POST /api/news/check-duplicate
+ * n8n workflow'u: Haberin daha önce kaydedilip kaydedilmediğini kontrol eder.
+ */
+router.post('/check-duplicate', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { title } = req.body;
+
+        if (!title || typeof title !== 'string') {
+            throw ValidationError('Lütfen kontrol edilecek başlığı (title) body içerisinde gönderin.');
+        }
+
+        const result = await newsService.isDuplicate(title);
+
+        res.json({
+            success: true,
+            is_duplicate: result.duplicate,
+            similarity: result.similarity || 0,
+            matched_title: result.matchedTitle || null
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * 4) GET /api/news/:slug
  * Okuyucu tıklayıp haberi okumak istediğinde
  */
 router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => {

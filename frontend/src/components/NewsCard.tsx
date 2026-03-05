@@ -40,51 +40,39 @@ export default function NewsCard({ news }: Props) {
     const badgeClass = BADGE_MAP[categoryName] || "badge-genel";
 
     return (
-        <article className="glass-card p-6 flex flex-col h-full group cursor-pointer">
+        <article className="glass-card p-6 flex flex-col h-full group hover:shadow-2xl transition-all duration-300">
             {/* Header: Category + Time */}
             <div className="flex items-center justify-between mb-4">
-                <span className={`${badgeClass} px-3 py-1 rounded-lg text-xs font-semibold`}>
-                    {news.kategori?.ikon} {categoryName}
+                <span className={`${badgeClass} px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase`}>
+                    {categoryName}
                 </span>
-                <span className="text-xs text-[var(--text-muted)]">
+                <span className="text-xs text-[var(--text-muted)] font-medium">
                     {timeAgo(news.yayinlanmaTarihi)}
                 </span>
             </div>
 
             {/* Title */}
-            <h3 className="text-lg font-bold leading-snug mb-3 text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition-colors duration-300 line-clamp-3">
+            <h3 className="text-xl font-bold leading-snug mb-3 text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition-colors duration-300 line-clamp-3">
                 {news.baslik}
             </h3>
 
             {/* Description */}
             {news.metaAciklama && (
-                <p className="text-sm text-[var(--text-secondary)] mb-4 line-clamp-2 flex-grow">
+                <p className="text-sm text-[var(--text-secondary)] mb-6 line-clamp-3 flex-grow leading-relaxed">
                     {news.metaAciklama}
                 </p>
             )}
 
-            {/* Footer: Stats */}
-            <div className="flex items-center justify-between pt-4 mt-auto" style={{ borderTop: "1px solid var(--border-subtle)" }}>
-                <div className="flex items-center gap-4 text-xs text-[var(--text-muted)]">
-                    <span title="Görüntülenme">👁 {news.goruntulemeSayisi.toLocaleString("tr-TR")}</span>
-                    <span title="Duygu Analizi">{sentimentIcon(news.sentiment)} {news.sentiment || "—"}</span>
+            {/* Footer: Minimal Source/AI indicator */}
+            <div className="flex items-center justify-between pt-4 mt-auto border-t border-[var(--border-subtle)]">
+                <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded overflow-hidden flex items-center justify-center bg-[var(--bg-secondary)] text-[10px]">
+                        {news.kaynakUrl ? "🔗" : "📰"}
+                    </span>
+                    <span className="text-xs font-medium text-[var(--text-secondary)]">
+                        {news.kaynakUrl ? new URL(news.kaynakUrl).hostname.replace('www.', '') : "Ajans"}
+                    </span>
                 </div>
-
-                {/* ML Confidence Bar */}
-                {news.mlConfidence !== null && (
-                    <div className="flex items-center gap-2" title={`ML Güven: %${(news.mlConfidence * 100).toFixed(0)}`}>
-                        <span className="text-xs text-[var(--text-muted)]">AI</span>
-                        <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-primary)" }}>
-                            <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                    width: `${news.mlConfidence * 100}%`,
-                                    background: news.mlConfidence > 0.8 ? "var(--accent-emerald)" : news.mlConfidence > 0.6 ? "var(--accent-amber)" : "var(--accent-rose)",
-                                }}
-                            />
-                        </div>
-                    </div>
-                )}
             </div>
         </article>
     );
