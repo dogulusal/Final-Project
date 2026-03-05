@@ -18,18 +18,9 @@ function timeAgo(dateStr: string): string {
     const mins = Math.floor(diff / 60000);
     if (mins < 60) return `${mins} dk önce`;
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} saat önce`;
+    if (hours < 24) return `${hours} sa önce`;
     const days = Math.floor(hours / 24);
     return `${days} gün önce`;
-}
-
-function sentimentIcon(sentiment: string | null): string {
-    if (!sentiment) return "⚪";
-    switch (sentiment) {
-        case "Pozitif": return "🟢";
-        case "Negatif": return "🔴";
-        default: return "🟡";
-    }
 }
 
 function getHostname(url: string | null): string {
@@ -51,39 +42,37 @@ export default function NewsCard({ news }: Props) {
 
     return (
         <Link href={`/haber/${news.slug}`} className="block h-full">
-            <article className="glass-card p-6 flex flex-col h-full group hover:shadow-2xl transition-all duration-300">
-                {/* Header: Category + Time */}
-                <div className="flex items-center justify-between mb-4">
-                    <span className={`${badgeClass} px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase`}>
+            <article className="glass-card p-5 flex flex-col h-full group">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                    <span className={`${badgeClass} px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase`}>
                         {categoryName}
                     </span>
-                    <span className="text-xs text-[var(--text-muted)] font-medium">
+                    <span className="text-[11px] text-[var(--text-muted)]">
                         {timeAgo(news.yayinlanmaTarihi)}
                     </span>
                 </div>
 
                 {/* Title */}
-                <h3 className="text-xl font-bold leading-snug mb-3 text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition-colors duration-300 line-clamp-3">
+                <h3 className="text-base font-bold leading-snug mb-2 text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition-colors duration-200 line-clamp-2">
                     {news.baslik}
                 </h3>
 
                 {/* Description */}
                 {news.metaAciklama && (
-                    <p className="text-sm text-[var(--text-secondary)] mb-6 line-clamp-3 flex-grow leading-relaxed">
+                    <p className="text-xs text-[var(--text-secondary)] mb-4 line-clamp-2 flex-grow leading-relaxed">
                         {news.metaAciklama}
                     </p>
                 )}
 
-                {/* Footer: Minimal Source/AI indicator */}
-                <div className="flex items-center justify-between pt-4 mt-auto border-t border-[var(--border-subtle)]">
-                    <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded overflow-hidden flex items-center justify-center bg-[var(--bg-secondary)] text-[10px]">
-                            {news.kaynakUrl ? "🔗" : "📰"}
-                        </span>
-                        <span className="text-xs font-medium text-[var(--text-secondary)]">
-                            {getHostname(news.kaynakUrl)}
-                        </span>
-                    </div>
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-3 mt-auto border-t border-[var(--border-subtle)]">
+                    <span className="text-[11px] text-[var(--text-muted)]">
+                        {getHostname(news.kaynakUrl)}
+                    </span>
+                    <span className="text-[11px] text-[var(--accent-blue)] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                        Oku →
+                    </span>
                 </div>
             </article>
         </Link>

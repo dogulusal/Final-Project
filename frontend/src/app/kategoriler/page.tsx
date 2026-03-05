@@ -19,9 +19,9 @@ interface Kategori {
     ikon: string | null;
 }
 
-const BADGE_MAP: Record<string, string> = {
-    Spor: "badge-spor", Ekonomi: "badge-ekonomi", Teknoloji: "badge-teknoloji",
-    Siyaset: "badge-siyaset", Dünya: "badge-dunya", Sağlık: "badge-saglik", Genel: "badge-genel",
+const CATEGORY_ICONS: Record<string, string> = {
+    Spor: "⚽", Ekonomi: "💰", Teknoloji: "💻",
+    Siyaset: "🏛️", Dünya: "🌍", Sağlık: "🏥", Genel: "📰",
 };
 
 function KategorilerContent() {
@@ -48,7 +48,6 @@ function KategorilerContent() {
         }
     };
 
-    // Kategorileri haberlerden çıkar
     const categories: Kategori[] = [];
     const seenIds = new Set<number>();
     for (const n of news) {
@@ -67,57 +66,51 @@ function KategorilerContent() {
     return (
         <main className="min-h-screen">
             <Navbar />
-            <section className="max-w-[1500px] w-full mx-auto px-6 lg:px-12 py-16">
-                <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-                    {/* Header */}
-                    <nav className="flex items-center gap-2 text-sm text-[var(--text-muted)] mb-8">
+            <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+                    <nav className="flex items-center gap-2 text-xs text-[var(--text-muted)] mb-6">
                         <Link href="/" className="hover:text-[var(--text-primary)] transition-colors">Ana Sayfa</Link>
                         <span>›</span>
                         <span className="text-[var(--text-secondary)]">Kategoriler</span>
                     </nav>
 
-                    <h1 className="text-4xl font-extrabold tracking-tight mb-4">
+                    <h1 className="text-3xl font-extrabold tracking-tight mb-2">
                         <span className="gradient-text">Kategoriler</span>
                     </h1>
-                    <p className="text-lg text-[var(--text-secondary)] mb-12 max-w-xl">
+                    <p className="text-sm text-[var(--text-secondary)] mb-8">
                         İlgi alanına göre haberleri filtrele.
                     </p>
 
                     {/* Category Cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-12">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 mb-10">
                         <button
                             onClick={() => setActiveCategory(null)}
-                            className={`glass-card p-5 text-left transition-all duration-300 ${!activeCategory ? "ring-2 ring-[var(--accent-blue)]" : ""}`}
+                            className={`glass-card p-4 text-left transition-all duration-200 ${!activeCategory ? "ring-2 ring-[var(--accent-blue)]" : ""}`}
                         >
-                            <span className="text-2xl block mb-2">🔥</span>
-                            <span className="text-base font-bold block">Tümü</span>
-                            <span className="text-xs text-[var(--text-muted)]">{news.length} haber</span>
+                            <span className="text-xl block mb-1">🔥</span>
+                            <span className="text-sm font-bold block">Tümü</span>
+                            <span className="text-[10px] text-[var(--text-muted)]">{news.length} haber</span>
                         </button>
 
-                        {categories.map(cat => {
-                            const badge = BADGE_MAP[cat.ad] || "badge-genel";
-                            return (
-                                <button
-                                    key={cat.id}
-                                    onClick={() => setActiveCategory(cat.ad)}
-                                    className={`glass-card p-5 text-left transition-all duration-300 ${activeCategory === cat.ad ? "ring-2 ring-[var(--accent-blue)]" : ""}`}
-                                >
-                                    <span className="text-2xl block mb-2">{cat.ikon || "📄"}</span>
-                                    <span className="text-base font-bold block">{cat.ad}</span>
-                                    <span className={`${badge} text-[10px] font-bold px-2 py-0.5 rounded-full mt-2 inline-block`}>
-                                        {categoryCount(cat.ad)} haber
-                                    </span>
-                                </button>
-                            );
-                        })}
+                        {categories.map(cat => (
+                            <button
+                                key={cat.id}
+                                onClick={() => setActiveCategory(cat.ad)}
+                                className={`glass-card p-4 text-left transition-all duration-200 ${activeCategory === cat.ad ? "ring-2 ring-[var(--accent-blue)]" : ""}`}
+                            >
+                                <span className="text-xl block mb-1">{CATEGORY_ICONS[cat.ad] || "📄"}</span>
+                                <span className="text-sm font-bold block">{cat.ad}</span>
+                                <span className="text-[10px] text-[var(--text-muted)]">{categoryCount(cat.ad)} haber</span>
+                            </button>
+                        ))}
                     </div>
 
                     {/* Filtered News */}
-                    <div className="flex items-center justify-between mb-8">
-                        <h2 className="text-2xl font-bold">
-                            {activeCategory ? activeCategory : "Tüm"} Haberleri
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-bold">
+                            {activeCategory || "Tüm"} Haberleri
                         </h2>
-                        <span className="text-sm text-[var(--text-muted)]">{filteredNews.length} sonuç</span>
+                        <span className="text-xs text-[var(--text-muted)]">{filteredNews.length} sonuç</span>
                     </div>
 
                     <NewsGrid news={filteredNews} loading={loading} />
@@ -133,7 +126,7 @@ export default function KategorilerPage() {
         <Suspense fallback={
             <main className="min-h-screen">
                 <Navbar />
-                <div className="max-w-[1500px] w-full mx-auto px-6 lg:px-12 py-16 text-center">
+                <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center text-[var(--text-muted)]">
                     Yükleniyor...
                 </div>
             </main>

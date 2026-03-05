@@ -1,8 +1,8 @@
 # AI Haber Ajansı — Proje Yol Haritası
 
-> **Son Güncelleme:** 5 Mart 2026 | **Versiyon:** 1.0  
+> **Son Güncelleme:** 5 Mart 2026 | **Versiyon:** 2.0  
 > **Proje:** Full-Stack AI Haber Platformu  
-> **Teknoloji:** Node.js · Next.js 16 · n8n · PostgreSQL · Docker
+> **Teknoloji:** Node.js · Next.js 16 · n8n · PostgreSQL · Docker · Gemini AI
 
 ---
 
@@ -17,16 +17,8 @@
 │  │ :5432    │    │ :3000        │    │ :5678        │    │ :3001    │  │
 │  │          │    │              │    │              │    │          │  │
 │  │ Prisma   │    │ Express API  │    │ 4 Workflow   │    │ Next.js  │  │
-│  │ ORM      │    │ 6 Modül      │    │ Orkestratör  │    │ Tailwind │  │
+│  │ ORM      │    │ 7 Modül      │    │ Orkestratör  │    │ Tailwind │  │
 │  └──────────┘    └──────────────┘    └──────────────┘    └──────────┘  │
-│                         │                   │                  │       │
-│                         ▼                   ▼                  ▼       │
-│              ┌────────────────┐   ┌──────────────┐   ┌─────────────┐  │
-│              │ ML + LLM + RSS │   │ RSS Toplama   │   │ Haber       │  │
-│              │ Render + News  │   │ Kategorize    │   │ Listeleme   │  │
-│              │ Dedup + Social │   │ Özgünleştirme │   │ Detay       │  │
-│              └────────────────┘   │ Görsel + Pay. │   │ Filtreleme  │  │
-│                                   └──────────────┘   └─────────────┘  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -40,10 +32,11 @@
 |---|-------|----------|-------|----------|
 | 1 | RSS Parser | `POST /api/rss/parse` | ✅ | Çoklu RSS kaynağından haber çekme |
 | 2 | ML Kategorisasyon | `POST /api/ml/categorize` | ✅ | Naive Bayes sınıflandırma + güven skoru |
-| 3 | LLM Entegrasyonu | `POST /api/llm/generate` | ✅ | Ollama / OpenAI provider (Factory pattern) |
+| 3 | LLM Entegrasyonu | `POST /api/llm/generate` | ✅ | Gemini AI provider |
 | 4 | Render Engine | `POST /api/render` | ✅ | Canvas ile haber görseli oluşturma |
-| 5 | News CRUD | `GET/POST /api/news` | ✅ | Kaydetme, listeleme, slug detay, Jaro-Winkler dedup |
-| 6 | Sosyal Medya | — | 🔶 | Sadece interface + mock adapter var |
+| 5 | News CRUD | `GET/POST /api/news` | ✅ | Kaydetme, listeleme, arama, pagination, dedup |
+| 6 | Sosyal Medya | `POST /api/social/publish` | ✅ | Mock adapter + controller + service |
+| 7 | CORS | Middleware | ✅ | localhost:3001 ve 3002 origin izinli |
 
 ### n8n Workflow'ları
 
@@ -51,8 +44,19 @@
 |---|----------|-------|-------|
 | 1 | Haber Toplama | RSS → ML kategorize → Kopya kontrol → DB kaydet | ✅ |
 | 2 | İçerik Zenginleştirme | Ham haberleri çek → Gemini AI ile özgünleştir → DB güncelle | ✅ |
-| 3 | Yayınlama | Hazır haberleri çek → Görsel oluştur → Telegram paylaşım → "Yayında" yap | ✅ |
+| 3 | Yayınlama | Hazır haberleri çek → Görsel oluştur → Telegram paylaşım | ✅ |
 | 4 | Sağlık Kontrolü | Sistem sağlık kontrolü → Arıza varsa Telegram uyarısı | ✅ |
+
+### Frontend Sayfaları
+
+| Sayfa | Durum | Açıklama |
+|-------|-------|----------|
+| `/` (Ana Sayfa) | ✅ | Haber listesi, arama, kategori filtresi, pagination, auto-refresh |
+| `/haber/[slug]` | ✅ | Dinamik haber detay sayfası, breadcrumb, okuma süresi |
+| `/kategoriler` | ✅ | Kategori kartları + filtreleme |
+| `/hakkinda` | ✅ | Proje mimarisi, tech stack, pipeline |
+| Tema Değiştirici | ✅ | Karanlık / Aydınlık mod (next-themes) |
+| KVKK Çerez Onayı | ✅ | Animasyonlu cookie consent banner |
 
 ### Altyapı
 
@@ -61,7 +65,6 @@
 | PostgreSQL + Prisma ORM | ✅ | 6 model, migration, seed |
 | Docker Compose | ✅ | 4 servis (postgres, n8n, backend, frontend) |
 | Centralized Error Handler | ✅ | ConflictError, NotFoundError, ValidationError |
-| Next.js Frontend | 🔶 | Ana sayfa var, alt sayfalar eksik |
 
 ---
 
@@ -80,40 +83,47 @@ Zamanlayıcı    ──► n8n Workflow 3 ──► DB'den hazır haberleri çek
                                   ──► Telegram paylaşım
                                   ──► DB güncelle (durum: "yayinda")
 
-Kullanıcı      ──► Frontend       ──► GET /api/news ──► Haber Listesi Ekranı
+Kullanıcı      ──► Frontend       ──► GET /api/news ──► Haber Listesi + Arama + Pagination
 ```
 
 ---
 
-## 4. Eksik Geliştirmeler (Öncelik Sırasıyla)
+## 4. Tamamlanan Geliştirmeler
 
-### 🔴 P0 — Zorunlu
+### ✅ Sprint 1 (P0 — Zorunlu)
+
+| # | Görev | Durum |
+|---|-------|-------|
+| 1 | `/haber/[slug]` detay sayfası | ✅ Tamamlandı |
+| 2 | `/kategoriler` sayfası | ✅ Tamamlandı |
+| 3 | `/hakkinda` sayfası | ✅ Tamamlandı |
+| 4 | NewsCard → Link bağlantısı | ✅ Tamamlandı |
+| 5 | Demo veri kaldırma | ✅ Tamamlandı |
+
+### ✅ Sprint 2 (P1 — Önemli)
+
+| # | Görev | Durum |
+|---|-------|-------|
+| 6 | CORS yapılandırması | ✅ Tamamlandı |
+| 7 | Sosyal medya controller/router | ✅ Tamamlandı |
+| 8 | Otomatik yenileme (Polling 60sn) | ✅ Tamamlandı |
+
+### ✅ Sprint 3 (P2 — İyileştirme)
+
+| # | Görev | Durum |
+|---|-------|-------|
+| 9 | Arama fonksiyonu (Backend + UI) | ✅ Tamamlandı |
+| 10 | Pagination (Backend + UI) | ✅ Tamamlandı |
+| 13 | KVKK çerez onayı | ✅ Tamamlandı |
+| 14 | Karanlık / Aydınlık tema | ✅ Tamamlandı |
+| 15 | Minimalist UI tasarım güncellemesi | ✅ Tamamlandı |
+
+### 🔶 Bekleyen (Opsiyonel)
 
 | # | Görev | Efor | Açıklama |
 |---|-------|------|----------|
-| 1 | `/haber/[slug]` detay sayfası | 2 sa | Habere tıklanınca açılacak tam içerik sayfası |
-| 2 | `/kategoriler` sayfası | 1.5 sa | Kategori bazlı haber filtreleme |
-| 3 | `/hakkinda` sayfası | 1 sa | Proje tanıtım ve mimari açıklama |
-| 4 | NewsCard → Link bağlantısı | 30 dk | Kartları tıklanabilir yapma |
-| 5 | Demo veri kaldırma | 30 dk | Sadece gerçek API verisine geçiş |
-
-### 🟡 P1 — Önemli
-
-| # | Görev | Efor | Açıklama |
-|---|-------|------|----------|
-| 6 | CORS yapılandırması | 30 dk | Frontend origin izni |
-| 7 | Sosyal medya controller/router | 1.5 sa | Mock adapter'ı API'ye bağlama |
-| 8 | Otomatik yenileme (Polling) | 2 sa | Her 60 sn'de yeni haber kontrolü |
-
-### 🟢 P2 — İyileştirme
-
-| # | Görev | Efor | Açıklama |
-|---|-------|------|----------|
-| 9 | Arama fonksiyonu | 3 sa | Başlık/içerik bazlı haber arama |
-| 10 | Pagination | 2 sa | Büyük veri setleri için sayfalama |
 | 11 | Admin dashboard | 4 sa | İstatistik paneli |
 | 12 | Kullanıcı sistemi | 6 sa | JWT auth + kişisel akış |
-| 13 | KVKK çerez onayı | 2 sa | Yasal uyum |
 
 ---
 
@@ -122,38 +132,12 @@ Kullanıcı      ──► Frontend       ──► GET /api/news ──► Habe
 | Risk | Olasılık | Etki | Çözüm |
 |------|----------|------|-------|
 | n8n + Prisma migration çakışması | Orta | Yüksek | n8n için ayrı DB şeması |
-| CORS engeli (port farkı) | Yüksek | Düşük | Backend CORS listesine `:3001` ekle |
+| CORS engeli | ~~Yüksek~~ | ~~Düşük~~ | ✅ Çözüldü |
 | LLM provider erişim kaybı | Düşük | Orta | Graceful degradation: ham haber göster |
-| Demo verinin yanıltması | Yüksek | Düşük | "Demo Modu" etiketi ekle |
 
 ---
 
-## 6. Sonraki Sprint Planı
-
-```
-Sprint 1 (P0 — Tahmini 5.5 saat)
-├── 1. /haber/[slug] detay sayfası
-├── 2. /kategoriler sayfası
-├── 3. /hakkinda sayfası
-├── 4. NewsCard link bağlama
-└── 5. Demo veri temizliği
-
-Sprint 2 (P1 — Tahmini 4 saat)
-├── 6. CORS düzeltmesi
-├── 7. Sosyal medya modülü
-└── 8. Auto-refresh mekanizması
-
-Sprint 3 (P2 — Tahmini 17 saat)
-├── 9.  Arama
-├── 10. Pagination
-├── 11. Dashboard
-├── 12. Auth sistemi
-└── 13. KVKK uyumu
-```
-
----
-
-## 7. Dosya Yapısı
+## 6. Dosya Yapısı
 
 ```
 Final-Project/
@@ -162,15 +146,15 @@ Final-Project/
 │   └── src/modules/
 │       ├── rss/                      # ✅ RSS Parser
 │       ├── ml/                       # ✅ Naive Bayes
-│       ├── llm/                      # ✅ Ollama / OpenAI
+│       ├── llm/                      # ✅ Gemini AI
 │       ├── render/                   # ✅ Canvas görselleri
-│       ├── news/                     # ✅ CRUD + Dedup
-│       └── social/                   # 🔶 Interface only
+│       ├── news/                     # ✅ CRUD + Dedup + Search + Pagination
+│       └── social/                   # ✅ Controller + Service + Mock Adapter
 ├── frontend/                         # Next.js 16 + Tailwind
 │   └── src/
-│       ├── app/                      # 🔶 Sadece ana sayfa
-│       └── components/               # ✅ 7 bileşen
+│       ├── app/                      # ✅ 4 sayfa (/, /haber, /kategoriler, /hakkinda)
+│       └── components/               # ✅ 11 bileşen
 ├── training/naive-bayes/             # ML eğitim verisi
 ├── docker-compose.yml                # ✅ 4 konteyner
-└── docs/                             # Bu dosya + faz raporları
+└── docs/                             # Roadmap + n8n rehberi
 ```

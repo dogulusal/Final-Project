@@ -4,17 +4,17 @@ import { motion } from "framer-motion";
 
 export default function HeroSection() {
     return (
-        <section className="relative overflow-hidden py-32 px-6 lg:px-12">
-            {/* Minimalist Glow effect */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[60vw] h-[600px] rounded-full opacity-10 blur-[120px] pointer-events-none"
+        <section className="relative overflow-hidden py-20 sm:py-28 px-4 sm:px-6 lg:px-8">
+            {/* Subtle glow */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[50vw] h-[400px] rounded-full opacity-[0.07] blur-[100px] pointer-events-none"
                 style={{ background: "var(--gradient-hero)" }} />
 
-            <div className="max-w-[1500px] mx-auto text-left sm:text-center relative z-10 flex flex-col items-start sm:items-center">
+            <div className="max-w-7xl mx-auto text-center relative z-10">
                 <motion.h1
-                    initial={{ opacity: 0, y: 30 }}
+                    initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.7, delay: 0.1 }}
-                    className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-tight mb-8"
+                    transition={{ duration: 0.6 }}
+                    className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight mb-5"
                 >
                     Haberleri{" "}
                     <span className="gradient-text">Yapay Zeka</span>{" "}
@@ -22,21 +22,21 @@ export default function HeroSection() {
                 </motion.h1>
 
                 <motion.p
-                    initial={{ opacity: 0, y: 30 }}
+                    initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.7, delay: 0.2 }}
-                    className="text-lg sm:text-2xl text-[var(--text-secondary)] font-light max-w-3xl mb-12 sm:text-center text-left"
+                    transition={{ duration: 0.6, delay: 0.1 }}
+                    className="text-base sm:text-lg text-[var(--text-secondary)] font-light max-w-2xl mx-auto mb-8"
                 >
-                    Makine öğrenmesi ile kategorize edilen, duygu ayrımına tabi tutulan ve akıllıca sentezlenen yeni nesil haber akışı.
+                    Makine öğrenmesi ile kategorize edilen ve akıllıca sentezlenen yeni nesil haber akışı.
                 </motion.p>
 
                 <motion.div
-                    initial={{ opacity: 0, y: 30 }}
+                    initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.7, delay: 0.3 }}
+                    transition={{ duration: 0.6, delay: 0.2 }}
                 >
-                    <a href="#news" className="px-10 py-4 rounded-2xl text-base font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-xl inline-block"
-                        style={{ background: "var(--gradient-hero)", boxShadow: "var(--shadow-glow)" }}>
+                    <a href="#news" className="inline-block px-8 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-lg"
+                        style={{ background: "var(--gradient-hero)" }}>
                         Haberlere Göz At
                     </a>
                 </motion.div>

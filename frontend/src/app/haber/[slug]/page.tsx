@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -10,48 +9,53 @@ import type { NewsItem } from "@/app/page";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-export default function HaberDetay() {
-    const params = useParams();
-    const slug = params.slug as string;
-
+export default function HaberDetayPage({ params }: { params: Promise<{ slug: string }> }) {
+    const [slug, setSlug] = useState<string>("");
     const [news, setNews] = useState<NewsItem | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
+    const [notFound, setNotFound] = useState(false);
+
+    useEffect(() => {
+        params.then((p) => setSlug(p.slug));
+    }, [params]);
 
     useEffect(() => {
         if (!slug) return;
+        const fetchNews = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/api/news/${slug}`);
+                if (!res.ok) {
+                    setNotFound(true);
+                    setLoading(false);
+                    return;
+                }
+                const data = await res.json();
+                if (data.success && data.data) {
+                    setNews(data.data);
+                } else {
+                    setNotFound(true);
+                }
+            } catch {
+                setNotFound(true);
+            } finally {
+                setLoading(false);
+            }
+        };
         fetchNews();
     }, [slug]);
 
-    const fetchNews = async () => {
-        try {
-            const res = await fetch(`${API_BASE}/api/news/${slug}`);
-            const data = await res.json();
-            if (data.success) {
-                setNews(data.data);
-            } else {
-                setError(true);
-            }
-        } catch {
-            setError(true);
-        } finally {
-            setLoading(false);
-        }
-    };
-
+    // Loading skeleton
     if (loading) {
         return (
             <main className="min-h-screen">
                 <Navbar />
-                <div className="max-w-[900px] mx-auto px-6 lg:px-12 py-20">
-                    <div className="animate-pulse space-y-6">
-                        <div className="h-8 w-32 rounded-full" style={{ background: "var(--bg-card-hover)" }} />
-                        <div className="h-12 w-full rounded-xl" style={{ background: "var(--bg-card-hover)" }} />
-                        <div className="h-12 w-3/4 rounded-xl" style={{ background: "var(--bg-card-hover)" }} />
-                        <div className="h-4 w-48 rounded" style={{ background: "var(--bg-card-hover)" }} />
-                        <div className="h-px w-full" style={{ background: "var(--border-subtle)" }} />
-                        {[...Array(6)].map((_, i) => (
-                            <div key={i} className="h-4 w-full rounded" style={{ background: "var(--bg-card-hover)" }} />
+                <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-pulse">
+                    <div className="h-3 w-32 rounded mb-8" style={{ background: "var(--bg-card-hover)" }} />
+                    <div className="h-8 w-3/4 rounded mb-4" style={{ background: "var(--bg-card-hover)" }} />
+                    <div className="h-4 w-1/2 rounded mb-10" style={{ background: "var(--bg-card-hover)" }} />
+                    <div className="space-y-3">
+                        {[...Array(8)].map((_, i) => (
+                            <div key={i} className="h-3 w-full rounded" style={{ background: "var(--bg-card-hover)" }} />
                         ))}
                     </div>
                 </div>
@@ -59,104 +63,81 @@ export default function HaberDetay() {
         );
     }
 
-    if (error || !news) {
+    // 404
+    if (notFound || !news) {
         return (
             <main className="min-h-screen">
                 <Navbar />
-                <div className="max-w-[900px] mx-auto px-6 lg:px-12 py-20 text-center">
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                        <span className="text-6xl block mb-6">📭</span>
-                        <h1 className="text-3xl font-bold mb-4">Haber Bulunamadı</h1>
-                        <p className="text-[var(--text-secondary)] mb-8">
-                            Aradığınız haber silinmiş veya taşınmış olabilir.
-                        </p>
-                        <Link href="/" className="px-8 py-3 rounded-xl text-sm font-semibold text-white transition-all duration-300 hover:scale-105"
-                            style={{ background: "var(--gradient-hero)" }}>
-                            Ana Sayfaya Dön
-                        </Link>
-                    </motion.div>
+                <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+                    <span className="text-5xl block mb-4">🔍</span>
+                    <h1 className="text-2xl font-bold mb-2">Haber bulunamadı</h1>
+                    <p className="text-sm text-[var(--text-secondary)] mb-6">Bu haber kaldırılmış veya henüz yayınlanmamış olabilir.</p>
+                    <Link href="/" className="inline-block px-6 py-2.5 rounded-xl text-sm font-semibold text-white"
+                        style={{ background: "var(--gradient-hero)" }}>
+                        Ana Sayfaya Dön
+                    </Link>
                 </div>
                 <Footer />
             </main>
         );
     }
 
-    const categorySlug = news.kategori?.slug || "genel";
-    const BADGE_MAP: Record<string, string> = {
-        spor: "badge-spor", ekonomi: "badge-ekonomi", teknoloji: "badge-teknoloji",
-        siyaset: "badge-siyaset", dunya: "badge-dunya", saglik: "badge-saglik", genel: "badge-genel",
-    };
-    const badgeClass = BADGE_MAP[categorySlug] || "badge-genel";
-
-    const formattedDate = new Date(news.yayinlanmaTarihi).toLocaleDateString("tr-TR", {
-        year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit",
-    });
+    const categoryName = news.kategori?.ad || "Genel";
+    const readTime = news.okumaSuresiDakika || 1;
 
     return (
         <main className="min-h-screen">
             <Navbar />
-            <article className="max-w-[900px] mx-auto px-6 lg:px-12 py-16">
-                <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            <article className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
                     {/* Breadcrumb */}
-                    <nav className="flex items-center gap-2 text-sm text-[var(--text-muted)] mb-8">
+                    <nav className="flex items-center gap-2 text-xs text-[var(--text-muted)] mb-6">
                         <Link href="/" className="hover:text-[var(--text-primary)] transition-colors">Ana Sayfa</Link>
                         <span>›</span>
-                        <Link href={`/kategoriler?cat=${news.kategori?.ad}`} className="hover:text-[var(--text-primary)] transition-colors">
-                            {news.kategori?.ad}
-                        </Link>
+                        <Link href="/kategoriler" className="hover:text-[var(--text-primary)] transition-colors">{categoryName}</Link>
                         <span>›</span>
                         <span className="text-[var(--text-secondary)] truncate max-w-[200px]">{news.baslik}</span>
                     </nav>
 
-                    {/* Category Badge */}
-                    <span className={`${badgeClass} px-4 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase inline-block mb-6`}>
-                        {news.kategori?.ad}
-                    </span>
-
-                    {/* Title */}
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight mb-6 tracking-tight">
+                    {/* Header */}
+                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight mb-4">
                         {news.baslik}
                     </h1>
 
                     {/* Meta */}
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-[var(--text-muted)] mb-10">
-                        <span>📅 {formattedDate}</span>
-                        {news.okumaSuresiDakika && <span>⏱ {Math.ceil(news.okumaSuresiDakika)} dk okuma</span>}
-                        <span>👁 {news.goruntulemeSayisi.toLocaleString("tr-TR")} görüntülenme</span>
-                        {news.sentiment && <span>{news.sentiment === "Pozitif" ? "🟢" : news.sentiment === "Negatif" ? "🔴" : "🟡"} {news.sentiment}</span>}
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--text-muted)] mb-8 pb-6 border-b border-[var(--border-subtle)]">
+                        <span>{new Date(news.yayinlanmaTarihi).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                        <span>·</span>
+                        <span>{readTime} dk okuma</span>
+                        <span>·</span>
+                        <span>{news.goruntulemeSayisi} görüntülenme</span>
+                        {news.kaynakUrl && (
+                            <>
+                                <span>·</span>
+                                <a href={news.kaynakUrl} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-blue)] hover:underline">
+                                    Kaynak
+                                </a>
+                            </>
+                        )}
                     </div>
-
-                    {/* Divider */}
-                    <div className="h-px w-full mb-10" style={{ background: "var(--border-subtle)" }} />
 
                     {/* Content */}
                     {news.icerik ? (
-                        <div className="prose prose-invert max-w-none text-lg leading-relaxed text-[var(--text-secondary)]"
-                            style={{ lineHeight: "1.9" }}>
-                            {news.icerik.split("\n").map((paragraph, i) => (
-                                <p key={i} className="mb-6">{paragraph}</p>
-                            ))}
+                        <div className="prose prose-sm max-w-none text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap text-sm">
+                            {news.icerik}
                         </div>
+                    ) : news.metaAciklama ? (
+                        <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                            {news.metaAciklama}
+                        </p>
                     ) : (
-                        <p className="text-[var(--text-muted)] italic">Bu haberin içeriği henüz yüklenmedi.</p>
+                        <p className="text-sm text-[var(--text-muted)] italic">İçerik henüz oluşturulmamış.</p>
                     )}
 
-                    {/* Source Link */}
-                    {news.kaynakUrl && (
-                        <div className="mt-12 p-6 glass-card">
-                            <span className="text-sm text-[var(--text-muted)] block mb-2">Kaynak</span>
-                            <a href={news.kaynakUrl} target="_blank" rel="noopener noreferrer"
-                                className="text-[var(--accent-blue)] hover:underline text-sm break-all">
-                                {news.kaynakUrl}
-                            </a>
-                        </div>
-                    )}
-
-                    {/* Back Button */}
-                    <div className="mt-16">
-                        <Link href="/" className="px-8 py-3 rounded-xl text-sm font-semibold transition-all duration-300 hover:scale-105 inline-block"
-                            style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", color: "var(--text-secondary)" }}>
-                            ← Tüm Haberlere Dön
+                    {/* Back */}
+                    <div className="mt-10 pt-6 border-t border-[var(--border-subtle)]">
+                        <Link href="/" className="text-sm text-[var(--accent-blue)] hover:underline font-medium">
+                            ← Tüm haberlere dön
                         </Link>
                     </div>
                 </motion.div>
