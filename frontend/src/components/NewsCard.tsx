@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { NewsItem } from "@/app/page";
 
 const BADGE_MAP: Record<string, string> = {
@@ -40,40 +41,42 @@ export default function NewsCard({ news }: Props) {
     const badgeClass = BADGE_MAP[categoryName] || "badge-genel";
 
     return (
-        <article className="glass-card p-6 flex flex-col h-full group hover:shadow-2xl transition-all duration-300">
-            {/* Header: Category + Time */}
-            <div className="flex items-center justify-between mb-4">
-                <span className={`${badgeClass} px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase`}>
-                    {categoryName}
-                </span>
-                <span className="text-xs text-[var(--text-muted)] font-medium">
-                    {timeAgo(news.yayinlanmaTarihi)}
-                </span>
-            </div>
-
-            {/* Title */}
-            <h3 className="text-xl font-bold leading-snug mb-3 text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition-colors duration-300 line-clamp-3">
-                {news.baslik}
-            </h3>
-
-            {/* Description */}
-            {news.metaAciklama && (
-                <p className="text-sm text-[var(--text-secondary)] mb-6 line-clamp-3 flex-grow leading-relaxed">
-                    {news.metaAciklama}
-                </p>
-            )}
-
-            {/* Footer: Minimal Source/AI indicator */}
-            <div className="flex items-center justify-between pt-4 mt-auto border-t border-[var(--border-subtle)]">
-                <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded overflow-hidden flex items-center justify-center bg-[var(--bg-secondary)] text-[10px]">
-                        {news.kaynakUrl ? "🔗" : "📰"}
+        <Link href={`/haber/${news.slug}`} className="block h-full">
+            <article className="glass-card p-6 flex flex-col h-full group hover:shadow-2xl transition-all duration-300">
+                {/* Header: Category + Time */}
+                <div className="flex items-center justify-between mb-4">
+                    <span className={`${badgeClass} px-3 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase`}>
+                        {categoryName}
                     </span>
-                    <span className="text-xs font-medium text-[var(--text-secondary)]">
-                        {news.kaynakUrl ? new URL(news.kaynakUrl).hostname.replace('www.', '') : "Ajans"}
+                    <span className="text-xs text-[var(--text-muted)] font-medium">
+                        {timeAgo(news.yayinlanmaTarihi)}
                     </span>
                 </div>
-            </div>
-        </article>
+
+                {/* Title */}
+                <h3 className="text-xl font-bold leading-snug mb-3 text-[var(--text-primary)] group-hover:text-[var(--accent-blue)] transition-colors duration-300 line-clamp-3">
+                    {news.baslik}
+                </h3>
+
+                {/* Description */}
+                {news.metaAciklama && (
+                    <p className="text-sm text-[var(--text-secondary)] mb-6 line-clamp-3 flex-grow leading-relaxed">
+                        {news.metaAciklama}
+                    </p>
+                )}
+
+                {/* Footer: Minimal Source/AI indicator */}
+                <div className="flex items-center justify-between pt-4 mt-auto border-t border-[var(--border-subtle)]">
+                    <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded overflow-hidden flex items-center justify-center bg-[var(--bg-secondary)] text-[10px]">
+                            {news.kaynakUrl ? "🔗" : "📰"}
+                        </span>
+                        <span className="text-xs font-medium text-[var(--text-secondary)]">
+                            {news.kaynakUrl ? new URL(news.kaynakUrl).hostname.replace('www.', '') : "Ajans"}
+                        </span>
+                    </div>
+                </div>
+            </article>
+        </Link>
     );
 }

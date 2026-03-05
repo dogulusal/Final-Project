@@ -22,6 +22,7 @@ export interface NewsItem {
   sentiment: string | null;
   durum: string;
   mlConfidence: number | null;
+  okumaSuresiDakika: number | null;
   yayinlanmaTarihi: string;
   goruntulemeSayisi: number;
   kategori: {
@@ -48,10 +49,12 @@ export default function Home() {
       const data = await res.json();
       if (data.success) {
         setNews(data.data);
+      } else {
+        setNews([]);
       }
     } catch {
-      // Backend kapalıysa demo verisiyle devam et
-      setNews(DEMO_NEWS);
+      // Backend kapalıysa veya hata varsa boş liste göster
+      setNews([]);
     } finally {
       setLoading(false);
     }
@@ -94,61 +97,3 @@ export default function Home() {
     </main>
   );
 }
-
-// Demo data for when backend is offline
-const DEMO_NEWS: NewsItem[] = [
-  {
-    id: 1, baslik: "Yapay Zeka Sektöründe Devrim: Yeni Model Dünya Çapında Ses Getirdi",
-    slug: "yapay-zeka-sektorunde-devrim", metaAciklama: "AI dünyasında çığır açan gelişme",
-    icerik: "Yapay zeka alanında uzun süredir beklenen gelişme nihayet gerçekleşti...",
-    kategoriId: 3, kaynakUrl: "https://example.com", gorselUrl: null,
-    sentiment: "Pozitif", durum: "yayinda", mlConfidence: 0.92,
-    yayinlanmaTarihi: new Date().toISOString(), goruntulemeSayisi: 1250,
-    kategori: { id: 3, ad: "Teknoloji", slug: "teknoloji", renkKodu: "#2d1a47", ikon: "💻" }
-  },
-  {
-    id: 2, baslik: "Merkez Bankası Faiz Kararını Açıkladı: Piyasalarda Sert Hareketler",
-    slug: "merkez-bankasi-faiz-karari", metaAciklama: "Faiz kararı piyasaları sarstı",
-    icerik: "Merkez Bankası bugün yaptığı toplantıda politika faizini değiştirmeme kararı aldı...",
-    kategoriId: 2, kaynakUrl: "https://example.com", gorselUrl: null,
-    sentiment: "Nötr", durum: "yayinda", mlConfidence: 0.87,
-    yayinlanmaTarihi: new Date(Date.now() - 3600000).toISOString(), goruntulemeSayisi: 890,
-    kategori: { id: 2, ad: "Ekonomi", slug: "ekonomi", renkKodu: "#1a2a47", ikon: "💰" }
-  },
-  {
-    id: 3, baslik: "Süper Lig'de Şampiyonluk Yarışı Kızıştı: Kritik Maç Sonuçları",
-    slug: "super-lig-sampiyonluk-yarisi", metaAciklama: "Süper Lig'de heyecan dorukta",
-    icerik: "Süper Lig'de bu hafta oynanan kritik maçlar şampiyonluk yarışını iyice kızıştırdı...",
-    kategoriId: 1, kaynakUrl: "https://example.com", gorselUrl: null,
-    sentiment: "Pozitif", durum: "yayinda", mlConfidence: 0.95,
-    yayinlanmaTarihi: new Date(Date.now() - 7200000).toISOString(), goruntulemeSayisi: 2100,
-    kategori: { id: 1, ad: "Spor", slug: "spor", renkKodu: "#1a472a", ikon: "⚽" }
-  },
-  {
-    id: 4, baslik: "Seçim Anketlerinde Son Durum: Sürpriz Sonuçlar Ortaya Çıktı",
-    slug: "secim-anketleri-son-durum", metaAciklama: "Anket sonuçları açıklandı",
-    icerik: "Son yapılan kamuoyu araştırmalarında dikkat çekici sonuçlar ortaya çıktı...",
-    kategoriId: 4, kaynakUrl: "https://example.com", gorselUrl: null,
-    sentiment: "Nötr", durum: "yayinda", mlConfidence: 0.78,
-    yayinlanmaTarihi: new Date(Date.now() - 10800000).toISOString(), goruntulemeSayisi: 1560,
-    kategori: { id: 4, ad: "Siyaset", slug: "siyaset", renkKodu: "#471a1a", ikon: "🏛️" }
-  },
-  {
-    id: 5, baslik: "Dünya Sağlık Örgütü'nden Kritik Açıklama: Yeni Salgın Uyarısı",
-    slug: "dso-yeni-salgin-uyarisi", metaAciklama: "DSÖ'den yeni salgın uyarısı",
-    icerik: "Dünya Sağlık Örgütü, küresel sağlık tehditlerine yönelik kapsamlı açıklama yaptı...",
-    kategoriId: 6, kaynakUrl: "https://example.com", gorselUrl: null,
-    sentiment: "Negatif", durum: "yayinda", mlConfidence: 0.81,
-    yayinlanmaTarihi: new Date(Date.now() - 14400000).toISOString(), goruntulemeSayisi: 730,
-    kategori: { id: 6, ad: "Sağlık", slug: "saglik", renkKodu: "#47381a", ikon: "🏥" }
-  },
-  {
-    id: 6, baslik: "NATO Zirvesi'nde Kritik Kararlar: Türkiye'nin Rolü Öne Çıktı",
-    slug: "nato-zirvesi-turkiye", metaAciklama: "NATO zirvesinden önemli kararlar",
-    icerik: "NATO'nun olağanüstü zirvesinde alınan kararlar dünya gündemine oturdu...",
-    kategoriId: 5, kaynakUrl: "https://example.com", gorselUrl: null,
-    sentiment: "Pozitif", durum: "yayinda", mlConfidence: 0.88,
-    yayinlanmaTarihi: new Date(Date.now() - 18000000).toISOString(), goruntulemeSayisi: 1890,
-    kategori: { id: 5, ad: "Dünya", slug: "dunya", renkKodu: "#1a3847", ikon: "🌍" }
-  },
-];
