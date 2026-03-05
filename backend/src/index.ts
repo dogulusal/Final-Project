@@ -18,6 +18,8 @@ app.get('/api/health', (_req, res) => {
 });
 
 // --- Routes (Faz 1-4'te eklenecek) ---
+import { rssRouter } from './modules/rss';
+app.use('/api/rss', rssRouter);
 // app.use('/api/ml', mlRouter);
 // app.use('/api/llm', llmRouter);
 // app.use('/api/news', newsRouter);
