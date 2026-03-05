@@ -74,6 +74,20 @@ services:
         condition: service_healthy
     command: npm run dev
 
+  # --- Frontend Application ---
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    depends_on:
+      - backend
+
 volumes:
   pg_data:
   n8n_data:
