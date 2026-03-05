@@ -1,5 +1,3 @@
-/**
- * Haber CRUD Servisi
- * Faz 4'te implement edilecek
- */
-export { }; // placeholder
+export * from './news.interface';
+export * from './news.service';
+export * from './news.controller';
