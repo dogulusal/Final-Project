@@ -24,8 +24,16 @@ export interface GeneratedNewsContent {
     etiketler: string[];
 }
 
+export interface ABTestResult {
+    base: GeneratedNewsContent;
+    fineTuned: GeneratedNewsContent;
+    baseProvider: string;
+    fineTunedProvider: string;
+}
+
 export interface IContentGenerationService {
     generate(input: RawNewsInput): Promise<GeneratedNewsContent>;
+    abTestGenerate(input: RawNewsInput): Promise<ABTestResult>;
     setProvider(provider: ILLMProvider): void;
     setFallback(fallbackService: IContentGenerationService): void;
 }

@@ -1,0 +1,104 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Kullanıcılar ---
+model Kullanici {
+  id                  Int       @id @default(autoincrement())
+  email               String    @unique
+  sifreHash           String    @map("sifre_hash")
+  ad                  String
+  tercihKategorileri  String[]  @map("tercih_kategorileri")
+  olusturulmaTarihi   DateTime  @default(now()) @map("olusturulma_tarihi")
+
+  cerezTercihi        CerezTercihi?
+  okumaGecmisi        OkumaGecmisi[]
+
+  @@map("kullanicilar")
+}
+
+// --- Kategoriler ---
+model Kategori {
+  id        Int     @id @default(autoincrement())
+  ad        String  @unique
+  slug      String  @unique
+  renkKodu  String  @map("renk_kodu")
+  ikon      String?
+
+  haberler  Haber[]
+
+  @@map("kategoriler")
+}
+
+// --- Haberler ---
+model Haber {
+  id                  Int       @id @default(autoincrement())
+  baslik              String
+  slug                String    @unique
+  metaAciklama        String?   @map("meta_aciklama")
+  icerik              String?
+  kategoriId          Int       @map("kategori_id")
+  kaynakUrl           String?   @map("kaynak_url")
+  gorselUrl           String?   @map("gorsel_url")
+  sentiment           String?   // Pozitif | Negatif | Nötr
+  okumaSuresiDakika   Float?    @map("okuma_suresi_dakika")
+  yayinlanmaTarihi    DateTime  @default(now()) @map("yayinlanma_tarihi")
+  goruntulemeSayisi   Int       @default(0) @map("goruntulenme_sayisi")
+  durum               String    @default("ham") // ham | hazir | yayinda
+  mlConfidence        Float?    @map("ml_confidence")
+  llmProvider         String?   @map("llm_provider")
+
+  kategori            Kategori  @relation(fields: [kategoriId], references: [id])
+  okumaGecmisi        OkumaGecmisi[]
+
+  @@map("haberler")
+}
+
+// --- Çerez Tercihleri ---
+model CerezTercihi {
+  id                    Int       @id @default(autoincrement())
+  kullaniciId           Int       @unique @map("kullanici_id")
+  analitikIzni          Boolean   @default(false) @map("analitik_izni")
+  kisisellesirmeIzni    Boolean   @default(false) @map("kisisellesirme_izni")
+  guncellemeTarihi      DateTime  @default(now()) @map("guncelleme_tarihi")
+
+  kullanici             Kullanici @relation(fields: [kullaniciId], references: [id])
+
+  @@map("cerez_tercihleri")
+}
+
+// --- Okuma Geçmişi ---
+model OkumaGecmisi {
+  id            Int       @id @default(autoincrement())
+  kullaniciId   Int       @map("kullanici_id")
+  haberId       Int       @map("haber_id")
+  okumaTarihi   DateTime  @default(now()) @map("okuma_tarihi")
+
+  kullanici     Kullanici @relation(fields: [kullaniciId], references: [id])
+  haber         Haber     @relation(fields: [haberId], references: [id])
+
+  @@map("okuma_gecmisi")
+}
+
+// --- Dead Letter Queue ---
+model DeadLetterQueue {
+  id            Int       @id @default(autoincrement())
+  workflowName  String    @map("workflow_name")
+  payload       Json
+  errorMessage  String?   @map("error_message")
+  retryCount    Int       @default(0) @map("retry_count")
+  maxRetries    Int       @default(3) @map("max_retries")
+  nextRetryAt   DateTime? @map("next_retry_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  resolvedAt    DateTime? @map("resolved_at")
+
+  @@map("dead_letter_queue")
+}

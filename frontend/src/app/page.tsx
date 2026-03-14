@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import HeroSection from "@/components/HeroSection";
-import NewsGrid from "@/components/NewsGrid";
+import NewsFeed from "@/features/news/ui/NewsFeed";
 import CategoryFilter from "@/components/CategoryFilter";
 import SearchInput from "@/components/SearchInput";
 import Footer from "@/components/Footer";
@@ -138,7 +138,7 @@ export default function Home() {
             }}
           />
 
-          <NewsGrid news={filteredNews} loading={loading && news.length === 0} />
+          <NewsFeed newsItems={filteredNews} loading={loading && news.length === 0} />
 
           {/* Pagination */}
           {totalPages > 1 && (

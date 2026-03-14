@@ -6,6 +6,7 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import type { NewsItem } from "@/app/page";
+import { Share2 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -43,6 +44,26 @@ export default function HaberDetayPage({ params }: { params: Promise<{ slug: str
         };
         fetchNews();
     }, [slug]);
+
+    // Share functionality
+    const handleShare = async () => {
+        if (!news) return;
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: news.baslik,
+                    text: news.metaAciklama || news.icerik?.substring(0, 50),
+                    url: window.location.href,
+                });
+            } catch (error) {
+                console.log('Share canceled or failed', error);
+            }
+        } else {
+            // Fallback
+            navigator.clipboard.writeText(window.location.href);
+            alert("Bağlantı panoya kopyalandı!");
+        }
+    };
 
     // Loading skeleton
     if (loading) {
@@ -91,12 +112,21 @@ export default function HaberDetayPage({ params }: { params: Promise<{ slug: str
             <article className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
                     {/* Breadcrumb */}
-                    <nav className="flex items-center gap-2 text-xs text-[var(--text-muted)] mb-6">
-                        <Link href="/" className="hover:text-[var(--text-primary)] transition-colors">Ana Sayfa</Link>
-                        <span>›</span>
-                        <Link href="/kategoriler" className="hover:text-[var(--text-primary)] transition-colors">{categoryName}</Link>
-                        <span>›</span>
-                        <span className="text-[var(--text-secondary)] truncate max-w-[200px]">{news.baslik}</span>
+                    <nav className="flex items-center justify-between gap-2 text-xs text-[var(--text-muted)] mb-6">
+                        <div className="flex items-center gap-2">
+                            <Link href="/" className="hover:text-[var(--text-primary)] transition-colors">Ana Sayfa</Link>
+                            <span>›</span>
+                            <Link href="/kategoriler" className="hover:text-[var(--text-primary)] transition-colors">{categoryName}</Link>
+                            <span>›</span>
+                            <span className="text-[var(--text-secondary)] truncate max-w-[200px] sm:max-w-sm">{news.baslik}</span>
+                        </div>
+                        <button 
+                            onClick={handleShare}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-subtle)] transition-colors text-[var(--accent-blue)]"
+                        >
+                            <Share2 size={14} />
+                            <span className="font-medium hidden sm:inline">Paylaş</span>
+                        </button>
                     </nav>
 
                     {/* Header */}
@@ -123,7 +153,7 @@ export default function HaberDetayPage({ params }: { params: Promise<{ slug: str
 
                     {/* Content */}
                     {news.icerik ? (
-                        <div className="prose prose-sm max-w-none text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap text-sm">
+                        <div className="prose prose-sm max-w-none text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap text-[15px]">
                             {news.icerik}
                         </div>
                     ) : news.metaAciklama ? (
@@ -134,9 +164,21 @@ export default function HaberDetayPage({ params }: { params: Promise<{ slug: str
                         <p className="text-sm text-[var(--text-muted)] italic">İçerik henüz oluşturulmamış.</p>
                     )}
 
+                    {/* Share Button Bottom */}
+                    <div className="flex justify-center mt-12 mb-6">
+                        <button 
+                            onClick={handleShare}
+                            className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-lg transition-transform hover:scale-105"
+                            style={{ background: "var(--gradient-hero)" }}
+                        >
+                            <Share2 size={18} />
+                            Haberi Sosyal Medyada Paylaş
+                        </button>
+                    </div>
+
                     {/* Back */}
-                    <div className="mt-10 pt-6 border-t border-[var(--border-subtle)]">
-                        <Link href="/" className="text-sm text-[var(--accent-blue)] hover:underline font-medium">
+                    <div className="pt-6 border-t border-[var(--border-subtle)] text-center">
+                        <Link href="/" className="text-sm text-[var(--text-secondary)] hover:text-[var(--accent-blue)] transition-colors font-medium">
                             ← Tüm haberlere dön
                         </Link>
                     </div>

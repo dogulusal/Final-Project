@@ -1,9 +1,35 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { NewsService } from './news.service';
+import { NewsService, newsEventEmitter } from './news.service';
 import { ValidationError } from '../../middleware/error-handler';
 
 const router = Router();
 const newsService = new NewsService();
+
+/**
+ * 0) GET /api/news/live
+ * SSE Endpoint for Real-time Breaking News (Faz 4)
+ */
+router.get('/live', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    
+    // Bağlantı kopmaması için periyodik Heartbeat
+    const heartbeat = setInterval(() => {
+        res.write(': heartbeat\n\n');
+    }, 30000);
+
+    const onNewNews = (news: any) => {
+        res.write(`data: ${JSON.stringify(news)}\n\n`);
+    };
+
+    newsEventEmitter.on('new-news', onNewNews);
+
+    req.on('close', () => {
+        clearInterval(heartbeat);
+        newsEventEmitter.off('new-news', onNewNews);
+    });
+});
 
 /**
  * 1) GET /api/news

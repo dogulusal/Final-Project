@@ -4,18 +4,20 @@ import { MlCategorizationService } from './ml.service';
 const router = Router();
 const mlService = new MlCategorizationService();
 
-// Sisteme başladığında otomatik olarak diskteki JSON modeli yükle ve eğit
-mlService.loadAndTrainFromDisk().then(success => {
+// Sisteme başladığında otomatik olarak DB'deki onaylı haberleri çek ve modeli eğit
+mlService.loadAndTrainFromDB().then(success => {
     if (success) {
         console.log('[ML Controller] Model hazır ve gelen isteklere açık.');
+    } else {
+        console.warn('[ML Controller] Model başlatılırken sorun yaşandı veya JSON yedeği de bulunamadı.');
     }
 });
 
 router.post('/train', async (_req: Request, res: Response) => {
     try {
-        const success = await mlService.loadAndTrainFromDisk();
+        const success = await mlService.loadAndTrainFromDB();
         if (success) {
-            res.json({ success: true, message: 'Model diskteki dataset.json üzerinden başarıyla eğitildi.' });
+            res.json({ success: true, message: 'Model DB üzerindeki Onaylı Haberler ile başarıyla eğitildi.' });
         } else {
             res.status(500).json({ success: false, message: 'Model eğitimi başarısız oldu.' });
         }

@@ -2,6 +2,12 @@ import type { Metadata } from "next";
 import "./globals.css";
 import CookieConsent from "@/components/CookieConsent";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import DashboardShell from "@/ui/layout/DashboardShell";
+import { Inter, Newsreader } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+const newsreader = Newsreader({ subsets: ['latin'], variable: '--font-serif', style: ['normal', 'italic'] });
 
 export const metadata: Metadata = {
   title: "AI Haber Ajansı — Yapay Zeka Destekli Haber Platformu",
@@ -11,20 +17,22 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
+  modal,
 }: Readonly<{
   children: React.ReactNode;
+  modal: React.ReactNode;
 }>) {
   return (
-    <html lang="tr" suppressHydrationWarning>
+    <html lang="tr" suppressHydrationWarning className={cn("font-sans", inter.variable, newsreader.variable)}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
       </head>
       <body className="antialiased select-none" suppressHydrationWarning>
         <ThemeProvider>
           <div className="animated-bg" />
-          {children}
+          <DashboardShell>
+            {children}
+          </DashboardShell>
+          {modal}
           <CookieConsent />
         </ThemeProvider>
       </body>

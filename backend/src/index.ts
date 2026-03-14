@@ -39,6 +39,7 @@ import { llmRouter } from './modules/llm';
 import { renderRouter } from './modules/render';
 import { newsRouter } from './modules/news';
 import { socialRouter } from './modules/social';
+import { adminRouter } from './modules/admin/admin.controller';
 
 app.use('/api/rss', rssRouter);
 app.use('/api/ml', mlRouter);
@@ -46,6 +47,7 @@ app.use('/api/llm', llmRouter);
 app.use('/api/news', newsRouter);
 app.use('/api/render', renderRouter);
 app.use('/api/social', socialRouter);
+app.use('/api/admin', adminRouter);
 
 // --- Centralized Error Handler (EN SON middleware olmalı) ---
 app.use(errorHandler);

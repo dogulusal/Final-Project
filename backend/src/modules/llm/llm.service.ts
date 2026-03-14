@@ -1,8 +1,10 @@
-import { IContentGenerationService, ILLMProvider, RawNewsInput, GeneratedNewsContent } from './llm.interface';
+import { IContentGenerationService, ILLMProvider, RawNewsInput, GeneratedNewsContent, ABTestResult } from './llm.interface';
 import { OllamaProvider } from './providers/ollama.provider';
 import { OpenAiProvider } from './providers/openai.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 import { LLM_PROVIDER, LLM_FALLBACK_PROVIDER, LLMProviderType } from '../../config/constants';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class ContentGenerationService implements IContentGenerationService {
     private activeProvider: ILLMProvider;
@@ -43,23 +45,30 @@ export class ContentGenerationService implements IContentGenerationService {
     }
 
     /**
-     * Gazeteci/Editör personasıyla Haber metnini yeniden yaratır (Özgünleştirir)
-     * Ayrıca bir JSON formatı beklediğimizi çok zorlayıcı şekilde LLM'e iletiyoruz.
+     * Parsing helper for generation outputs
      */
-    async generate(input: RawNewsInput): Promise<GeneratedNewsContent> {
-        const isAvailable = await this.activeProvider.isAvailable();
-        let currentProvider = this.activeProvider;
-
-        if (!isAvailable) {
-            console.warn(`[LLM Warn] Ana sağlayıcı (${currentProvider.name}) kullanılamıyor!`);
-            if (this.fallbackProvider) {
-                console.log(`[LLM Info] Yedek (Fallback) sağlayıcıya geçiliyor: ${this.fallbackProvider.name}`);
-                currentProvider = this.fallbackProvider;
-            } else {
-                throw new Error('Hiçbir LLM sağlayıcısına ulaşılamıyor (Ana ve Yedek başarısız).');
-            }
+    private parseRawOutput(rawContent: string, input: RawNewsInput): GeneratedNewsContent {
+        let content = rawContent.trim();
+        if (content.startsWith('```json')) {
+            content = content.replace(/^```json/, '').replace(/```$/, '').trim();
+        } else if (content.startsWith('```')) {
+            content = content.replace(/^```/, '').replace(/```$/, '').trim();
         }
+        
+        try {
+            return JSON.parse(content) as GeneratedNewsContent;
+        } catch (e) {
+            // Sona erdirici fallback (hiçbir şey çalışmazsa orijinali ver ki crawler çökmesin)
+            return {
+                baslik: input.baslik,
+                icerik: input.ozet + `\n\n(Kaynak: ${input.kaynak_url})`,
+                meta_aciklama: input.ozet.substring(0, 150),
+                etiketler: [input.kategori]
+            };
+        }
+    }
 
+    private getPrompts(input: RawNewsInput) {
         const systemPrompt = `
 Sen 20 yıllık deneyimli bir baş editörsün ve objektif ama ilgi çekici haberler yazıyorsun.
 Sana ham bir haber verisi verilecek. Görevin bu haberi okuyucu için sıkıcı olmayacak, telif hakkı ihlali yapmayacak şekilde tamamen ÖZGÜNLEŞTİREREK yeniden yazmaktır.
@@ -85,35 +94,82 @@ ${input.baslik}
 HAM ÖZET/İÇERİK:
 ${input.ozet}
 `;
+        return { systemPrompt, userPrompt };
+    }
+
+    /**
+     * Gazeteci/Editör personasıyla Haber metnini yeniden yaratır (Özgünleştirir)
+     * Ayrıca bir JSON formatı beklediğimizi çok zorlayıcı şekilde LLM'e iletiyoruz.
+     */
+    async generate(input: RawNewsInput): Promise<GeneratedNewsContent> {
+        const isAvailable = await this.activeProvider.isAvailable();
+        let currentProvider = this.activeProvider;
+
+        if (!isAvailable) {
+            console.warn(`[LLM Warn] Ana sağlayıcı (${currentProvider.name}) kullanılamıyor!`);
+            if (this.fallbackProvider) {
+                console.log(`[LLM Info] Yedek (Fallback) sağlayıcıya geçiliyor: ${this.fallbackProvider.name}`);
+                currentProvider = this.fallbackProvider;
+            } else {
+                throw new Error('Hiçbir LLM sağlayıcısına ulaşılamıyor (Ana ve Yedek başarısız).');
+            }
+        }
+
+        const { systemPrompt, userPrompt } = this.getPrompts(input);
 
         try {
             const response = await currentProvider.generateContent(userPrompt, systemPrompt);
             console.log(`[LLM Info] ${currentProvider.name} ${response.tokensUsed} token kullandı.`);
-
-            // JSON Parse işlemindeki hataları engellemek için metin temizliği (markdown block vs.)
-            let rawContent = response.content.trim();
-
-            // Bazen LLM'ler json markdown bloguna alır: \`\`\`json { ... } \`\`\`
-            if (rawContent.startsWith('```json')) {
-                rawContent = rawContent.replace(/^```json/, '').replace(/```$/, '').trim();
-            } else if (rawContent.startsWith('```')) {
-                rawContent = rawContent.replace(/^```/, '').replace(/```$/, '').trim();
-            }
-
-            const generatedData: GeneratedNewsContent = JSON.parse(rawContent);
-
-            return generatedData;
-
+            return this.parseRawOutput(response.content, input);
         } catch (error) {
-            console.error(`[LLM Error] İşlem hatası veya JSON Parse hatası:`, error instanceof Error ? error.message : error);
-
-            // Sona erdirici fallback (hiçbir şey çalışmazsa orijinali ver ki crawler çökmesin)
-            return {
-                baslik: input.baslik,
-                icerik: input.ozet + `\n\n(Kaynak: ${input.kaynak_url})`,
-                meta_aciklama: input.ozet.substring(0, 150),
-                etiketler: [input.kategori]
-            };
+            console.error(`[LLM Error] İşlem hatası:`, error instanceof Error ? error.message : error);
+            return this.parseRawOutput("", input); // triggers fallback
         }
+    }
+
+    async abTestGenerate(input: RawNewsInput): Promise<ABTestResult> {
+        if (!this.fallbackProvider) {
+            throw new Error('A/B testi için fallback provider tanımlanması gereklidir. (.env içinde yapılandırın)');
+        }
+        
+        const { systemPrompt, userPrompt } = this.getPrompts(input);
+        
+        console.log(`[LLM A/B Test] A/B Testi başlatılıyor. Base: ${this.fallbackProvider.name}, Fine-Tuned: ${this.activeProvider.name}`);
+        
+        const [fineTunedResponse, baseResponse] = await Promise.all([
+            this.activeProvider.generateContent(userPrompt, systemPrompt).catch(e => {
+                console.error('FineTuned API Hatası:', e);
+                return { content: "", tokensUsed: 0, provider: this.activeProvider.name, model: 'unknown' };
+            }),
+            this.fallbackProvider.generateContent(userPrompt, systemPrompt).catch(e => {
+                console.error('Base API Hatası:', e);
+                return { content: "", tokensUsed: 0, provider: this.fallbackProvider!.name, model: 'unknown' };
+            })
+        ]);
+        
+        const fineTunedData = this.parseRawOutput(fineTunedResponse.content, input);
+        const baseData = this.parseRawOutput(baseResponse.content, input);
+        
+        const result: ABTestResult = {
+            base: baseData,
+            fineTuned: fineTunedData,
+            baseProvider: this.fallbackProvider.name,
+            fineTunedProvider: this.activeProvider.name
+        };
+        
+        // Çıktıları bir dosyaya kaydet
+        try {
+            const reportsDir = path.resolve(__dirname, '../../../../training/ab-tests');
+            if (!fs.existsSync(reportsDir)) {
+                fs.mkdirSync(reportsDir, { recursive: true });
+            }
+            const fileName = `ab-test-${new Date().getTime()}.json`;
+            fs.writeFileSync(path.join(reportsDir, fileName), JSON.stringify({input, result}, null, 2), 'utf8');
+            console.log(`[LLM A/B Test] Sonuçlar kaydedildi: ${fileName}`);
+        } catch (e) {
+            console.error('[LLM A/B Test Error] Sonuçlar dosyaya yazılamadı:', e);
+        }
+        
+        return result;
     }
 }

@@ -34,6 +34,7 @@ export default function Navbar() {
                         <NavLink href="/" label="Ana Sayfa" />
                         <NavLink href="/kategoriler" label="Kategoriler" />
                         <NavLink href="/hakkinda" label="Hakkında" />
+                        <NavLink href="/admin" label="Yönetici Paneli" />
                         <ThemeToggle />
                         <Link href="http://localhost:5678" target="_blank" rel="noopener noreferrer"
                             className="ml-2 px-5 py-2 rounded-xl text-sm font-semibold text-white transition-all duration-300 hover:scale-105"
@@ -73,6 +74,7 @@ export default function Navbar() {
                         <NavLink href="/" label="Ana Sayfa" />
                         <NavLink href="/kategoriler" label="Kategoriler" />
                         <NavLink href="/hakkinda" label="Hakkında" />
+                        <NavLink href="/admin" label="Yönetici Paneli" />
                     </motion.div>
                 )}
             </div>

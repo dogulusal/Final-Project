@@ -3,6 +3,12 @@ import { prisma } from '../../config/database';
 import { INewsService, CreateNewsDto } from './news.interface';
 import { DEDUP_SIMILARITY_THRESHOLD, DEDUP_WINDOW_SIZE } from '../../config/constants';
 import { ConflictError, NotFoundError } from '../../middleware/error-handler';
+import { EventEmitter } from 'events';
+
+export const newsEventEmitter = new EventEmitter();
+
+import { redis as redisClient } from '../../config/redis';
+import crypto from 'crypto';
 
 export class NewsService implements INewsService {
 
@@ -48,37 +54,94 @@ export class NewsService implements INewsService {
             }
         });
 
+        // 4. Redis Fingerprint ve Cache güncelle
+        try {
+            const fingerprint = this.generateFingerprint(data.baslik);
+            await redisClient.sadd('news:fingerprints', fingerprint);
+            await redisClient.expire('news:fingerprints', 48 * 3600); // 48 saat
+
+            // Son haberleri Redis listesinde de tutalım (L1 Cache)
+            await redisClient.lpush('news:recent_titles', data.baslik);
+            await redisClient.ltrim('news:recent_titles', 0, DEDUP_WINDOW_SIZE - 1);
+        } catch (e) {
+            console.error('[Redis Error] Cache güncellenemedi:', e);
+        }
+
         console.log(`[DB] Yeni haber kaydedildi: "${newNews.baslik}" (ID: ${newNews.id})`);
+        
+        // SSE üzerinden dinleyen istemcilere bildir:
+        newsEventEmitter.emit('new-news', newNews);
+        
         return newNews;
     }
 
     /**
-     * Jaro-Winkler algoritmasıyla son 50 haberi tarar.
-     * (Jaro-Winkler, metinlerin baş tarafına daha çok ağırlık verir, haber başlıkları için idealdir).
+     * İki seviyeli Deduplication:
+     * L1: Redis Set (Fingerprint) - %100 eşleşme (Çok hızlı)
+     * L2: Jaro-Winkler Similarity - %80+ benzerlik (Redis List üzerinden)
      */
     async isDuplicate(baslik: string): Promise<{ duplicate: boolean; similarity?: number; matchedTitle?: string }> {
-        const recentNews = await prisma.haber.findMany({
-            take: DEDUP_WINDOW_SIZE, // Sadece son 50 haber (Performans için)
-            orderBy: {
-                yayinlanmaTarihi: 'desc'
-            },
-            select: {
-                id: true,
-                baslik: true
-            }
-        });
+        const fingerprint = this.generateFingerprint(baslik);
 
-        for (const news of recentNews) {
-            // Natural.JaroWinklerDistance 0 ile 1 arası değer döner. 1 tam eşleşme, 0 alakasız.
-            const similarity = natural.JaroWinklerDistance(baslik.toLowerCase(), news.baslik.toLowerCase(), { ignoreCase: true });
-
-            if (similarity >= DEDUP_SIMILARITY_THRESHOLD) { // Varsayılan: 0.80 (%80)
-                console.log(`[Dedup] İptal edildi! Similarity: ${similarity.toFixed(2)} | Gelen: "${baslik}" | DB: "${news.baslik}"`);
-                return { duplicate: true, similarity, matchedTitle: news.baslik };
+        try {
+            // L1: Exact Fingerprint Check
+            const isExists = await redisClient.sismember('news:fingerprints', fingerprint);
+            if (isExists) {
+                return { duplicate: true, similarity: 1, matchedTitle: 'Kesin Eşleşme (Hash)' };
             }
+
+            // L2: Semantic Similarity Check (Redis listesi üzerinden)
+            let titles = await redisClient.lrange('news:recent_titles', 0, DEDUP_WINDOW_SIZE - 1);
+
+            // Eğer Redis boşsa (örneğin yeni restart veya cache temizliği), DB'den çek ve cache'i ısıt
+            if (titles.length === 0) {
+                const dbNews = await prisma.haber.findMany({
+                    take: DEDUP_WINDOW_SIZE,
+                    orderBy: { yayinlanmaTarihi: 'desc' },
+                    select: { baslik: true }
+                });
+                titles = dbNews.map(n => n.baslik);
+                
+                if (titles.length > 0) {
+                    await redisClient.rpush('news:recent_titles', ...titles);
+                }
+            }
+
+            for (const cachedTitle of titles) {
+                const similarity = natural.JaroWinklerDistance(baslik.toLowerCase(), cachedTitle.toLowerCase(), { ignoreCase: true });
+                if (similarity >= DEDUP_SIMILARITY_THRESHOLD) {
+                    return { duplicate: true, similarity, matchedTitle: cachedTitle };
+                }
+            }
+        } catch (e) {
+            console.error('[Redis Error] Dedup işlemi sırasında hata, DB fallback yapılıyor:', e);
+            // Hata durumunda eski yoldan (DB) devam et (Resiliency)
+            return this.isDuplicateDatabaseFallback(baslik);
         }
 
         return { duplicate: false };
+    }
+
+    private async isDuplicateDatabaseFallback(baslik: string): Promise<{ duplicate: boolean; similarity?: number; matchedTitle?: string }> {
+        const recentNews = await prisma.haber.findMany({
+            take: DEDUP_WINDOW_SIZE,
+            orderBy: { yayinlanmaTarihi: 'desc' },
+            select: { baslik: true }
+        });
+
+        for (const news of recentNews) {
+            const similarity = natural.JaroWinklerDistance(baslik.toLowerCase(), news.baslik.toLowerCase(), { ignoreCase: true });
+            if (similarity >= DEDUP_SIMILARITY_THRESHOLD) {
+                return { duplicate: true, similarity, matchedTitle: news.baslik };
+            }
+        }
+        return { duplicate: false };
+    }
+
+    private generateFingerprint(title: string): string {
+        // Küçük harf, boşluksuz ve temizlenmiş metnin hash'i
+        const clean = title.toLowerCase().replace(/\s+/g, '').trim();
+        return crypto.createHash('sha1').update(clean).digest('hex');
     }
 
     async getRecentNews(page = 1, limit = 20, status?: string, search?: string): Promise<{ data: any[], total: number, totalPages: number }> {
