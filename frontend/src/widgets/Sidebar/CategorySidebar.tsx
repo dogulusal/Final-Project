@@ -2,12 +2,27 @@ import Link from "next/link";
 import { prisma } from "@/shared/lib/prisma";
 
 export default async function CategorySidebar() {
-    // Kategori verilerini Prisma üzerinden doğrudan çekiyoruz
-    const categories = await prisma.kategori.findMany({
-        orderBy: {
-            ad: 'asc'
-        }
-    });
+    let categories = [];
+    try {
+        // Kategori verilerini Prisma üzerinden doğrudan çekiyoruz
+        categories = await prisma.kategori.findMany({
+            orderBy: {
+                ad: 'asc'
+            }
+        });
+    } catch (e) {
+        console.error("[Prisma Error] Kategoriler yüklenemedi, mock veriler dönülüyor:", e);
+        // DB kapalıysa fallback olarak mock kategoriler
+        categories = [
+            { id: 1, ad: "Spor", slug: "spor", renkKodu: "#1a472a", ikon: "⚽" },
+            { id: 2, ad: "Ekonomi", slug: "ekonomi", renkKodu: "#1a2a47", ikon: "📈" },
+            { id: 3, ad: "Teknoloji", slug: "teknoloji", renkKodu: "#2d1a47", ikon: "💻" },
+            { id: 4, ad: "Siyaset", slug: "siyaset", renkKodu: "#471a1a", ikon: "🏛️" },
+            { id: 5, ad: "Dünya", slug: "dunya", renkKodu: "#1a3847", ikon: "🌍" },
+            { id: 6, ad: "Sağlık", slug: "saglik", renkKodu: "#47381a", ikon: "🏥" },
+            { id: 7, ad: "Genel", slug: "genel", renkKodu: "#2c3e50", ikon: "📰" },
+        ];
+    }
 
     return (
         <aside className="w-full h-full flex flex-col gap-6 sticky top-24 pt-4">

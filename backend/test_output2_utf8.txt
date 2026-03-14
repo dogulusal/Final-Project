@@ -1,0 +1,270 @@
+﻿node.exe : FAIL src/__tests__/
+news.service.test.ts
+At line:1 char:1
++ & "C:\Program Files\nodejs/n
+ode.exe" "C:\Program Files\nod
+ejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (FAIL src/  
+  __tests__/news.service.te   
+ st.ts:String) [], RemoteE    
+xception
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+  ÔùÅ Console
+
+    console.log
+      [Redis] Connecting to lo
+calhost:6379...
+
+      at Object.<anonymous> (s
+rc/config/redis.ts:6:9)
+
+    console.log
+      [Redis] Connected succes
+sfully
+
+      at EventEmitter.<anonymo
+us> (src/config/redis.ts:22:11
+)
+
+  ÔùÅ NewsService ÔÇ║ generate
+Slug (private, tested via crea
+teNews) ÔÇ║ should create news
+ with correct slug format
+
+    Bu haber zaten eklenmi┼ş. 
+(Benzerlik: %100.0, E┼şle┼şen:
+ "Kesin E┼şle┼şme (Hash)")
+
+    [0m [90m 33 |[39m
+     [90m 34 |[39m [36mexpo
+rt[39m [36mconst[39m [33mC
+onflictError[39m [33m=[39m 
+(message[33m:[39m string) [
+33m=>[39m
+    [31m[1m>[22m[39m[90m 
+35 |[39m     [36mnew[39m [
+33mAppError[39m(message[33m,
+[39m [35m409[39m[33m,[39m
+ [32m'CONFLICT'[39m)[33m;[
+39m
+     [90m    |[39m     [31m
+[1m^[22m[39m
+     [90m 36 |[39m
+     [90m 37 |[39m [36mexpo
+rt[39m [36mconst[39m [33mS
+erviceUnavailableError[39m [
+33m=[39m (service[33m:[39m 
+string) [33m=>[39m
+     [90m 38 |[39m     [36m
+new[39m [33mAppError[39m([
+32m`${service} servisi ┼şu an 
+kullan─▒lam─▒yor`[39m[33m,[
+39m [35m503[39m[33m,[39m 
+[32m'SERVICE_UNAVAILABLE'[39m
+)[33m;[39m[0m
+
+      at ConflictError (src/mi
+ddleware/error-handler.ts:35:5
+)
+      at NewsService.createNew
+s (src/modules/news/news.servi
+ce.ts:25:32)
+      at Object.<anonymous> (s
+rc/__tests__/news.service.test
+.ts:139:28)
+
+PASS src/__tests__/ml.service.
+test.ts
+  ÔùÅ Console
+
+    console.log
+      [Redis] Connecting to lo
+calhost:6379...
+
+      at Object.<anonymous> (s
+rc/config/redis.ts:6:9)
+
+    console.log
+      [ML] Model e─şitimi ba┼ş
+l─▒yor... (2 ├Ârnek)
+
+      at MlCategorizationServi
+ce.train (src/modules/ml/ml.se
+rvice.ts:55:17)
+
+    console.warn
+      [ML Warn] Yeterli veri y
+ok, e─şitim atlan─▒yor.
+
+    [0m [90m 56 |[39m      
+   
+     [90m 57 |[39m         
+[36mif[39m (dataset[33m.[39
+mlength [33m<[39m [35m5[39
+m) {
+    [31m[1m>[22m[39m[90m 
+58 |[39m             console
+[33m.[39mwarn([32m'[ML Warn]
+ Yeterli veri yok, e─şitim atl
+an─▒yor.'[39m)[33m;[39m
+     [90m    |[39m          
+           [31m[1m^[22m[39
+m
+     [90m 59 |[39m          
+   [36mreturn[39m[33m;[39m
+     [90m 60 |[39m         }
+     [90m 61 |[39m[0m
+
+      at MlCategorizationServi
+ce.train (src/modules/ml/ml.se
+rvice.ts:58:21)
+      at Object.<anonymous> (s
+rc/__tests__/ml.service.test.t
+s:27:29)
+
+    console.log
+      [ML] Model e─şitimi ba┼ş
+l─▒yor... (9 ├Ârnek)
+
+      at MlCategorizationServi
+ce.train (src/modules/ml/ml.se
+rvice.ts:55:17)
+
+    console.log
+      [ML] Model ba┼şar─▒yla e
+─şitildi ve RAM'e al─▒nd─▒. (T
+rain: 7, Test: 2, Accuracy: %0
+.0)
+
+      at MlCategorizationServi
+ce.train (src/modules/ml/ml.se
+rvice.ts:101:17)
+
+    console.log
+      [ML] D├╝┼ş├╝k G├╝ven Sko
+ru (0.27): "Be┼şikta┼ş ma├ğ─▒ 
+yakla┼ş─▒yor" -> Manuel ─░ncel
+eme Kuyru─şuna Eklenecek.
+
+      at MlCategorizationServi
+ce.categorize (src/modules/ml/
+ml.service.ts:205:21)
+
+
+  ÔùÅ  Cannot log after tests 
+are done. Did you forget to wa
+it for something async in your
+ test?
+    Attempted to log "[Redis] 
+Connected successfully".
+
+    [0m [90m 20 |[39m
+     [90m 21 |[39m redis[33
+m.[39mon([32m'connect'[39m
+[33m,[39m () [33m=>[39m {
+    [31m[1m>[22m[39m[90m 
+22 |[39m   console[33m.[39m
+log([32m'[Redis] Connected su
+ccessfully'[39m)[33m;[39m
+     [90m    |[39m          
+ [31m[1m^[22m[39m
+     [90m 23 |[39m })[33m;
+[39m
+     [90m 24 |[39m
+     [90m 25 |[39m [36mexpo
+rt[39m { redis }[33m;[39m[
+0m
+
+      at console.log (node_mod
+ules/@jest/console/build/Buffe
+redConsole.js:156:10)
+      at EventEmitter.<anonymo
+us> (src/config/redis.ts:22:11
+)
+
+PASS src/__tests__/social.serv
+ice.test.ts (8.85 s)
+  ÔùÅ Console
+
+    console.log
+      [MockSocial][Telegram] P
+ayla┼ş─▒m sim├╝le edildi (1100
+ms): Test Haber Ba┼şl─▒─ş─▒
+
+      at MockSocialAdapter.pub
+lish (src/modules/social/socia
+l.interface.ts:51:17)
+
+    console.log
+      [MockSocial][Twitter] Pa
+yla┼ş─▒m sim├╝le edildi (1335m
+s): Test Haber Ba┼şl─▒─ş─▒
+
+      at MockSocialAdapter.pub
+lish (src/modules/social/socia
+l.interface.ts:51:17)
+
+    console.log
+      [MockSocial][LinkedIn] P
+ayla┼ş─▒m sim├╝le edildi (678m
+s): Test Haber Ba┼şl─▒─ş─▒
+
+      at MockSocialAdapter.pub
+lish (src/modules/social/socia
+l.interface.ts:51:17)
+
+    console.log
+      [MockSocial][Telegram] P
+ayla┼ş─▒m sim├╝le edildi (1347
+ms): Platform Test
+
+      at MockSocialAdapter.pub
+lish (src/modules/social/socia
+l.interface.ts:51:17)
+
+    console.log
+      [MockSocial][Twitter] Pa
+yla┼ş─▒m sim├╝le edildi (849ms
+): Platform Test
+
+      at MockSocialAdapter.pub
+lish (src/modules/social/socia
+l.interface.ts:51:17)
+
+    console.log
+      [MockSocial][LinkedIn] P
+ayla┼ş─▒m sim├╝le edildi (838m
+s): Platform Test
+
+      at MockSocialAdapter.pub
+lish (src/modules/social/socia
+l.interface.ts:51:17)
+
+A worker process has failed to
+ exit gracefully and has been 
+force exited. This is likely c
+aused by tests leaking due to 
+improper teardown. Try running
+ with --detectOpenHandles to f
+ind leaks. Active timers can a
+lso cause this, ensure that .u
+nref() was called on them.
+
+Test Suites: 1 failed, 2 passe
+d, 3 total
+Tests:       1 failed, 17 pass
+ed, 18 total
+Snapshots:   0 total
+Time:        10.573 s
+Ran all test suites.
+Force exiting Jest: Have you c
+onsidered using `--detectOpenH
+andles` to detect async operat
+ions that kept running after a
+ll tests finished?

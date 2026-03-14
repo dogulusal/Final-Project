@@ -41,8 +41,9 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         const limit = parseInt(req.query.limit as string) || 20;
         const status = req.query.status as string;
         const search = req.query.search as string;
+        const category = req.query.category as string;
 
-        const result = await newsService.getRecentNews(page, limit, status, search);
+        const result = await newsService.getRecentNews(page, limit, status, search, category);
 
         res.json({
             success: true,
@@ -74,13 +75,13 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
         // n8n'den gelen string kategori adını (örn: "Teknoloji") ID'ye dönüştür
         if (isNaN(dbKategoriId) && kategoriAd) {
-            const { PrismaClient } = require('@prisma/client');
-            const prisma = new PrismaClient();
+            const { prisma } = require('../../config/database');
             const foundCat = await prisma.kategori.findFirst({ where: { ad: kategoriAd } });
             if (foundCat) {
                 dbKategoriId = foundCat.id;
             } else {
-                dbKategoriId = 7; // 7 = 'Genel' kategorisi fallback olarak
+                const genelCat = await prisma.kategori.findFirst({ where: { slug: 'genel' } });
+                dbKategoriId = genelCat?.id ?? 1; // Dinamik 'Genel' kategorisi fallback olarak
             }
         }
 

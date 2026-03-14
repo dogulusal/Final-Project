@@ -3,11 +3,21 @@ import "./globals.css";
 import CookieConsent from "@/components/CookieConsent";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import DashboardShell from "@/ui/layout/DashboardShell";
-import { Inter, Newsreader } from "next/font/google";
+import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
-const newsreader = Newsreader({ subsets: ['latin'], variable: '--font-serif', style: ['normal', 'italic'] });
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  weight: ["300", "400", "500", "600"],
+});
+
+const dmSerifDisplay = DM_Serif_Display({
+  subsets: ["latin"],
+  variable: "--font-serif",
+  weight: "400",
+  style: ["normal", "italic"],
+});
 
 export const metadata: Metadata = {
   title: "AI Haber Ajansı — Yapay Zeka Destekli Haber Platformu",
@@ -23,10 +33,12 @@ export default function RootLayout({
   modal: React.ReactNode;
 }>) {
   return (
-    <html lang="tr" suppressHydrationWarning className={cn("font-sans", inter.variable, newsreader.variable)}>
-      <head>
-      </head>
-      <body className="antialiased select-none" suppressHydrationWarning>
+    <html
+      lang="tr"
+      suppressHydrationWarning
+      className={cn("font-sans", dmSans.variable, dmSerifDisplay.variable)}
+    >
+      <body className="antialiased" suppressHydrationWarning>
         <ThemeProvider>
           <div className="animated-bg" />
           <DashboardShell>

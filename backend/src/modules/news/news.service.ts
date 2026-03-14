@@ -9,6 +9,7 @@ export const newsEventEmitter = new EventEmitter();
 
 import { redis as redisClient } from '../../config/redis';
 import crypto from 'crypto';
+import { ImageService } from './image.service';
 
 export class NewsService implements INewsService {
 
@@ -33,6 +34,10 @@ export class NewsService implements INewsService {
             slug = `${slug}-${Date.now()}`;
         }
 
+        // Kategori bilgisini çek (Görsel için slug lazım)
+        const kategori = await prisma.kategori.findUnique({ where: { id: data.kategoriId } });
+        const fallbackImage = kategori ? ImageService.getImageForNews(kategori.slug, data.baslik) : ImageService.getImageForNews('genel', data.baslik);
+
         // 3. Veritabanına kaydet
         const newNews = await prisma.haber.create({
             data: {
@@ -42,12 +47,12 @@ export class NewsService implements INewsService {
                 metaAciklama: data.metaAciklama || null,
                 kategoriId: data.kategoriId,
                 kaynakUrl: data.kaynakUrl || null,
-                gorselUrl: data.gorselUrl || null,
+                gorselUrl: data.gorselUrl || fallbackImage,
                 sentiment: data.sentiment || 'Nötr',
                 durum: data.durum || 'ham',
                 mlConfidence: data.mlConfidence || null,
                 llmProvider: data.llmProvider || null,
-                okumaSuresiDakika: data.icerik ? Math.ceil(data.icerik.split(' ').length / 200) : 1, // Basit ortalama
+                okumaSuresiDakika: data.icerik ? Math.ceil(data.icerik.split(' ').length / 200) : null, // Basit ortalama
             },
             include: {
                 kategori: true
@@ -144,10 +149,14 @@ export class NewsService implements INewsService {
         return crypto.createHash('sha1').update(clean).digest('hex');
     }
 
-    async getRecentNews(page = 1, limit = 20, status?: string, search?: string): Promise<{ data: any[], total: number, totalPages: number }> {
+    async getRecentNews(page = 1, limit = 20, status?: string, search?: string, category?: string): Promise<{ data: any[], total: number, totalPages: number }> {
         const filters: any = {};
         if (status) {
             filters.durum = status;
+        }
+
+        if (category && category !== 'Tümü') {
+            filters.kategori = { slug: category };
         }
 
         if (search) {

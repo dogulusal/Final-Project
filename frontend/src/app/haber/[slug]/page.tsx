@@ -104,7 +104,6 @@ export default function HaberDetayPage({ params }: { params: Promise<{ slug: str
     }
 
     const categoryName = news.kategori?.ad || "Genel";
-    const readTime = news.okumaSuresiDakika || 1;
 
     return (
         <main className="min-h-screen">
@@ -137,8 +136,12 @@ export default function HaberDetayPage({ params }: { params: Promise<{ slug: str
                     {/* Meta */}
                     <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--text-muted)] mb-8 pb-6 border-b border-[var(--border-subtle)]">
                         <span>{new Date(news.yayinlanmaTarihi).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                        <span>·</span>
-                        <span>{readTime} dk okuma</span>
+                        {news.okumaSuresiDakika && news.okumaSuresiDakika > 1 && (
+                            <>
+                                <span>·</span>
+                                <span>{news.okumaSuresiDakika} dk okuma</span>
+                            </>
+                        )}
                         <span>·</span>
                         <span>{news.goruntulemeSayisi} görüntülenme</span>
                         {news.kaynakUrl && (

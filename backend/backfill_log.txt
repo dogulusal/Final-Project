@@ -1,0 +1,68 @@
+﻿--- Haber G├Ârseli Backfill Ba┼şlat─▒ld─▒ ---
+node.exe : Hata: PrismaClientI
+nitializationError: 
+At line:1 char:1
++ & "C:\Program Files\nodejs/n
+ode.exe" "C:\Program Files\nod
+ejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (Hata: Pri  
+  smaClientInitializationEr   
+ ror: :String) [], RemoteE    
+xception
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+Invalid `prisma.haber.findMany
+()` invocation in
+C:\Users\dogul\Final-Project\b
+ackend\src\scripts\backfill-im
+ages.ts:9:48
+
+  6 async function backfill() 
+{
+  7   console.log('--- Haber G
+├Ârseli Backfill Ba┼şlat─▒ld─▒
+ ---');
+  8   
+ÔåÆ 9   const newsWithoutImage
+s = await prisma.haber.findMan
+y(
+error: Environment variable no
+t found: DATABASE_URL.
+  -->  schema.prisma:10
+   | 
+ 9 |   provider = "postgresql"
+10 |   url      = env("DATABAS
+E_URL")
+   | 
+
+Validation Error Count: 1
+    at $n.handleRequestError (
+C:\Users\dogul\Final-Project\b
+ackend\node_modules\@prisma\cl
+ient\runtime\library.js:121:76
+15)
+    at $n.handleAndLogRequestE
+rror (C:\Users\dogul\Final-Pro
+ject\backend\node_modules\@pri
+sma\client\runtime\library.js:
+121:6623)
+    at $n.request (C:\Users\do
+gul\Final-Project\backend\node
+_modules\@prisma\client\runtim
+e\library.js:121:6307)
+    at async l (C:\Users\dogul
+\Final-Project\backend\node_mo
+dules\@prisma\client\runtime\l
+ibrary.js:130:9633)
+    at async backfill (C:\User
+s\dogul\Final-Project\backend\
+src\scripts\backfill-images.ts
+:9:29) {
+  clientVersion: '5.22.0',
+  errorCode: undefined
+}

@@ -14,19 +14,47 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 
+import type { NewsItem } from "@/app/page";
+
 export interface AISummaryModalProps {
   newsId: string;
 }
 
 export default function AISummaryModal({ newsId }: AISummaryModalProps) {
   const router = useRouter();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<NewsItem | null>(null);
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
 
-  const fetchNews = async () => {
+  useEffect(() => {
+    let active = true;
+    const fetchNews = async () => {
+      // delay initial loading set to avoid sync cascading renders
+      setTimeout(() => { if (active) setStatus("loading"); }, 0);
+      try {
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+        const res = await fetch(`${API_BASE}/api/news/${newsId}`);
+        const result = await res.json();
+        if (active) {
+          if (result.success && result.data) {
+            setData(result.data);
+            setStatus("success");
+          } else {
+            setStatus("error");
+          }
+        }
+      } catch {
+        if (active) setStatus("error");
+      }
+    };
+    fetchNews();
+    return () => { active = false; };
+  }, [newsId]);
+
+  const fetchNewsRetry = async () => {
     setStatus("loading");
     try {
-      const res = await fetch(`/api/news/${newsId}`);
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const res = await fetch(`${API_BASE}/api/news/${newsId}`);
       const result = await res.json();
       if (result.success && result.data) {
         setData(result.data);
@@ -38,10 +66,6 @@ export default function AISummaryModal({ newsId }: AISummaryModalProps) {
       setStatus("error");
     }
   };
-
-  useEffect(() => {
-    fetchNews();
-  }, [newsId]);
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -86,7 +110,7 @@ export default function AISummaryModal({ newsId }: AISummaryModalProps) {
               <AlertDescription className="mt-2 flex flex-col gap-4 items-start">
                 <p>Haberin yapay zeka tarafından işlenmesi sırasında bir hata oluştu veya bağlantı zaman aşımına uğradı.</p>
                 <button 
-                  onClick={fetchNews}
+                  onClick={fetchNewsRetry}
                   className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-md shadow-sm transition-colors"
                 >
                   Yeniden Dene

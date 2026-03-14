@@ -1,5 +1,19 @@
 import { NewsService } from '../modules/news/news.service';
 
+// Mock Redis client
+jest.mock('../config/redis', () => ({
+    redis: {
+        sismember: jest.fn().mockResolvedValue(0),
+        sadd: jest.fn(),
+        expire: jest.fn(),
+        lpush: jest.fn(),
+        ltrim: jest.fn(),
+        lrange: jest.fn().mockResolvedValue([]),
+        rpush: jest.fn(),
+        on: jest.fn(),
+    }
+}));
+
 // Mock Prisma client
 jest.mock('../config/database', () => ({
     prisma: {
@@ -12,6 +26,7 @@ jest.mock('../config/database', () => ({
         },
         kategori: {
             findFirst: jest.fn(),
+            findUnique: jest.fn(),
         }
     }
 }));

@@ -1,0 +1,95 @@
+﻿[Redis] Connecting to localhost:6379...
+[LLM] Fallback Sa─şlay─▒c─▒s─▒ aktif edildi: ollama
+node.exe : Error: Cannot find 
+module '../build/Release/canva
+s.node'
+At line:1 char:1
++ & "C:\Program Files\nodejs/n
+ode.exe" "C:\Program Files\nod
+ejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (Error: Ca  
+  nnot f...se/canvas.node':   
+ String) [], RemoteExcepti    
+on
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+Require stack:
+- C:\Users\dogul\Final-Project
+\backend\node_modules\canvas\l
+ib\bindings.js
+- C:\Users\dogul\Final-Project
+\backend\node_modules\canvas\l
+ib\canvas.js
+- C:\Users\dogul\Final-Project
+\backend\node_modules\canvas\i
+ndex.js
+- C:\Users\dogul\Final-Project
+\backend\src\modules\render\re
+nder.service.ts
+- C:\Users\dogul\Final-Project
+\backend\src\modules\render\in
+dex.ts
+- C:\Users\dogul\Final-Project
+\backend\src\index.ts
+    at Module.<anonymous> (nod
+e:internal/modules/cjs/loader:
+1421:15)
+    at Module._resolveFilename
+.sharedData.moduleResolveFilen
+ameHook.installedValue [as _re
+solveFilename] (C:\Users\dogul
+\Final-Project\backend\node_mo
+dules\@cspotcode\source-map-su
+pport\source-map-support.js:81
+1:30)
+    at defaultResolveImpl (nod
+e:internal/modules/cjs/loader:
+1059:19)
+    at resolveForCJSWithHooks 
+(node:internal/modules/cjs/loa
+der:1064:22)
+    at Module._load (node:inte
+rnal/modules/cjs/loader:1227:3
+7)
+    at TracingChannel.traceSyn
+c (node:diagnostics_channel:32
+8:14)
+    at wrapModuleLoad (node:in
+ternal/modules/cjs/loader:245:
+24)
+    at Module.require (node:in
+ternal/modules/cjs/loader:1504
+:12)
+    at require (node:internal/
+modules/helpers:152:16)
+    at Object.<anonymous> (C:\
+Users\dogul\Final-Project\back
+end\node_modules\canvas\lib\bi
+ndings.js:3:18) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    'C:\\Users\\dogul\\Final-P
+roject\\backend\\node_modules\
+\canvas\\lib\\bindings.js',
+    'C:\\Users\\dogul\\Final-P
+roject\\backend\\node_modules\
+\canvas\\lib\\canvas.js',
+    'C:\\Users\\dogul\\Final-P
+roject\\backend\\node_modules\
+\canvas\\index.js',
+    'C:\\Users\\dogul\\Final-P
+roject\\backend\\src\\modules\
+\render\\render.service.ts',
+    'C:\\Users\\dogul\\Final-P
+roject\\backend\\src\\modules\
+\render\\index.ts',
+    'C:\\Users\\dogul\\Final-P
+roject\\backend\\src\\index.ts
+'
+  ]
+}
