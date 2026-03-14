@@ -228,7 +228,23 @@ export class MlCategorizationService implements INewsCategorizationService {
         try {
             if (fs.existsSync(dictPath)) {
                 const rawDict = fs.readFileSync(dictPath, 'utf-8');
-                sentimentDict = JSON.parse(rawDict);
+                const parsedDict = JSON.parse(rawDict);
+                
+                // Stem the dictionary keys on load to ensure matches against tokenized text
+                for (const [key, value] of Object.entries(parsedDict)) {
+                    // Import inside function or use already available stemmer logic
+                    // We can just use the natural.PorterStemmer.tokenizeAndStem for English 
+                    // or for Turkish we already overwrote tokenizeAndStem in the constructor.
+                    // Wait, we can import turkishStem here at the top of the file, or just use the overwritten tokenizeAndStem on the key.
+                    // Let's use our tokenizer safely.
+                    const keyTokens = tokenizeAndStem(key);
+                    if (keyTokens.length > 0) {
+                        sentimentDict[keyTokens[0]] = value as number;
+                    } else {
+                        // fallback if tokenizer removes it (e.g., short word)
+                        sentimentDict[key] = value as number;
+                    }
+                }
             } else {
                 console.warn('[ML Warn] tr-sentiment-dict.json bulunamadı. Tüm skorlar 0 dönecek.');
             }
