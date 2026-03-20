@@ -10,6 +10,7 @@ export const newsEventEmitter = new EventEmitter();
 import { redis as redisClient } from '../../config/redis';
 import crypto from 'crypto';
 import { ImageService } from './image.service';
+import { sanitizeText } from '../../common';
 
 export class NewsService implements INewsService {
 
@@ -36,15 +37,15 @@ export class NewsService implements INewsService {
 
         // Kategori bilgisini çek (Görsel için slug lazım)
         const kategori = await prisma.kategori.findUnique({ where: { id: data.kategoriId } });
-        const fallbackImage = kategori ? ImageService.getImageForNews(kategori.slug, data.baslik) : ImageService.getImageForNews('genel', data.baslik);
+        const fallbackImage = kategori ? ImageService.getImageForNews(kategori.slug, data.baslik, slug) : ImageService.getImageForNews('genel', data.baslik, slug);
 
-        // 3. Veritabanına kaydet
+        // 3. Veritabanına kaydet (Karakter uyuşmazlığını önlemek için sanitize et)
         const newNews = await prisma.haber.create({
             data: {
-                baslik: data.baslik,
+                baslik: sanitizeText(data.baslik)!,
                 slug,
-                icerik: data.icerik || null,
-                metaAciklama: data.metaAciklama || null,
+                icerik: sanitizeText(data.icerik) || null,
+                metaAciklama: sanitizeText(data.metaAciklama) || null,
                 kategoriId: data.kategoriId,
                 kaynakUrl: data.kaynakUrl || null,
                 gorselUrl: data.gorselUrl || fallbackImage,
@@ -52,7 +53,7 @@ export class NewsService implements INewsService {
                 durum: data.durum || 'ham',
                 mlConfidence: data.mlConfidence || null,
                 llmProvider: data.llmProvider || null,
-                okumaSuresiDakika: data.icerik ? Math.ceil(data.icerik.split(' ').length / 200) : null, // Basit ortalama
+                okumaSuresiDakika: data.icerik ? Math.ceil(data.icerik.split(' ').length / 200) : null,
             },
             include: {
                 kategori: true
@@ -112,12 +113,7 @@ export class NewsService implements INewsService {
                 }
             }
 
-            for (const cachedTitle of titles) {
-                const similarity = natural.JaroWinklerDistance(baslik.toLowerCase(), cachedTitle.toLowerCase(), { ignoreCase: true });
-                if (similarity >= DEDUP_SIMILARITY_THRESHOLD) {
-                    return { duplicate: true, similarity, matchedTitle: cachedTitle };
-                }
-            }
+            return this.checkSimilarity(baslik, titles);
         } catch (e) {
             console.error('[Redis Error] Dedup işlemi sırasında hata, DB fallback yapılıyor:', e);
             // Hata durumunda eski yoldan (DB) devam et (Resiliency)
@@ -134,10 +130,15 @@ export class NewsService implements INewsService {
             select: { baslik: true }
         });
 
-        for (const news of recentNews) {
-            const similarity = natural.JaroWinklerDistance(baslik.toLowerCase(), news.baslik.toLowerCase(), { ignoreCase: true });
+        const titles = recentNews.map(n => n.baslik);
+        return this.checkSimilarity(baslik, titles);
+    }
+
+    private checkSimilarity(baslik: string, titles: string[]): { duplicate: boolean; similarity?: number; matchedTitle?: string } {
+        for (const cachedTitle of titles) {
+            const similarity = natural.JaroWinklerDistance(baslik.toLowerCase(), cachedTitle.toLowerCase(), { ignoreCase: true });
             if (similarity >= DEDUP_SIMILARITY_THRESHOLD) {
-                return { duplicate: true, similarity, matchedTitle: news.baslik };
+                return { duplicate: true, similarity, matchedTitle: cachedTitle };
             }
         }
         return { duplicate: false };

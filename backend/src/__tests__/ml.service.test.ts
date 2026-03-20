@@ -54,6 +54,30 @@ describe('MlCategorizationService', () => {
             expect(result).toBeDefined();
             expect(result.confidence).toBeGreaterThanOrEqual(0);
         });
+
+        it('should produce normalized confidence scores using stabilized softmax', async () => {
+             const data: TrainingData[] = [
+                { text: 'spor haberi futbol', category: 'Spor' },
+                { text: 'ekonomi haber borsa', category: 'Ekonomi' },
+                { text: 'teknoloji yapay zeka', category: 'Teknoloji' },
+                { text: 'siyaset seçim meclis', category: 'Siyaset' },
+                { text: 'saglik hastane doktor', category: 'Sağlık' },
+                { text: 'dunya nato savas', category: 'Dünya' },
+                { text: 'genel haber bilgi', category: 'Genel' },
+            ];
+            await mlService.train(data);
+
+            const result = await mlService.categorize('futbol maci gol');
+            
+            // Confidence should be high for 'futbol' in Spor
+            expect(result.kategori).toBe('Spor');
+            expect(result.confidence).toBeGreaterThan(0.15); // Higher than uniform distribution (1/7 ~= 0.14)
+            
+            // Sum of all scores should be approximately 1
+            const totalScore = Object.values(result.allScores).reduce((a, b) => a + b, 0);
+            expect(totalScore).toBeGreaterThan(0.99);
+            expect(totalScore).toBeLessThan(1.01);
+        });
     });
 
     describe('isDuplicate', () => {

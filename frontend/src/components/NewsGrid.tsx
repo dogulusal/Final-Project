@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import type { NewsItem } from "@/app/page";
+import { NewsItem } from "@/types/news";
 import NewsCard from "./NewsCard";
 
 interface Props {

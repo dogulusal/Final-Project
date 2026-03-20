@@ -24,10 +24,16 @@
   /* Brand */
   --accent-primary:  #1e2035;   /* Deep navy */
   --accent-warm:     #a38068;   /* Mocha */
+  --accent-purple:   #7c3aed;
   --accent-green:    #16a34a;
   --accent-red:      #dc2626;
   --accent-amber:    #d97706;
   --accent-blue:     #2563eb;
+
+  /* Desaturated tones for delicate UI */
+  --accent-green-desat: #e7f6ed;
+  --accent-red-desat:   #fdeced;
+  --accent-blue-desat:  #edf4ff;
 
   /* Text */
   --text-primary:   #1e2035;
@@ -54,6 +60,7 @@
 
   /* Gradient */
   --gradient-brand: linear-gradient(135deg, #1e2035 0%, #a38068 100%);
+  --gradient-hero:  linear-gradient(135deg, #1e2035 0%, #a38068 100%);
   --gradient-warm:  linear-gradient(180deg, rgba(163,128,104,0.12) 0%, transparent 100%);
 
   /* Radius */
@@ -94,10 +101,15 @@
 
   --accent-primary: #f0eeea;
   --accent-warm:    #c4a088;
+  --accent-purple:  #a78bfa;
   --accent-green:   #22c55e;
   --accent-red:     #f87171;
   --accent-amber:   #fbbf24;
   --accent-blue:    #60a5fa;
+
+  --accent-green-desat:  rgba(34, 197, 94, 0.1);
+  --accent-red-desat:    rgba(248, 113, 113, 0.1);
+  --accent-blue-desat:   rgba(96, 165, 250, 0.1);
 
   --text-primary:   #f0eeea;
   --text-secondary: #a8a9be;
@@ -116,6 +128,7 @@
   --shadow-lg:   0 8px 32px rgba(0, 0, 0, 0.5);
 
   --gradient-brand: linear-gradient(135deg, #c4a088 0%, #333552 100%);
+  --gradient-hero:  linear-gradient(135deg, #c4a088 0%, #333552 100%);
 
   --background:          oklch(0.1 0.015 255);
   --foreground:          oklch(0.94 0.005 90);
@@ -145,6 +158,13 @@ html {
 
 *, *::before, *::after {
   box-sizing: border-box;
+  transition: background-color 0.4s ease, 
+              color 0.3s ease,
+              border-color 0.3s ease;
+}
+
+.no-theme-transition, .no-theme-transition * {
+  transition: none !important;
 }
 
 body {
@@ -154,6 +174,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
+  transition: background-color 0.5s ease, color 0.5s ease;
 }
 
 /* ===== Typography System ===== */
@@ -226,10 +247,24 @@ body {
 .badge-saglik   { background: rgba(217, 119, 6, 0.1);   color: #d97706; }
 .badge-genel    { background: rgba(100, 116, 139, 0.1); color: #64748b; }
 
-/* ===== Sentiment Dots ===== */
+/* ===== Sentiment Dots & Glow ===== */
 .sentiment-pozitif { color: #16a34a; }
 .sentiment-negatif { color: #dc2626; }
 .sentiment-notr    { color: #9394a8; }
+
+/* Desature ve Hover-Only Glow */
+.sentiment-glow-pozitif:hover {
+  box-shadow: 0 8px 24px -10px rgba(22, 163, 74, 0.15);
+  border-color: rgba(22, 163, 74, 0.12) !important;
+}
+.sentiment-glow-negatif:hover {
+  box-shadow: 0 8px 24px -10px rgba(220, 38, 38, 0.15);
+  border-color: rgba(220, 38, 38, 0.12) !important;
+}
+.sentiment-glow-notr:hover {
+  box-shadow: 0 8px 24px -10px rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.1) !important;
+}
 
 /* ===== Section Divider ===== */
 .section-rule {
@@ -368,6 +403,22 @@ body {
   0%, 100% { transform: translate(0, 0) scale(1); }
   33%       { transform: translate(25px, -25px) scale(1.04); }
   66%       { transform: translate(-15px, 15px) scale(0.97); }
+}
+
+/* ===== Skeleton Refinement ===== */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-premium {
+  background: linear-gradient(90deg, 
+    var(--bg-secondary) 25%, 
+    var(--bg-card-hover) 50%, 
+    var(--bg-secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 2s infinite ease-in-out;
 }
 
 /* ===== Scrollbar ===== */

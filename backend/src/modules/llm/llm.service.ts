@@ -61,25 +61,34 @@ export class ContentGenerationService implements IContentGenerationService {
             // Sona erdirici fallback (hiçbir şey çalışmazsa orijinali ver ki crawler çökmesin)
             return {
                 baslik: input.baslik,
-                icerik: input.ozet + `\n\n(Kaynak: ${input.kaynak_url})`,
-                meta_aciklama: input.ozet.substring(0, 150),
-                etiketler: [input.kategori]
+                icerik: `- ${input.ozet.split('. ').join('.\n- ')}`,
+                meta_aciklama: `Bu haberin önemi: ${input.ozet.substring(0, 100)}...`,
+                etiketler: [input.kategori],
+                sentiment: "Nötr",
+                confidence: 0.5
             };
         }
     }
 
     private getPrompts(input: RawNewsInput) {
         const systemPrompt = `
-Sen 20 yıllık deneyimli bir baş editörsün ve objektif ama ilgi çekici haberler yazıyorsun.
-Sana ham bir haber verisi verilecek. Görevin bu haberi okuyucu için sıkıcı olmayacak, telif hakkı ihlali yapmayacak şekilde tamamen ÖZGÜNLEŞTİREREK yeniden yazmaktır.
-Asla yorum katma, sadece gerçekleri gazetecilik etiğine uygun olarak aktar.
+Sen 20 yıllık deneyimli bir baş editörsün ve "Smart Brevity" (Akıllı Kısalık) felsefesiyle haberler yazıyorsun.
+Görevin, sana verilen ham veriyi tamamen ÖZGÜNLEŞTİREREK, okuyucunun vaktini çalmayan ama en kritik bilgiyi veren bir JSON raporuna dönüştürmektir.
 
-SADECE VE SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER. EKSTRA HİÇBİR AÇIKLAMA YAZMA:
+KURALLAR:
+1. meta_aciklama alanı mutlaka "Neden önemli?" sorusuna yanıt veren, 1-2 cümlelik, somut etki odaklı bir metin olmalıdır.
+2. icerik alanı, haberi 3-5 adet kısa madde işaretine (bullet points) bölerek özetlemelidir.
+3. sentiment alanı sadece "Pozitif", "Negatif" veya "Nötr" değerlerinden biri olmalıdır.
+4. confidence alanı haberin doğruluğuna dair güven skorun olmalıdır (0.0-1.0 arası).
+
+SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
 {
-  "baslik": "İlgi çekici SEO uyumlu yeni haber başlığı (en fazla 70 karakter)",
-  "meta_aciklama": "Arama motorları için 150 karakteri geçmeyen vurucu özet",
-  "icerik": "Okunması kolay paragraflara bölünmüş, zenginleştirilmiş haber metni (HTML formatı OLMASIN, düz metin olsun)",
-  "etiketler": ["etiket1", "etiket2", "kategoriyeUygunEtiket3"]
+  "baslik": "Vurucu haber başlığı (en fazla 70 karakter)",
+  "meta_aciklama": "Bu haberin önemini açıklayan kısa cümle.",
+  "icerik": "Madde 1. Madde 2. Madde 3.",
+  "etiketler": ["etiket1", "etiket2"],
+  "sentiment": "Pozitif|Negatif|Nötr",
+  "confidence": 0.95
 }
 `;
 

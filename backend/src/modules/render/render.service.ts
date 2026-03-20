@@ -1,23 +1,29 @@
 let canvasModule: any;
 try {
-    canvasModule = require('canvas');
-} catch (e: any) {
-    console.error('[Render Warning] Canvas kütüphanesi yüklenemedi, temel görsel oluşturma pasif olacak:', e.message);
-    canvasModule = {
-        createCanvas: () => ({
-            getContext: () => ({
-                createLinearGradient: () => ({ addColorStop: () => {} }),
-                fillRect: () => {},
-                beginPath: () => {},
-                arc: () => {},
-                fill: () => {},
-                measureText: () => ({ width: 100 }),
-                fillText: () => {},
-                roundRect: () => {},
+    // Önce en güvenilir ve modern alternatif olan @napi-rs/canvas dene (Windows dostu)
+    canvasModule = require('@napi-rs/canvas');
+} catch (e1: any) {
+    try {
+        // Fallback olarak orijinal canvas'ı dene
+        canvasModule = require('canvas');
+    } catch (e2: any) {
+        console.error('[Render Warning] Hiçbir canvas kütüphanesi yüklenemedi, temel görsel oluşturma pasif olacak.');
+        canvasModule = {
+            createCanvas: () => ({
+                getContext: () => ({
+                    createLinearGradient: () => ({ addColorStop: () => {} }),
+                    fillRect: () => {},
+                    beginPath: () => {},
+                    arc: () => {},
+                    fill: () => {},
+                    measureText: () => ({ width: 100 }),
+                    fillText: () => {},
+                    roundRect: () => {},
+                }),
+                toBuffer: () => Buffer.from('mock-image'),
             }),
-            toBuffer: () => Buffer.from('mock-image'),
-        }),
-    };
+        };
+    }
 }
 
 const { createCanvas } = canvasModule;

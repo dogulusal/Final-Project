@@ -11,7 +11,9 @@ export default function AdminDashboardPage() {
         totalNews: 0,
         activeCategories: 7,
         mlAccuracy: 85,
-        avgConfidence: 89.4
+        avgConfidence: 89.4,
+        abTestCount: 0,
+        recentCategorizations: [] as any[]
     });
 
     const [loading, setLoading] = useState(true);
@@ -19,14 +21,20 @@ export default function AdminDashboardPage() {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/stats`);
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/stats`, {
+                    headers: {
+                        'x-api-key': process.env.NEXT_PUBLIC_ADMIN_API_KEY || 'ag-agency-secret-token-2026'
+                    }
+                });
                 const data = await response.json();
                 if (data.success) {
                     setStats({
                         totalNews: data.stats.totalNews,
                         activeCategories: data.stats.activeCategories,
                         mlAccuracy: data.stats.mlAccuracy,
-                        avgConfidence: parseFloat(data.stats.avgConfidence)
+                        avgConfidence: parseFloat(data.stats.avgConfidence),
+                        abTestCount: data.stats.abTestCount,
+                        recentCategorizations: data.stats.recentCategorizations
                     });
                 }
             } catch (error) {
@@ -105,21 +113,22 @@ export default function AdminDashboardPage() {
                         <div className="space-y-4">
                             <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
                                 <div className="flex justify-between items-center mb-2">
-                                    <span className="font-semibold text-sm">Fine-Tuned Model Başarısı</span>
-                                    <span className="text-emerald-500 font-bold text-sm">%94 Eşleşme</span>
+                                    <span className="font-semibold text-sm">Toplam Gerçekleşen Test</span>
+                                    <span className="text-purple-500 font-bold text-sm tracking-widest">{stats.abTestCount} Dosya</span>
                                 </div>
                                 <div className="w-full bg-[var(--border-subtle)] rounded-full h-2">
-                                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '94%' }}></div>
+                                    <div className="bg-purple-500 h-2 rounded-full" style={{ width: stats.abTestCount > 0 ? '100%' : '0%' }}></div>
                                 </div>
+                                <p className="text-[10px] text-[var(--text-muted)] mt-2 italic">A/B test verileri `training/ab-tests` klasöründe JSON olarak tutulmaktadır.</p>
                             </div>
 
                             <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
                                 <div className="flex justify-between items-center mb-2">
-                                    <span className="font-semibold text-sm">Base Model Fallback Oranı</span>
-                                    <span className="text-amber-500 font-bold text-sm">%6</span>
+                                    <span className="font-semibold text-sm">Model Kapsama Oranı</span>
+                                    <span className="text-emerald-500 font-bold text-sm">%100</span>
                                 </div>
                                 <div className="w-full bg-[var(--border-subtle)] rounded-full h-2">
-                                    <div className="bg-amber-500 h-2 rounded-full" style={{ width: '6%' }}></div>
+                                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '100%' }}></div>
                                 </div>
                             </div>
                         </div>
@@ -145,25 +154,27 @@ export default function AdminDashboardPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {[
-                                        { title: "Yeni Yapay Zeka Yasası Kabul Edildi", conf: 98.4, status: "Otomatik" },
-                                        { title: "Borsada Sert Düşüş", conf: 92.1, status: "Otomatik" },
-                                        { title: "Esrarengiz Işık Hüzmesi", conf: 54.2, status: "Manuel İnceleme" },
-                                    ].map((item, i) => (
+                                    {stats.recentCategorizations.length > 0 ? stats.recentCategorizations.map((item, i) => (
                                         <tr key={i} className="border-b border-[var(--border-subtle)] last:border-0">
-                                            <td className="py-3 font-medium text-[var(--text-primary)] truncate max-w-[200px]">
-                                                {item.title}
+                                            <td className="py-3 font-medium text-[var(--text-primary)] truncate max-w-[200px]" title={item.baslik}>
+                                                {item.baslik}
                                             </td>
                                             <td className="py-3 text-center text-[var(--text-secondary)]">
-                                                %{item.conf}
+                                                %{item.guven}
                                             </td>
                                             <td className="py-3 text-right">
-                                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${item.conf < 60 ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
-                                                    {item.status}
+                                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${parseFloat(item.guven) < 60 ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
+                                                    {parseFloat(item.guven) < 60 ? 'Manuel' : 'Oto'}
                                                 </span>
                                             </td>
                                         </tr>
-                                    ))}
+                                    )) : (
+                                        <tr>
+                                            <td colSpan={3} className="py-8 text-center text-[var(--text-muted)] italic text-xs">
+                                                Henüz kategorize edilmiş haber bulunamadı.
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>

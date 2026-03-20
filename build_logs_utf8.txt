@@ -1,0 +1,108 @@
+﻿docker-compose : time="2026-03
+-14T18:00:07+03:00" level=warn
+ing msg="C:\\Users\\dogul\\Fin
+al-Project\\docker-compose.yml
+: the attribute `version` is o
+bsolete, it will be ignored, p
+lease remove it to avoid poten
+tial confusion"
+At line:1 char:1
++ docker-compose build backend
+ > build_logs.txt 2>&1 ; Get-C
+ontent buil ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (time="202  
+  6-03-1...tial confusion":   
+ String) [], RemoteExcepti    
+on
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+ Image final-project-backend B
+uilding 
+#1 [internal] load local bake definitions
+#1 reading from stdin 549B 0.1s done
+#1 DONE 0.1s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 487B done
+#2 DONE 0.0s
+
+#3 [auth] library/node:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/library/node:20-bullseye-slim
+#4 DONE 1.0s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [1/9] FROM docker.io/library/node:20-bullseye-slim@sha256:3bf68c75bf40e79160c62afdd14485f5c2df07b361e751cebd9b55a63a5accb2
+#6 resolve docker.io/library/node:20-bullseye-slim@sha256:3bf68c75bf40e79160c62afdd14485f5c2df07b361e751cebd9b55a63a5accb2 0.0s done
+#6 DONE 0.0s
+
+#7 [internal] load build context
+#7 transferring context: 860.00kB 1.2s done
+#7 DONE 1.2s
+
+#8 [5/9] COPY prisma ./prisma/
+#8 CACHED
+
+#9 [6/9] RUN npm ci
+#9 CACHED
+
+#10 [7/9] COPY . .
+#10 CACHED
+
+#11 [2/9] WORKDIR /app
+#11 CACHED
+
+#12 [3/9] RUN apt-get update && apt-get install -y     build-essential     libcairo2-dev     libpango1.0-dev     libjpeg-dev     libgif-dev     librsvg2-dev     && rm -rf /var/lib/apt/lists/*
+#12 CACHED
+
+#13 [4/9] COPY package*.json ./
+#13 CACHED
+
+#14 [8/9] RUN npx prisma generate
+#14 CACHED
+
+#15 [9/9] RUN npm run build
+#15 0.412 
+#15 0.412 > ai-news-agency-backend@0.1.0 build
+#15 0.412 > tsc
+#15 0.412 
+#15 3.103 src/scripts/backfill-images.ts(29,35): error TS2339: Property 'getRandomImageForCategory' does not exist on type 'typeof ImageService'.
+#15 ERROR: process "/bin/sh -c npm run build" did not complete successfully: exit code: 2
+------
+ > [9/9] RUN npm run build:
+0.412 
+0.412 > ai-news-agency-backend@0.1.0 build
+0.412 > tsc
+0.412 
+3.103 src/scripts/backfill-images.ts(29,35): error TS2339: Property 'getRandomImageForCategory' does not exist on type 'typeof ImageService'.
+------
+Dockerfile:21
+
+--------------------
+
+  19 |     COPY . .
+
+  20 |     RUN npx prisma gene
+rate
+
+  21 | >>> RUN npm run build
+
+  22 |     
+
+  23 |     EXPOSE 3000
+
+--------------------
+
+failed to solve: process "/bin
+/sh -c npm run build" did not 
+complete successfully: exit co
+de: 2
+

@@ -14,7 +14,7 @@ export class MlCategorizationService implements INewsCategorizationService {
     private lastAccuracy: number = 0;
     private trainSize: number = 0;
     private testSize: number = 0;
-    private readonly BATCH_TRAIN_THRESHOLD = 50;
+    private readonly BATCH_TRAIN_THRESHOLD = 20;
 
     constructor() {
         // Türkçe dil desteği için kendi tokenizer'ımızı oluşturuyoruz
@@ -31,8 +31,8 @@ export class MlCategorizationService implements INewsCategorizationService {
 
     private initializeTrainingPipeline(): void {
         newsEventEmitter.on('new-news', (news: any) => {
-            // Sadece yönetici-onaylı (veya n8n tarafından hazır işaretlenen) temiz veriyi eğitime alıyoruz (Hibrit Geliştirme)
-            if (news.durum === 'hazir' || news.durum === 'yayinda') {
+            // Ham dahil tüm düzenli haberleri (hata hariç) eğitime katıp modelin kelime dağarcığını genişletiyoruz
+            if (news.durum === 'ham' || news.durum === 'hazir' || news.durum === 'yayinda') {
                 this.newsSinceLastTrain++;
                 console.log(`[ML Pipeline] Yeni temiz veri yakalandı! Sıradaki eğitim için: ${this.newsSinceLastTrain}/${this.BATCH_TRAIN_THRESHOLD}`);
 
@@ -178,27 +178,30 @@ export class MlCategorizationService implements INewsCategorizationService {
         // Basitlik açısından en yüksek skoru toplam skora bölerek yaklaşık bir güven yüzdesi bulalım.
 
         const scores: Record<string, number> = {};
-        let totalScore = 0;
-
-        classifications.forEach(c => {
-            // Değerler eksi olabilir, mutlak değere/pozitife çevirerek oransal dağılım
-            const posValue = Math.exp(c.value);
-            scores[c.label] = posValue;
-            totalScore += posValue;
+        
+        // natural v6 log-probability (negatif değerler) döner.
+        // Hassas normalization için en yüksek skoru 0'a çekip (shift) exp alıyoruz (Softmax stability)
+        const maxLogVal = Math.max(...classifications.map(c => c.value));
+        
+        let totalExp = 0;
+        const expScores = classifications.map(c => {
+            const expVal = Math.exp(c.value - maxLogVal);
+            totalExp += expVal;
+            return { label: c.label, expVal };
         });
 
         let bestCategory = 'Bilinmeyen';
         let highestConfidence = 0;
 
-        for (const [label, score] of Object.entries(scores)) {
-            const confidence = score / totalScore;
-            scores[label] = confidence; // Skorları Yüzde (0-1) cinsinden kaydet
-
+        expScores.forEach(s => {
+            const confidence = s.expVal / totalExp;
+            scores[s.label] = confidence;
+            
             if (confidence > highestConfidence) {
                 highestConfidence = confidence;
-                bestCategory = label;
+                bestCategory = s.label;
             }
-        }
+        });
 
         // Eğer güven skoru tanımlanan barajın altındaysa "İnceleme Gerekiyor" olarak işaretle (İlerde Admin Dashboard için)
         if (highestConfidence < ML_CONFIDENCE_THRESHOLD) {
@@ -221,53 +224,85 @@ export class MlCategorizationService implements INewsCategorizationService {
     }
 
     async analyzeSentiment(text: string): Promise<SentimentResult> {
-        // Read and parse the custom Turkish dictionary
         const dictPath = path.resolve(__dirname, 'tr-sentiment-dict.json');
         let sentimentDict: Record<string, number> = {};
+        let stemDict: Record<string, number> = {}; // 6-char stem mapping
         
         try {
             if (fs.existsSync(dictPath)) {
                 const rawDict = fs.readFileSync(dictPath, 'utf-8');
                 const parsedDict = JSON.parse(rawDict);
                 
-                // Stem the dictionary keys on load to ensure matches against tokenized text
                 for (const [key, value] of Object.entries(parsedDict)) {
-                    // Import inside function or use already available stemmer logic
-                    // We can just use the natural.PorterStemmer.tokenizeAndStem for English 
-                    // or for Turkish we already overwrote tokenizeAndStem in the constructor.
-                    // Wait, we can import turkishStem here at the top of the file, or just use the overwritten tokenizeAndStem on the key.
-                    // Let's use our tokenizer safely.
-                    const keyTokens = tokenizeAndStem(key);
-                    if (keyTokens.length > 0) {
-                        sentimentDict[keyTokens[0]] = value as number;
-                    } else {
-                        // fallback if tokenizer removes it (e.g., short word)
-                        sentimentDict[key] = value as number;
+                    const lowKey = key.toLowerCase();
+                    sentimentDict[lowKey] = value as number;
+                    // Kök bazlı eşleşme için ilk 6 karakteri de sisteme ekle (Sorun 3 İyileştirmesi)
+                    if (lowKey.length >= 5) {
+                        const stem = lowKey.substring(0, 6);
+                        // Eğer aynı kök hem pozitif hem negatifte çakışırsa literal olan her zaman önceliklidir,
+                        // stem sözlüğünde ise ilk gelen kalır (genelde sözlük düzenlidir).
+                        if (!stemDict[stem]) stemDict[stem] = value as number;
                     }
                 }
-            } else {
-                console.warn('[ML Warn] tr-sentiment-dict.json bulunamadı. Tüm skorlar 0 dönecek.');
             }
         } catch (error) {
             console.error('[ML Error] Sentiment sözlüğü okunamadı:', error);
         }
 
-        // Tokenize text using our Turkish stemmer
-        const tokens = tokenizeAndStem(text);
+        // Metni temizle ve kelimelere böl (stemmer kullanmıyoruz ki orijinal hallerine 6-char kuralı uygulayabilelim)
+        const words = text.toLowerCase()
+            .replace(/[^\w\sğüşıöç]/gi, ' ')
+            .split(/\s+/)
+            .filter(w => w.length > 2);
         
         let score = 0;
-        tokens.forEach(token => {
-            if (sentimentDict[token]) {
-                score += sentimentDict[token];
+        const negations = ['değil', 'yok', 'olmaz', 'hiç', 'asla', 'olmadı', 'olmadığını', 'değildir'];
+        let inNegationWindow = 0;
+
+        words.forEach(word => {
+            if (negations.includes(word)) {
+                inNegationWindow = 3;
+            }
+
+            let wordScore = 0;
+            // 1. Tam eşleşme kontrolü
+            if (sentimentDict[word] !== undefined) {
+                wordScore = sentimentDict[word];
+            } 
+            // 2. Kök bazlı eşleşme kontrolü (Sorun 3: "yaptırım" -> "yaptırımlar")
+            else {
+                const wordStem = word.substring(0, 6);
+                if (stemDict[wordStem] !== undefined) {
+                    wordScore = stemDict[wordStem];
+                }
+            }
+
+            if (wordScore !== 0) {
+                // Negasyon penceresindeysek skoru ters çevir
+                if (inNegationWindow > 0) {
+                    wordScore *= -1;
+                }
+                score += wordScore;
+            }
+
+            if (inNegationWindow > 0) {
+                inNegationWindow--;
             }
         });
         
-        // Output normalization based on threshold
-        let label: 'Pozitif' | 'Negatif' | 'Nötr' = 'Nötr';
-        if (score > 0) label = 'Pozitif';
-        else if (score < 0) label = 'Negatif';
+        // [REF-] Kelime yoğunluğu normalizasyonu (square-root scaling)
+        // score = Σ(ağırlıklar) / √(toplam_kelime_sayısı)
+        const scaleFactor = 1.5;
+        const normalizedScore = words.length > 0 
+            ? (score / Math.sqrt(words.length)) * scaleFactor 
+            : 0;
 
-        return { score, label };
+        // Eşik değerlerini hassaslaştır
+        let label: 'Pozitif' | 'Negatif' | 'Nötr' = 'Nötr';
+        if (normalizedScore > 0.65) label = 'Pozitif';
+        else if (normalizedScore < -0.65) label = 'Negatif';
+
+        return { score: normalizedScore, label };
     }
 
     extractEntities(text: string): string[] {

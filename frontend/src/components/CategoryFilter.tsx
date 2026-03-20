@@ -28,14 +28,11 @@ export default function CategoryFilter({ categories, activeCategory, onCategoryC
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => onCategoryChange(cat)}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${activeCategory === cat
-                            ? "text-white shadow-lg"
-                            : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 border ${
+                        activeCategory === cat
+                            ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] border-transparent shadow-lg"
+                            : "bg-[var(--bg-card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border-subtle)]"
                         }`}
-                    style={{
-                        background: activeCategory === cat ? "var(--gradient-hero)" : "var(--bg-card)",
-                        border: `1px solid ${activeCategory === cat ? "transparent" : "var(--border-subtle)"}`,
-                    }}
                 >
                     <span className="mr-1.5">{CATEGORY_ICONS[cat] || "📄"}</span>
                     {cat}

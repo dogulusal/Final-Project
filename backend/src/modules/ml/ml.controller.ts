@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { MlCategorizationService } from './ml.service';
 
 const router = Router();
-const mlService = new MlCategorizationService();
+export const mlService = new MlCategorizationService();
 
 // Sisteme başladığında otomatik olarak DB'deki onaylı haberleri çek ve modeli eğit
 mlService.loadAndTrainFromDB().then(success => {

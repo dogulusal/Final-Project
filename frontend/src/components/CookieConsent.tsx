@@ -9,12 +9,14 @@ export default function CookieConsent() {
     useEffect(() => {
         const consent = localStorage.getItem("kvkk_consent");
         if (!consent) {
-            setIsVisible(true);
+            const timeout = setTimeout(() => setIsVisible(true), 0);
+            return () => clearTimeout(timeout);
         }
     }, []);
 
     const acceptCookies = () => {
         localStorage.setItem("kvkk_consent", "true");
+        localStorage.setItem("personalization_enabled", "true");
         setIsVisible(false);
     };
 

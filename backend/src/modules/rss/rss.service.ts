@@ -36,9 +36,19 @@ export class RssParserService implements IRssParserService {
         }
     }
 
-    async fetchAllFeeds(sources: IRssSource[]): Promise<ParsedRssItem[]> {
-        const promises = sources.map((source) => this.fetchFeed(source));
-        const results = await Promise.all(promises);
+    async fetchAllFeeds(sources: IRssSource[], concurrencyLimit = 5): Promise<ParsedRssItem[]> {
+        const results: ParsedRssItem[][] = [];
+        
+        // Kaynakları belirtilen limit dahilinde parçalara (batch) bölerek işleyelim
+        // Bu sayede 100+ kaynağı aynı anda tetikleyip sistemi yormayız.
+        for (let i = 0; i < sources.length; i += concurrencyLimit) {
+            const batch = sources.slice(i, i + concurrencyLimit);
+            const batchResults = await Promise.all(
+                batch.map((source) => this.fetchFeed(source))
+            );
+            results.push(...batchResults);
+        }
+        
         return results.flat();
     }
 

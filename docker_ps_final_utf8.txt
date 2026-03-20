@@ -1,0 +1,6 @@
+﻿NAMES                      STATUS                    PORTS
+final-project-backend-1    Up About a minute         0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
+final-project-frontend-1   Up About a minute         0.0.0.0:3001->3001/tcp, [::]:3001->3001/tcp
+final-project-n8n-1        Up 11 minutes             0.0.0.0:5678->5678/tcp, [::]:5678->5678/tcp
+final-project-postgres-1   Up 11 minutes (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+final-project-redis-1      Up 11 minutes             0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp

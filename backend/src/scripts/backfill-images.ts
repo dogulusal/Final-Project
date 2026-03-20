@@ -26,7 +26,7 @@ async function backfill() {
 
   let updatedCount = 0;
   for (const item of newsWithoutImages) {
-    const imageUrl = ImageService.getRandomImageForCategory(item.kategori.slug);
+    const imageUrl = ImageService.getImageForNews(item.kategori.slug, item.baslik, item.slug);
     
     await prisma.haber.update({
       where: { id: item.id },

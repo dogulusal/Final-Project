@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { NewsService, newsEventEmitter } from './news.service';
 import { ValidationError } from '../../middleware/error-handler';
+import { mlService } from '../ml/ml.controller';
 
 const router = Router();
 const newsService = new NewsService();
@@ -89,19 +90,57 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
             throw ValidationError('Geçerli bir kategoriId veya kategoriAd gereklidir.');
         }
 
+        // ML işlemlerini (Sentiment & Kategorizasyon) paralel yürüt (Sorun 4 & Sorun 3: Hata yönetimi iyileştirildi)
+        const [mlCategoryResult, mlSentimentResult] = await Promise.all([
+            mlService.categorize(req.body.baslik).catch((e) => {
+                console.error("[ML Error] Categorization failed:", e);
+                return null;
+            }),
+            mlService.analyzeSentiment(req.body.baslik + " " + (req.body.icerik || "")).catch((e) => {
+                console.error("[ML Error] Sentiment analysis failed:", e);
+                return null;
+            })
+        ]);
+
         let parsedConfidence: number | undefined = undefined;
         if (req.body.mlConfidence !== undefined && req.body.mlConfidence !== null) {
             parsedConfidence = parseFloat(req.body.mlConfidence);
+        } else if (mlCategoryResult) {
+            parsedConfidence = mlCategoryResult.confidence;
+        }
+
+        let computedSentiment = req.body.sentiment;
+        if (computedSentiment && mlSentimentResult && computedSentiment !== mlSentimentResult.label && computedSentiment !== 'Nötr') {
+            console.log(`[Sentiment Conflict] ${req.body.baslik.substring(0, 30)}... -> LLM: ${computedSentiment}, Dictionary: ${mlSentimentResult.label}. LLM wins.`);
+        } else if (!computedSentiment && mlSentimentResult) {
+            computedSentiment = mlSentimentResult.label;
+        }
+
+        // 1. Manuel Kategori Ataması (Requestten gelen)
+        let finalKategoriId = dbKategoriId;
+
+        // 2. ML Otomatik Kategori Ataması (Eğer Confidence Yüksekse - Sorun 4 İyileştirmesi)
+        if (mlCategoryResult && mlCategoryResult.confidence > 0.4) {
+            const { prisma } = require('../../config/database');
+            const mlCatName = mlCategoryResult.kategori;
+            const mlFoundCat = await prisma.kategori.findFirst({ 
+                where: { ad: { equals: mlCatName, mode: 'insensitive' } } 
+            });
+            
+            if (mlFoundCat) {
+                finalKategoriId = mlFoundCat.id;
+                console.log(`[ML] Kategori Otomatik Atandı: ${req.body.baslik} -> ${mlCatName} (%${(mlCategoryResult.confidence * 100).toFixed(1)})`);
+            }
         }
 
         const savedNews = await newsService.createNews({
             baslik: req.body.baslik,
             icerik: req.body.icerik,
             metaAciklama: req.body.metaAciklama,
-            kategoriId: dbKategoriId,
+            kategoriId: finalKategoriId,
             kaynakUrl: req.body.kaynakUrl,
             gorselUrl: req.body.gorselUrl,
-            sentiment: req.body.sentiment,
+            sentiment: computedSentiment || 'Nötr',
             durum: status || 'ham',
             mlConfidence: parsedConfidence,
             llmProvider: req.body.llmProvider

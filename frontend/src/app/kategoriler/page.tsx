@@ -7,7 +7,7 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import NewsGrid from "@/components/NewsGrid";
 import Footer from "@/components/Footer";
-import type { NewsItem } from "@/app/page";
+import { NewsItem } from "@/types/news";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 

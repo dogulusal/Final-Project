@@ -12,15 +12,19 @@
         "prisma:generate": "prisma generate",
         "prisma:migrate": "prisma migrate dev",
         "prisma:studio": "prisma studio",
-        "prisma:seed": "ts-node prisma/seed.ts"
+        "prisma:seed": "ts-node prisma/seed.ts",
+        "migration:sanitize": "ts-node src/scripts/sanitize-existing-news.ts",
+        "training:generate": "ts-node src/scripts/generate-training-data.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
     },
     "dependencies": {
+        "@napi-rs/canvas": "^0.1.96",
         "@prisma/client": "^5.7.0",
         "@types/ioredis": "^4.28.10",
         "@types/snowball-stemmers": "^0.6.2",
+        "@napi-rs/canvas": "^0.1.66",
         "canvas": "^2.11.2",
         "cors": "^2.8.5",
         "dotenv": "^16.3.1",

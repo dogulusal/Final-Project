@@ -3,6 +3,8 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { PORT, NODE_ENV, LOG_LEVEL } from './config/constants';
 import { errorHandler } from './middleware/error-handler';
+import { authMiddleware } from './middleware/auth.middleware';
+
 
 const app = express();
 
@@ -42,12 +44,29 @@ import { socialRouter } from './modules/social';
 import { adminRouter } from './modules/admin/admin.controller';
 
 app.use('/api/rss', rssRouter);
-app.use('/api/ml', mlRouter);
+app.use('/api/ml', authMiddleware, mlRouter);
 app.use('/api/llm', llmRouter);
 app.use('/api/news', newsRouter);
 app.use('/api/render', renderRouter);
 app.use('/api/social', socialRouter);
-app.use('/api/admin', adminRouter);
+app.use('/api/admin', authMiddleware, adminRouter);
+
+
+// --- Background Tasks ---
+import { rssScheduler } from './modules/rss/rss-scheduler';
+rssScheduler.start(); // RSS periyodik toplayıcısını başlat
+
+// Graceful Shutdown
+process.on('SIGTERM', () => {
+    console.log('[Server] Kapatılıyor...');
+    rssScheduler.stop();
+    process.exit(0);
+});
+process.on('SIGINT', () => {
+    console.log('[Server] Kapatılıyor (Ctrl+C)...');
+    rssScheduler.stop();
+    process.exit(0);
+});
 
 // --- Centralized Error Handler (EN SON middleware olmalı) ---
 app.use(errorHandler);

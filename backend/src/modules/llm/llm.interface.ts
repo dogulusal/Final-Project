@@ -19,9 +19,11 @@ export interface ILLMProvider {
 
 export interface GeneratedNewsContent {
     baslik: string;
-    meta_aciklama: string;
+    meta_aciklama: string; // "Neden Önemli?" alanı için de kullanılabilir
     icerik: string;
     etiketler: string[];
+    sentiment?: string;    // "Pozitif" | "Negatif" | "Nötr"
+    confidence?: number;   // 0.0 - 1.0
 }
 
 export interface ABTestResult {

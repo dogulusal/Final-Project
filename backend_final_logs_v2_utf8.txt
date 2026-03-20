@@ -1,0 +1,63 @@
+﻿docker :     at Object.<anonym
+ous> (/app/src/modules/ml/turk
+ish-stemmer.ts:9:1)
+At line:1 char:1
++ docker logs final-project-ba
+ckend-1 --tail 30 > backend_fi
+nal_logs_v2 ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo          : 
+    NotSpecified: (    at Ob  
+  ject.<...stemmer.ts:9:1):   
+ String) [], RemoteExcepti    
+on
+    + FullyQualifiedErrorId : 
+    NativeCommandError
+ 
+    at Module._compile (node:i
+nternal/modules/cjs/loader:152
+1:14)
+    at Module._compile (/app/n
+ode_modules/source-map-support
+/source-map-support.js:521:25)
+    at Module.m._compile (/tmp
+/ts-node-dev-hook-949718141465
+205.js:69:33)
+    at Module._extensions..js 
+(node:internal/modules/cjs/loa
+der:1623:10)
+    at require.extensions..jsx
+.require.extensions..js (/tmp/
+ts-node-dev-hook-9497181414652
+05.js:114:20)
+npm error path /app
+npm error command failed
+npm error signal SIGTERM
+npm error command sh -c ts-nod
+e-dev --respawn --transpile-on
+ly src/index.ts
+npm error A complete log of th
+is run can be found in: /root/
+.npm/_logs/2026-03-14T15_02_11
+_891Z-debug-0.log
+[ERROR] 15:02:14 Error: Cannot find module 'snowball-stemmers'
+Require stack:
+- /app/src/modules/ml/turkish-stemmer.ts
+- /app/src/modules/ml/index.ts
+- /app/src/index.ts
+
+> ai-news-agency-backend@0.1.0 dev
+> ts-node-dev --respawn --transpile-only src/index.ts
+
+[INFO] 15:05:20 ts-node-dev ver. 2.0.0 (using ts-node ver. 10.9.2, typescript ver. 5.9.3)
+[Redis] Connecting to redis:6379...
+[LLM] Fallback Sa─şlay─▒c─▒s─▒ aktif edildi: ollama
+[Server] AI Haber Ajans─▒ backend ├ğal─▒┼ş─▒yor ÔåÆ http://localhost:3000
+[Server] Ortam: development | Log seviyesi: info
+[Redis] Connected successfully
+prisma:info Starting a postgresql pool with 13 connections.
+prisma:query SELECT "public"."haberler"."id", "public"."haberler"."baslik", "public"."haberler"."slug", "public"."haberler"."meta_aciklama", "public"."haberler"."icerik", "public"."haberler"."kategori_id", "public"."haberler"."kaynak_url", "public"."haberler"."gorsel_url", "public"."haberler"."sentiment", "public"."haberler"."okuma_suresi_dakika", "public"."haberler"."yayinlanma_tarihi", "public"."haberler"."goruntulenme_sayisi", "public"."haberler"."durum", "public"."haberler"."ml_confidence", "public"."haberler"."llm_provider" FROM "public"."haberler" WHERE "public"."haberler"."durum" IN ($1,$2) OFFSET $3
+prisma:query SELECT "public"."kategoriler"."id", "public"."kategoriler"."ad", "public"."kategoriler"."slug", "public"."kategoriler"."renk_kodu", "public"."kategoriler"."ikon" FROM "public"."kategoriler" WHERE "public"."kategoriler"."id" IN ($1,$2,$3,$4,$5,$6,$7) OFFSET $8
+[ML] Model e─şitimi ba┼şl─▒yor... (1122 ├Ârnek)

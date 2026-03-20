@@ -5,8 +5,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import type { NewsItem } from "@/app/page";
+import type { NewsItem } from "@/types/news";
 import { Share2 } from "lucide-react";
+import ReadingProgressBar from "@/components/ReadingProgressBar";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -107,6 +108,7 @@ export default function HaberDetayPage({ params }: { params: Promise<{ slug: str
 
     return (
         <main className="min-h-screen">
+            <ReadingProgressBar />
             <Navbar />
             <article className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
                 <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
