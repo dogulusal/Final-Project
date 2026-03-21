@@ -140,13 +140,15 @@ export class MlCategorizationService implements INewsCategorizationService {
             }
 
             // Sadece başlık kullan — en diskriminatif sinyal. LLM metaAciklama boilerplate içerir.
-            const rawDataset: TrainingData[] = approvedNews.map(news => ({
+            const rawDataset: Array<TrainingData & { id: number }> = approvedNews.map(news => ({
+                id: news.id,
                 text: news.baslik.trim(),
                 category: news.kategori.ad
             }));
 
-            // Kategori bazlı stratified split (önce böl, sonra upsample — data leakage engeli)
-            const byCategory: Record<string, TrainingData[]> = {};
+            // Kategori bazlı stratified split — hash deterministik (ID % 5 === 0 → test)
+            // Avantaj: zamansal bias yok, her eğitimde aynı sonuç, data leakage yok
+            const byCategory: Record<string, Array<TrainingData & { id: number }>> = {};
             rawDataset.forEach(d => {
                 if (!byCategory[d.category]) byCategory[d.category] = [];
                 byCategory[d.category].push(d);
@@ -157,13 +159,14 @@ export class MlCategorizationService implements INewsCategorizationService {
 
             for (const [, examples] of Object.entries(byCategory)) {
                 if (examples.length < 3) continue; // Kategori guard
-                const shuffled = [...examples].sort(() => 0.5 - Math.random());
-                const splitIdx = Math.floor(shuffled.length * 0.8);
-                const catTrain = shuffled.slice(0, splitIdx);
-                const catTest = shuffled.slice(splitIdx);
+                // ID % 5 === 0 → test (yaklaşık %20), geri kalan → train
+                const catTest = examples.filter(e => e.id % 5 === 0);
+                const catTrain = examples.filter(e => e.id % 5 !== 0);
+
+                if (catTrain.length < 2) continue;
 
                 // Upsampling sadece train setine uygulanır (test kirletilmez)
-                const maxTrainCount = Math.max(...Object.values(byCategory).map(arr => Math.floor(arr.length * 0.8)));
+                const maxTrainCount = Math.max(...Object.values(byCategory).map(arr => arr.filter(e => e.id % 5 !== 0).length));
                 const target = Math.min(maxTrainCount, catTrain.length * 3); // Max 3x upsampling
                 let i = 0;
                 const upsampled = [...catTrain];
@@ -171,8 +174,8 @@ export class MlCategorizationService implements INewsCategorizationService {
                     upsampled.push({ ...catTrain[i % catTrain.length] });
                     i++;
                 }
-                trainSet.push(...upsampled);
-                testSet.push(...catTest);
+                trainSet.push(...upsampled.map(({ id: _id, ...rest }) => rest));
+                testSet.push(...catTest.map(({ id: _id, ...rest }) => rest));
             }
 
             console.log(`[ML] DB'den ${approvedNews.length} haber yüklendi → train: ${trainSet.length} (upsampled), test: ${testSet.length} (temiz)`);
