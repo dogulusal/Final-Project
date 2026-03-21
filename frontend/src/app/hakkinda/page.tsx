@@ -17,7 +17,7 @@ const TECH_STACK = [
 const ARCHITECTURE = [
     { label: "Frontend", tech: "Next.js 16 + Tailwind", color: "var(--accent-blue)" },
     { label: "Backend", tech: "Express + Prisma", color: "var(--accent-purple)" },
-    { label: "Otomasyon", tech: "n8n (4 Workflow)", color: "var(--accent-emerald)" },
+    { label: "Otomasyon", tech: "RSS Scheduler (32 Kaynak)", color: "var(--accent-emerald)" },
     { label: "Veritabanı", tech: "PostgreSQL", color: "var(--accent-cyan)" },
     { label: "LLM", tech: "Google Gemini AI", color: "var(--accent-rose)" },
     { label: "Konteyner", tech: "Docker Compose", color: "var(--accent-amber)" },

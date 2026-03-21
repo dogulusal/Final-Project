@@ -1,5 +1,5 @@
 import Parser from 'rss-parser';
-import { RSS_SOURCES, LLM_PIPELINE_ENABLED, LLM_DAILY_QUOTA } from '../../config/constants';
+import { RSS_SOURCES, LLM_PIPELINE_ENABLED, LLM_DAILY_QUOTA, ML_CONFIDENCE_THRESHOLD } from '../../config/constants';
 import { ContentQualityFilter } from '../news/content-quality-filter';
 import { NewsService } from '../news/news.service';
 import { mlService } from '../ml/ml.controller';
@@ -151,7 +151,7 @@ export class RssScheduler {
                 }).then(rows => new Set(rows.map(r => r.kaynakUrl)));
 
                 // En yeni x tane habere bak
-                for (let i = 0; i < Math.min(feed.items.length, 5); i++) {
+                for (let i = 0; i < Math.min(feed.items.length, 15); i++) {
                     const item = feed.items[i];
                     if (!item.title) continue;
 
@@ -174,9 +174,8 @@ export class RssScheduler {
                     ]);
 
                     let finalCatId = 1; // Default
-                    const ML_THRESHOLD_CONFIDENCE = 0.4;
 
-                    if (catRes && catRes.confidence > ML_THRESHOLD_CONFIDENCE) {
+                    if (catRes && catRes.confidence > ML_CONFIDENCE_THRESHOLD) {
                         finalCatId = kategoriMap.get(catRes.kategori.toLowerCase()) ?? 1;
                     } else {
                         finalCatId = kategoriMap.get((source.category || '').toLowerCase()) ?? 1;

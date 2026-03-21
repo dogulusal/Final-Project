@@ -29,7 +29,7 @@ export default function Footer() {
                         <ul className="space-y-2 text-xs text-[var(--text-muted)]">
                             <li>🤖 Naive Bayes ML</li>
                             <li>🧠 Gemini AI</li>
-                            <li>📡 n8n Otomasyon</li>
+                            <li>⚙️ RSS Otomasyonu</li>
                             <li>🎨 Next.js + Tailwind</li>
                         </ul>
                     </div>

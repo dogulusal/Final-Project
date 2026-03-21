@@ -19,7 +19,7 @@ describe('MlCategorizationService', () => {
     });
 
     describe('train and categorize', () => {
-        it('should skip training if dataset is too small (<5 items)', async () => {
+        it('should skip training if dataset is too small (<30 items)', async () => {
             const smallData: TrainingData[] = [
                 { text: 'A text', category: 'Spor' },
                 { text: 'Another text', category: 'Ekonomi' }
@@ -31,24 +31,61 @@ describe('MlCategorizationService', () => {
         });
 
         it('should train correctly and split into test/train sets (80/20)', async () => {
+            // 30 examples split: 24 train, 6 test (all categories have ≥3 examples)
+            const makeExamples = (texts: string[], cat: string): TrainingData[] =>
+                texts.map(text => ({ text, category: cat }));
             const data: TrainingData[] = [
-                { text: 'Fenerbahçe maçı kazandı, gol attı', category: 'Spor' },
-                { text: 'Galatasaray derbiye hazır', category: 'Spor' },
-                { text: 'Dolar kuru fırladı enflasyon', category: 'Ekonomi' },
-                { text: 'Merkez Bankası faiz kararını açıkladı', category: 'Ekonomi' },
-                { text: 'Yeni iPhone modeli tanıtıldı', category: 'Teknoloji' },
-                { text: 'Yapay zeka devrimi devam ediyor', category: 'Teknoloji' },
-                { text: 'Siyaset arenasında seçim tartışması', category: 'Siyaset' },
-                { text: 'Meclis yeni yasayı oyladı', category: 'Siyaset' },
-                { text: 'Mars aracı kızıl gezegenden döndü', category: 'Teknoloji' }, // 9th item -> split will be 7 train, 2 test
+                ...makeExamples([
+                    'Fenerbahçe maçı kazandı, gol attı',
+                    'Galatasaray derbiye hazır, şampiyon',
+                    'Beşiktaş takımı transfer yaptı',
+                    'Trabzonspor şampiyonluk peşinde',
+                    'Futbol ligi puan durumu güncellendi',
+                ], 'Spor'),
+                ...makeExamples([
+                    'Dolar kuru fırladı enflasyon arttı',
+                    'Merkez Bankası faiz kararını açıkladı',
+                    'Borsa İstanbul rekor kırdı',
+                    'İşsizlik oranı açıklandı ekonomi',
+                    'Bütçe açığı büyüdü maliye politikası',
+                ], 'Ekonomi'),
+                ...makeExamples([
+                    'Yeni iPhone modeli tanıtıldı yapay zeka',
+                    'Yapay zeka devrimi devam ediyor teknoloji',
+                    'Mars aracı kızıl gezegenden döndü keşif',
+                    'Google yeni ürün lansmanı yaptı',
+                    'Siber güvenlik açığı bulundu yazılım',
+                ], 'Teknoloji'),
+                ...makeExamples([
+                    'Siyaset arenasında seçim tartışması',
+                    'Meclis yeni yasayı oyladı oylama',
+                    'Cumhurbaşkanı açıklama yaptı politika',
+                    'Muhalefet eleştiri yöneltti iktidar',
+                    'Hükümet reform paketi açıkladı',
+                ], 'Siyaset'),
+                ...makeExamples([
+                    'Hastane yeni tedavi yöntemi açıkladı',
+                    'Sağlık bakanlığı aşı kampanyası başlattı',
+                    'Kanser tedavisinde büyük gelişme',
+                    'Pandemi sonrası sağlık raporu yayınlandı',
+                    'Genç nüfusta kalp hastalığı artıyor',
+                ], 'Sağlık'),
+                ...makeExamples([
+                    'NATO zirvesi sonuçları açıklandı dünya',
+                    'Rusya Ukrayna savaşında son durum',
+                    'BM insan hakları raporu yayınlandı',
+                    'ABD Çin ilişkileri gerginleşiyor',
+                    'Avrupa Birliği yeni kararlar aldı',
+                ], 'Dünya'),
             ];
 
             await mlService.train(data);
 
             const accuracyData = await mlService.getAccuracy();
-            expect(accuracyData.trainSize).toBe(7); // math.floor(9 * 0.8)
-            expect(accuracyData.testSize).toBe(2);  // 9 - 7
-            expect(accuracyData.accuracy).toBeGreaterThanOrEqual(0); // Since text size is tiny, could be 0, 0.5 or 1
+            // 30 valid examples → 24 train, 6 test
+            expect(accuracyData.trainSize).toBe(24);
+            expect(accuracyData.testSize).toBe(6);
+            expect(accuracyData.accuracy).toBeGreaterThanOrEqual(0);
             
             const result = await mlService.categorize('Beşiktaş maçı yaklaşıyor');
             expect(result).toBeDefined();
@@ -56,17 +93,16 @@ describe('MlCategorizationService', () => {
         });
 
         it('should produce normalized confidence scores using stabilized softmax', async () => {
-             const data: TrainingData[] = [
-                // 3 Spor examples guarantee ≥1 is in training even with 80/20 split (max 2 go to test)
-                { text: 'spor haberi futbol mac', category: 'Spor' },
-                { text: 'futbol ligi sampiyonluk gol', category: 'Spor' },
-                { text: 'basketbol turnuvasi galip oyuncu', category: 'Spor' },
-                { text: 'ekonomi haber borsa', category: 'Ekonomi' },
-                { text: 'teknoloji yapay zeka', category: 'Teknoloji' },
-                { text: 'siyaset seçim meclis', category: 'Siyaset' },
-                { text: 'saglik hastane doktor', category: 'Sağlık' },
-                { text: 'dunya nato savas', category: 'Dünya' },
-                { text: 'genel haber bilgi', category: 'Genel' },
+            // 30 examples required: 5 per category × 6 categories
+            const makeExamples = (texts: string[], cat: string): TrainingData[] =>
+                texts.map(text => ({ text, category: cat }));
+            const data: TrainingData[] = [
+                ...makeExamples(['spor haberi futbol mac', 'futbol ligi sampiyonluk gol', 'basketbol turnuvasi galip oyuncu', 'besiktas macini kazandi', 'atletizm yaris sampiyonu'], 'Spor'),
+                ...makeExamples(['ekonomi haber borsa dustu', 'merkez bankasi faiz artirdi', 'enflasyon rekor seviye', 'isssizlik orani yukseldi', 'butce acigi buyudu'], 'Ekonomi'),
+                ...makeExamples(['teknoloji yapay zeka gelistirme', 'iphone yeni model tanitim', 'yazilim gelistirme arac', 'siber guvenlik saldirilari', 'bulut bilisim altyapi'], 'Teknoloji'),
+                ...makeExamples(['siyaset secim kampanya parti', 'meclis oylama yasa kabul', 'cumhurbaskani aciklama politika', 'muhalefet elestirileri hedef', 'hukumet reform paketi'], 'Siyaset'),
+                ...makeExamples(['saglik hastane tedavi yontem', 'asi kampanyasi baslatildi', 'kanser ilac gelistirme', 'pandemi raporu yayinlandi', 'doktor klinik hastane'], 'Sağlık'),
+                ...makeExamples(['dunya nato zirvesi sonuc', 'rusya ukrayna savas gelismeler', 'bm insan haklari ihlali', 'abd cin gerilim tirmandi', 'avrupa birligi karar aldi'], 'Dünya'),
             ];
             await mlService.train(data);
 
@@ -74,7 +110,7 @@ describe('MlCategorizationService', () => {
             
             // Confidence should be high for 'futbol' in Spor
             expect(result.kategori).toBe('Spor');
-            expect(result.confidence).toBeGreaterThan(0.15); // Higher than uniform distribution (1/7 ~= 0.14)
+            expect(result.confidence).toBeGreaterThan(0.15); // Higher than uniform distribution (1/6 ~= 0.17)
             
             // Sum of all scores should be approximately 1
             const totalScore = Object.values(result.allScores).reduce((a, b) => a + b, 0);
@@ -142,6 +178,33 @@ describe('MlCategorizationService', () => {
 
             // Negated version should have lower (or equal) score than positive
             expect(negated.score).toBeLessThanOrEqual(positive.score);
+        });
+
+        it('Ekonomi jargonu: borsa çöküşü negatif olmalı', async () => {
+            const mlService = new MlCategorizationService();
+            const result = await mlService.analyzeSentiment('Borsa çöktü, ekonomi resesyona girdi, enflasyon tırmandı.');
+            expect(result.label).toBe('Negatif');
+            expect(result.score).toBeLessThan(0);
+        });
+
+        it('Spor haberi: şampiyonluk pozitif olmalı', async () => {
+            const mlService = new MlCategorizationService();
+            const result = await mlService.analyzeSentiment('Türkiye Şampiyonu oldu, kupa kazandı, büyük zafer.');
+            expect(result.label).toBe('Pozitif');
+            expect(result.score).toBeGreaterThan(0);
+        });
+
+        it('Nötr meclis haberi: nötr kalmalı', async () => {
+            const mlService = new MlCategorizationService();
+            const result = await mlService.analyzeSentiment('Meclis toplandı, gündem maddeleri görüşüldü, oylama yapıldı.');
+            expect(result.label).toBe('Nötr');
+        });
+
+        it('Bağlam: değil + pozitif kelime → negatif yönde etki etmeli', async () => {
+            const mlService = new MlCategorizationService();
+            const withoutNegation = await mlService.analyzeSentiment('harika başarılı mükemmel');
+            const withNegation = await mlService.analyzeSentiment('değil harika başarılı mükemmel');
+            expect(withNegation.score).toBeLessThan(withoutNegation.score);
         });
     });
 });

@@ -76,7 +76,7 @@ router.get('/stats', async (_req: Request, res: Response) => {
                     id: h.id,
                     baslik: h.baslik,
                     tahmin: h.kategori.ad,
-                    guven: (h.mlConfidence! * 100).toFixed(1),
+                    dogruluk: h.mlConfidence ?? 0,
                     tarih: h.yayinlanmaTarihi
                 })),
                 breakdown: newsByDurum.reduce((acc: any, curr) => {

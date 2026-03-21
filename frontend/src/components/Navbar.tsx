@@ -57,11 +57,6 @@ export default function Navbar() {
                         <NavLink href="/hakkinda" label="Hakkında" />
                         <NavLink href="/admin" label="Yönetici Paneli" />
                         <ThemeToggle />
-                        <Link href="http://localhost:5678" target="_blank" rel="noopener noreferrer"
-                            className="ml-1 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all duration-300 hover:scale-105"
-                            style={{ background: "var(--gradient-brand)", boxShadow: "var(--shadow-glow)" }}>
-                            n8n Dashboard
-                        </Link>
                     </div>
 
                     {/* Mobile Controls */}

@@ -32,7 +32,7 @@ export default function NewsGrid({ news, loading }: Props) {
                 <span className="text-3xl mb-3 block">📭</span>
                 <h3 className="text-lg font-semibold mb-1">Henüz haber bulunamadı</h3>
                 <p className="text-sm text-[var(--text-secondary)]">
-                    n8n workflow&apos;ları aktifleştirildiğinde haberler otomatik olarak burada görünecek.
+                    RSS scheduler bir sonraki döngüde haberler ekleyecek.
                 </p>
             </div>
         );

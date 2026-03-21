@@ -24,7 +24,7 @@ export const LLM_FINE_TUNED_MODEL = process.env.LLM_FINE_TUNED_MODEL || '';
 export const LLM_FALLBACK_PROVIDER = process.env.LLM_FALLBACK_PROVIDER || 'ollama';
 
 // --- ML Model ---
-export const ML_CONFIDENCE_THRESHOLD = parseFloat(process.env.ML_CONFIDENCE_THRESHOLD || '0.60');
+export const ML_CONFIDENCE_THRESHOLD = parseFloat(process.env.ML_CONFIDENCE_THRESHOLD || '0.45');
 
 // --- Güvenlik ---
 export const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'ag-agency-secret-token-2026';
@@ -48,7 +48,7 @@ export const DAILY_NEWS_LIMIT = parseInt(process.env.DAILY_NEWS_LIMIT || '500', 
 
 // --- Dedup ---
 export const DEDUP_SIMILARITY_THRESHOLD = 0.80;
-export const DEDUP_WINDOW_SIZE = 50;
+export const DEDUP_WINDOW_SIZE = 200;
 
 // --- RSS ---
 export const RSS_HEALTH_CHECK_TIMEOUT_MS = 30 * 60 * 1000; // 30 dakika

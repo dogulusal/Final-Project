@@ -54,18 +54,35 @@ export class MlCategorizationService implements INewsCategorizationService {
     async train(dataset: TrainingData[]): Promise<void> {
         console.log(`[ML] Model eğitimi başlıyor... (${dataset.length} örnek)`);
         
-        if (dataset.length < 5) {
-            console.warn('[ML Warn] Yeterli veri yok, eğitim atlanıyor.');
+        if (dataset.length < 30) {
+            console.warn(`[ML Warn] Yeterli veri yok (${dataset.length} < 30), eğitim atlanıyor.`);
             return;
         }
 
+        // Kategori başına min 3 örnek kontrolü
+        const categoryCounts: Record<string, number> = {};
+        dataset.forEach(d => { categoryCounts[d.category] = (categoryCounts[d.category] || 0) + 1; });
+        const validDataset = dataset.filter(d => categoryCounts[d.category] >= 3);
+        const skippedCategories = Object.entries(categoryCounts).filter(([, count]) => count < 3).map(([cat]) => cat);
+        if (skippedCategories.length > 0) {
+            console.warn(`[ML Warn] Yetersiz örnek nedeniyle atlanan kategoriler (< 3 örnek): ${skippedCategories.join(', ')}`);
+        }
+
         // Shuffle dataset
-        const shuffled = [...dataset].sort(() => 0.5 - Math.random());
+        const shuffled = [...validDataset].sort(() => 0.5 - Math.random());
         
         // 80/20 split
         const splitIndex = Math.floor(shuffled.length * 0.8);
         const trainSet = shuffled.slice(0, splitIndex);
         const testSet = shuffled.slice(splitIndex);
+
+        await this.trainWithSplit(trainSet, testSet);
+    }
+
+    /**
+     * Hazır train/test setleriyle eğitim yapar (data leakage olmadan önceden bölünmüş veri için)
+     */
+    private async trainWithSplit(trainSet: TrainingData[], testSet: TrainingData[]): Promise<void> {
         
         this.trainSize = trainSet.length;
         this.testSize = testSet.length;
@@ -122,12 +139,44 @@ export class MlCategorizationService implements INewsCategorizationService {
                 return await this.loadAndTrainFromDiskFallback();
             }
 
-            const dbDataset: TrainingData[] = approvedNews.map(news => ({
-                text: `${news.baslik} ${news.metaAciklama || ''} ${news.icerik || ''}`,
+            // Sadece başlık kullan — en diskriminatif sinyal. LLM metaAciklama boilerplate içerir.
+            const rawDataset: TrainingData[] = approvedNews.map(news => ({
+                text: news.baslik.trim(),
                 category: news.kategori.ad
             }));
 
-            await this.train(dbDataset);
+            // Kategori bazlı stratified split (önce böl, sonra upsample — data leakage engeli)
+            const byCategory: Record<string, TrainingData[]> = {};
+            rawDataset.forEach(d => {
+                if (!byCategory[d.category]) byCategory[d.category] = [];
+                byCategory[d.category].push(d);
+            });
+
+            const trainSet: TrainingData[] = [];
+            const testSet: TrainingData[] = [];
+
+            for (const [, examples] of Object.entries(byCategory)) {
+                if (examples.length < 3) continue; // Kategori guard
+                const shuffled = [...examples].sort(() => 0.5 - Math.random());
+                const splitIdx = Math.floor(shuffled.length * 0.8);
+                const catTrain = shuffled.slice(0, splitIdx);
+                const catTest = shuffled.slice(splitIdx);
+
+                // Upsampling sadece train setine uygulanır (test kirletilmez)
+                const maxTrainCount = Math.max(...Object.values(byCategory).map(arr => Math.floor(arr.length * 0.8)));
+                const target = Math.min(maxTrainCount, catTrain.length * 3); // Max 3x upsampling
+                let i = 0;
+                const upsampled = [...catTrain];
+                while (upsampled.length < target) {
+                    upsampled.push({ ...catTrain[i % catTrain.length] });
+                    i++;
+                }
+                trainSet.push(...upsampled);
+                testSet.push(...catTest);
+            }
+
+            console.log(`[ML] DB'den ${approvedNews.length} haber yüklendi → train: ${trainSet.length} (upsampled), test: ${testSet.length} (temiz)`);
+            await this.trainWithSplit(trainSet, testSet);
             return true;
         } catch (error) {
             console.error('[ML Error] DB üzerinden veri seti oluşturulurken hata:', error);
@@ -299,8 +348,8 @@ export class MlCategorizationService implements INewsCategorizationService {
 
         // Eşik değerlerini hassaslaştır
         let label: 'Pozitif' | 'Negatif' | 'Nötr' = 'Nötr';
-        if (normalizedScore > 0.65) label = 'Pozitif';
-        else if (normalizedScore < -0.65) label = 'Negatif';
+        if (normalizedScore > 0.45) label = 'Pozitif';
+        else if (normalizedScore < -0.45) label = 'Negatif';
 
         return { score: normalizedScore, label };
     }
