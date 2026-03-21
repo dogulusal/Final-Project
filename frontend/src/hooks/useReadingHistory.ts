@@ -16,12 +16,18 @@ export function useReadingHistory() {
     const [isPersonalized, setIsPersonalized] = useState(false);
 
     useEffect(() => {
+        // localStorage sadece client-side'da mevcut
+        if (typeof window === 'undefined') return;
+        
         const consent = localStorage.getItem(CONSENT_KEY) === "true";
         const enabled = localStorage.getItem(PERSONALIZATION_KEY) === "true";
-        setIsPersonalized(consent && enabled);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setIsPersonalized(consent && enabled); // reading localStorage in mount effect, no cascade risk
     }, []);
 
     const recordClick = useCallback((categoryId: number) => {
+        if (typeof window === 'undefined') return;
+        
         // Sadece kişiselleştirme aktifse kaydet
         const consent = localStorage.getItem(CONSENT_KEY) === "true";
         const enabled = localStorage.getItem(PERSONALIZATION_KEY) === "true";
@@ -42,6 +48,8 @@ export function useReadingHistory() {
     }, []);
 
     const getInterests = useCallback(() => {
+        if (typeof window === 'undefined') return {};
+        
         const rawHistory = localStorage.getItem(HISTORY_KEY);
         if (!rawHistory) return {};
 

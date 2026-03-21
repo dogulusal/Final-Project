@@ -19,32 +19,8 @@ services:
       timeout: 5s
       retries: 5
 
-  # --- n8n Orkestrasyon ---
-  n8n:
-    image: n8nio/n8n:latest
-    restart: always
-    ports:
-      - "5678:5678"
-    environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-admin}
-      - N8N_HOST=${N8N_HOST:-localhost}
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://localhost:5678/
-      - GENERIC_TIMEZONE=Europe/Istanbul
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=${DB_NAME:-news_db}
-      - DB_POSTGRESDB_USER=${DB_USER:-postgres}
-      - DB_POSTGRESDB_PASSWORD=${DB_PASSWORD:-postgres}
-    volumes:
-      - n8n_data:/home/node/.n8n
-    depends_on:
-      postgres:
-        condition: service_healthy
+  # n8n kaldırıldı — LLM pipeline RSS scheduler üzerinden doğrudançalışmaktadır.
+  # Orkestrasyon kodda yapıldığından ayrı bir workflow motoru gereksizdir.
 
   # --- Backend API ---
   backend:
@@ -106,5 +82,4 @@ networks:
 
 volumes:
   pg_data:
-  n8n_data:
   redis_data:

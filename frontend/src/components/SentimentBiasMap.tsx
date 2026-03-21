@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, TrendingUp, AlertCircle } from "lucide-react";
+import { Brain, TrendingUp } from "lucide-react";
 
 interface Props {
   positiveCount?: number;

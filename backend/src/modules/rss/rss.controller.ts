@@ -31,8 +31,31 @@ router.get('/test', async (_req: Request, res: Response) => {
 
 router.post('/health', async (req: Request, res: Response) => {
     const { url } = req.body;
-    if (!url) {
+    if (!url || typeof url !== 'string') {
         res.status(400).json({ success: false, error: 'URL gereklidir' });
+        return;
+    }
+
+    // SSRF koruması: yalnızca https:// veya http:// ile başlayan harici URL'lere izin ver
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        res.status(400).json({ success: false, error: 'Geçersiz URL formatı' });
+        return;
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+        res.status(400).json({ success: false, error: 'Yalnızca HTTP/HTTPS protokolüne izin verilir' });
+        return;
+    }
+    // İç ağ adreslerini engelle (SSRF)
+    const hostname = parsed.hostname.toLowerCase();
+    const isInternal = hostname === 'localhost' || hostname === '127.0.0.1' ||
+        hostname === '0.0.0.0' || hostname.startsWith('192.168.') ||
+        hostname.startsWith('10.') || hostname.startsWith('172.') ||
+        hostname.endsWith('.local') || hostname === '::1';
+    if (isInternal) {
+        res.status(400).json({ success: false, error: 'İç ağ adreslerine erişime izin verilmez' });
         return;
     }
 

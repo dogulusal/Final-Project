@@ -1,27 +1,29 @@
 import Link from "next/link";
-import { prisma } from "@/shared/lib/prisma";
+
+const FALLBACK_CATEGORIES = [
+    { id: 1, ad: "Spor", slug: "spor", renkKodu: "#1a472a", ikon: "⚽" },
+    { id: 2, ad: "Ekonomi", slug: "ekonomi", renkKodu: "#1a2a47", ikon: "📈" },
+    { id: 3, ad: "Teknoloji", slug: "teknoloji", renkKodu: "#2d1a47", ikon: "💻" },
+    { id: 4, ad: "Siyaset", slug: "siyaset", renkKodu: "#471a1a", ikon: "🏛️" },
+    { id: 5, ad: "Dünya", slug: "dunya", renkKodu: "#1a3847", ikon: "🌍" },
+    { id: 6, ad: "Sağlık", slug: "saglik", renkKodu: "#47381a", ikon: "🏥" },
+    { id: 7, ad: "Genel", slug: "genel", renkKodu: "#2c3e50", ikon: "📰" },
+];
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export default async function CategorySidebar() {
-    let categories = [];
+    let categories = FALLBACK_CATEGORIES;
     try {
-        // Kategori verilerini Prisma üzerinden doğrudan çekiyoruz
-        categories = await prisma.kategori.findMany({
-            orderBy: {
-                ad: 'asc'
+        const res = await fetch(`${API_BASE}/api/news/categories`, { next: { revalidate: 300 } });
+        if (res.ok) {
+            const json = await res.json();
+            if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+                categories = json.data;
             }
-        });
+        }
     } catch (e) {
-        console.error("[Prisma Error] Kategoriler yüklenemedi, mock veriler dönülüyor:", e);
-        // DB kapalıysa fallback olarak mock kategoriler
-        categories = [
-            { id: 1, ad: "Spor", slug: "spor", renkKodu: "#1a472a", ikon: "⚽" },
-            { id: 2, ad: "Ekonomi", slug: "ekonomi", renkKodu: "#1a2a47", ikon: "📈" },
-            { id: 3, ad: "Teknoloji", slug: "teknoloji", renkKodu: "#2d1a47", ikon: "💻" },
-            { id: 4, ad: "Siyaset", slug: "siyaset", renkKodu: "#471a1a", ikon: "🏛️" },
-            { id: 5, ad: "Dünya", slug: "dunya", renkKodu: "#1a3847", ikon: "🌍" },
-            { id: 6, ad: "Sağlık", slug: "saglik", renkKodu: "#47381a", ikon: "🏥" },
-            { id: 7, ad: "Genel", slug: "genel", renkKodu: "#2c3e50", ikon: "📰" },
-        ];
+        console.error("[CategorySidebar] API isteği başarısız, fallback kullanılıyor:", e);
     }
 
     return (
@@ -55,3 +57,4 @@ export default async function CategorySidebar() {
         </aside>
     );
 }
+

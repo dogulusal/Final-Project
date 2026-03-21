@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { NewsService, newsEventEmitter } from './news.service';
 import { ValidationError } from '../../middleware/error-handler';
 import { mlService } from '../ml/ml.controller';
+import { cacheMiddleware } from '../../middleware/cache.middleware';
 
 const router = Router();
 const newsService = new NewsService();
@@ -36,7 +37,7 @@ router.get('/live', (req: Request, res: Response) => {
  * 1) GET /api/news
  * Son eklenen haberleri listeler. (?limit=30&status=hazir)
  */
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', cacheMiddleware(60), async (req: Request, res: Response, next: NextFunction) => {
     try {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 20;
@@ -158,7 +159,21 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 /**
- * 3) POST /api/news/check-duplicate
+ * 3) GET /api/news/categories
+ * Tüm kategorileri listeler (CategorySidebar için).
+ */
+router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { prisma } = require('../../config/database');
+        const categories = await prisma.kategori.findMany({ orderBy: { ad: 'asc' } });
+        res.json({ success: true, data: categories });
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * 4) POST /api/news/check-duplicate
  * n8n workflow'u: Haberin daha önce kaydedilip kaydedilmediğini kontrol eder.
  */
 router.post('/check-duplicate', async (req: Request, res: Response, next: NextFunction) => {

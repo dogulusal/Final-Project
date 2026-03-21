@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../config/database';
 import { mlService } from '../ml/ml.controller';
+import { LLM_PIPELINE_ENABLED, LLM_DAILY_QUOTA } from '../../config/constants';
 import fs from 'fs';
 import path from 'path';
 
@@ -12,14 +13,16 @@ const router = Router();
  */
 router.get('/stats', async (_req: Request, res: Response) => {
     try {
-        const [totalNews, activeCategories, newsByDurum] = await Promise.all([
+        const [totalNews, activeCategories, newsByDurum, newsByLlmProvider] = await Promise.all([
             prisma.haber.count(),
             prisma.kategori.count(),
             prisma.haber.groupBy({
                 by: ['durum'],
-                _count: {
-                    id: true
-                }
+                _count: { id: true }
+            }),
+            prisma.haber.groupBy({
+                by: ['llmProvider'],
+                _count: { id: true }
             })
         ]);
 
@@ -79,7 +82,15 @@ router.get('/stats', async (_req: Request, res: Response) => {
                 breakdown: newsByDurum.reduce((acc: any, curr) => {
                     acc[curr.durum] = curr._count.id;
                     return acc;
-                }, {})
+                }, {}),
+                llmBreakdown: newsByLlmProvider.reduce((acc: any, curr) => {
+                    acc[curr.llmProvider ?? 'bilinmiyor'] = curr._count.id;
+                    return acc;
+                }, {}),
+                pipeline: {
+                    enabled: LLM_PIPELINE_ENABLED,
+                    dailyQuota: LLM_DAILY_QUOTA,
+                }
             }
         });
     } catch (error) {

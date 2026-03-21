@@ -1,6 +1,0 @@
-﻿CONTAINER ID   IMAGE                    COMMAND                  CREATED       STATUS                 PORTS                                         NAMES
-772a807734ec   redis:7-alpine           "docker-entrypoint.sÔÇĞ"   2 hours ago   Up 2 hours             0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp   final-project-redis-1
-60bb16ea9737   final-project-backend    "docker-entrypoint.sÔÇĞ"   9 days ago    Up 2 hours             3000/tcp                                      final-project-backend-1
-f449cecfcfe4   final-project-frontend   "docker-entrypoint.sÔÇĞ"   9 days ago    Up 2 hours             3001/tcp                                      final-project-frontend-1
-25bcf8d5b27b   n8nio/n8n:latest         "tini -- /docker-entÔÇĞ"   9 days ago    Up 2 hours             0.0.0.0:5678->5678/tcp, [::]:5678->5678/tcp   final-project-n8n-1
-a439a2c16b4b   postgres:16-alpine       "docker-entrypoint.sÔÇĞ"   9 days ago    Up 2 hours (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp   final-project-postgres-1

@@ -28,6 +28,11 @@ export const ML_CONFIDENCE_THRESHOLD = parseFloat(process.env.ML_CONFIDENCE_THRE
 
 // --- Güvenlik ---
 export const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'ag-agency-secret-token-2026';
+// CORS_ALLOWED_ORIGINS: virgülle ayrılmış origin listesi (örn: http://localhost:3000,https://yourdomain.com)
+export const CORS_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001,http://localhost:3002')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
 
 
 // --- Sosyal Medya ---
@@ -48,6 +53,12 @@ export const DEDUP_WINDOW_SIZE = 50;
 // --- RSS ---
 export const RSS_HEALTH_CHECK_TIMEOUT_MS = 30 * 60 * 1000; // 30 dakika
 export const RSS_FETCH_INTERVAL_MS = 10 * 60 * 1000; // 10 dakika (15'ten düşürüldü)
+
+// --- LLM Pipeline ---
+// LLM_PIPELINE_ENABLED=true olarak .env'de ayarlanmadan pipeline çalışmaz (güvenli varsayılan)
+export const LLM_PIPELINE_ENABLED = process.env.LLM_PIPELINE_ENABLED === 'true';
+// Günlük LLM'e gönderilebilecek maksimum haber sayısı (maliyet kontrolü)
+export const LLM_DAILY_QUOTA = parseInt(process.env.LLM_DAILY_QUOTA || '100', 10);
 
 // --- Retry ---
 export const MAX_RETRY_ATTEMPTS = 3;

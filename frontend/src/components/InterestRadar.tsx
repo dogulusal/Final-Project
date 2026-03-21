@@ -20,7 +20,7 @@ export default function InterestRadar() {
       score: Number(raw[cat]),
       pct: Math.round((Number(raw[cat]) / maxScore) * 100)
     })).sort((a,b) => b.score - a.score).slice(0, 5); // top 5
-  }, [getInterests()]); // trigger re-render on interest change if possible
+  }, [getInterests]); // getInterests is stable (useCallback)
 
   if (!isPersonalized || interests.length === 0) {
     return (

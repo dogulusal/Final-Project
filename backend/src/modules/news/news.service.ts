@@ -6,11 +6,13 @@ import { ConflictError, NotFoundError } from '../../middleware/error-handler';
 import { EventEmitter } from 'events';
 
 export const newsEventEmitter = new EventEmitter();
+newsEventEmitter.setMaxListeners(50); // Multiple SSE clients + tests
 
 import { redis as redisClient } from '../../config/redis';
 import crypto from 'crypto';
 import { ImageService } from './image.service';
 import { sanitizeText } from '../../common';
+import { invalidateCache } from '../../middleware/cache.middleware';
 
 export class NewsService implements INewsService {
 
@@ -75,6 +77,9 @@ export class NewsService implements INewsService {
 
         console.log(`[DB] Yeni haber kaydedildi: "${newNews.baslik}" (ID: ${newNews.id})`);
         
+        // Cache invalidation: haber listesi cache'ini temizle
+        invalidateCache('api:cache:/api/news*').catch(() => {});
+
         // SSE üzerinden dinleyen istemcilere bildir:
         newsEventEmitter.emit('new-news', newNews);
         

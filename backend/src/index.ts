@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { PORT, NODE_ENV, LOG_LEVEL } from './config/constants';
+import { PORT, NODE_ENV, LOG_LEVEL, CORS_ALLOWED_ORIGINS } from './config/constants';
 import { errorHandler } from './middleware/error-handler';
 import { authMiddleware } from './middleware/auth.middleware';
 
@@ -9,8 +10,13 @@ import { authMiddleware } from './middleware/auth.middleware';
 const app = express();
 
 // --- Middleware ---
+// Helmet: güvenli HTTP başlıkları (X-Content-Type-Options, X-Frame-Options, vb.)
+app.use(helmet({
+    contentSecurityPolicy: NODE_ENV === 'production',  // Sadece prod'da CSP
+    crossOriginEmbedderPolicy: false, // Next.js ile uyumluluk için
+}));
 app.use(cors({
-    origin: ['http://localhost:3001', 'http://localhost:3002'],
+    origin: CORS_ALLOWED_ORIGINS,
     credentials: true,
 }));
 app.use(express.json({ limit: '1mb' }));
@@ -45,7 +51,7 @@ import { adminRouter } from './modules/admin/admin.controller';
 
 app.use('/api/rss', rssRouter);
 app.use('/api/ml', authMiddleware, mlRouter);
-app.use('/api/llm', llmRouter);
+app.use('/api/llm', authMiddleware, llmRouter); // LLM kotası koruma: yetkisiz çağrı = Gemini maliyeti
 app.use('/api/news', newsRouter);
 app.use('/api/render', renderRouter);
 app.use('/api/social', socialRouter);

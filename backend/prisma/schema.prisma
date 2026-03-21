@@ -59,6 +59,10 @@ model Haber {
   kategori            Kategori  @relation(fields: [kategoriId], references: [id])
   okumaGecmisi        OkumaGecmisi[]
 
+  @@index([durum])                          // En sık filtre: status=hazir
+  @@index([yayinlanmaTarihi(sort: Desc)])   // Sıralama: en yeni önce
+  @@index([kategoriId])                     // Kategori filtreleme
+  @@index([durum, yayinlanmaTarihi(sort: Desc)])  // Kombine: hazir haberler tarih sırası
   @@map("haberler")
 }
 

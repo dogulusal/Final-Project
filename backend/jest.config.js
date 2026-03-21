@@ -6,6 +6,7 @@ module.exports = {
     testMatch: ['**/__tests__/**/*.test.ts', '**/*.test.ts'],
     moduleFileExtensions: ['ts', 'js', 'json'],
     clearMocks: true,
+    forceExit: true, // Redis/timer bağlantıları testtten sonra kapatılmaz ise zorla çık
     collectCoverageFrom: [
         'src/**/*.ts',
         '!src/index.ts',

@@ -56,10 +56,17 @@ describe('Admin Controller', () => {
         it('should return stats if API key is valid', async () => {
             (prisma.haber.count as jest.Mock).mockResolvedValue(100);
             (prisma.kategori.count as jest.Mock).mockResolvedValue(5);
-            (prisma.haber.groupBy as jest.Mock).mockResolvedValue([
-                { durum: 'yayinda', _count: { id: 80 } },
-                { durum: 'ham', _count: { id: 20 } }
-            ]);
+            (prisma.haber.groupBy as jest.Mock)
+                // First call: groupBy durum
+                .mockResolvedValueOnce([
+                    { durum: 'hazir', _count: { id: 80 } },
+                    { durum: 'ham', _count: { id: 20 } }
+                ])
+                // Second call: groupBy llmProvider
+                .mockResolvedValueOnce([
+                    { llmProvider: 'gemini', _count: { id: 60 } },
+                    { llmProvider: null, _count: { id: 40 } }
+                ]);
             (prisma.haber.aggregate as jest.Mock).mockResolvedValue({ _avg: { mlConfidence: 0.85 } });
             (mlService.getAccuracy as jest.Mock).mockResolvedValue({ accuracy: 0.92 });
             (prisma.haber.findMany as jest.Mock).mockResolvedValue([]);
@@ -72,6 +79,11 @@ describe('Admin Controller', () => {
             expect(res.body.success).toBe(true);
             expect(res.body.stats.totalNews).toBe(100);
             expect(res.body.stats.mlAccuracy).toBe("92.0");
+            // Yeni alanlar
+            expect(res.body.stats.breakdown).toHaveProperty('hazir', 80);
+            expect(res.body.stats.breakdown).toHaveProperty('ham', 20);
+            expect(res.body.stats.llmBreakdown).toBeDefined();
+            expect(res.body.stats.pipeline).toEqual(expect.objectContaining({ dailyQuota: expect.any(Number) }));
         });
     });
 });

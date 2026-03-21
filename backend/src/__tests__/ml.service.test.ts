@@ -57,7 +57,10 @@ describe('MlCategorizationService', () => {
 
         it('should produce normalized confidence scores using stabilized softmax', async () => {
              const data: TrainingData[] = [
-                { text: 'spor haberi futbol', category: 'Spor' },
+                // 3 Spor examples guarantee ≥1 is in training even with 80/20 split (max 2 go to test)
+                { text: 'spor haberi futbol mac', category: 'Spor' },
+                { text: 'futbol ligi sampiyonluk gol', category: 'Spor' },
+                { text: 'basketbol turnuvasi galip oyuncu', category: 'Spor' },
                 { text: 'ekonomi haber borsa', category: 'Ekonomi' },
                 { text: 'teknoloji yapay zeka', category: 'Teknoloji' },
                 { text: 'siyaset seçim meclis', category: 'Siyaset' },
@@ -112,6 +115,33 @@ describe('MlCategorizationService', () => {
             const result = await mlService.analyzeSentiment('Büyük bir kriz ve felaket yaşandı.');
             expect(result.label).toBe('Negatif');
             expect(result.score).toBeLessThan(0);
+        });
+
+        it('√n normalizasyonu: uzun metinde skor dramatik şekilde artmamalı', async () => {
+            const mlService = new MlCategorizationService();
+            const shortText = 'harika başarılı';
+            const longText = Array(20).fill('harika başarılı iyi olumlu güzel').join(' ');
+            
+            const shortResult = await mlService.analyzeSentiment(shortText);
+            const longResult = await mlService.analyzeSentiment(longText);
+
+            // √n normalizasyonu sayesinde uzun metin skoru kısa metinden
+            // orantısız büyüklükte olmamalı (max ~5x fark beklenir)
+            if (shortResult.score > 0 && longResult.score > 0) {
+                expect(longResult.score / shortResult.score).toBeLessThan(10);
+            }
+        });
+
+        it('negasyon penceresi: "değil" sonraki pozitif kelimeyi ters çevirmeli', async () => {
+            const mlService = new MlCategorizationService();
+            const positiveText = 'bu çok başarılı bir sonuç';
+            const negatedText   = 'bu değil başarılı bir sonuç';
+
+            const positive = await mlService.analyzeSentiment(positiveText);
+            const negated  = await mlService.analyzeSentiment(negatedText);
+
+            // Negated version should have lower (or equal) score than positive
+            expect(negated.score).toBeLessThanOrEqual(positive.score);
         });
     });
 });

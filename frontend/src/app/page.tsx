@@ -13,8 +13,9 @@ import { personalizedSort } from "@/utils/personalizedSort";
 import PersonalizedHeroCarousel from "@/components/PersonalizedHeroCarousel";
 import SentimentBiasMap from "@/components/SentimentBiasMap";
 import InterestRadar from "@/components/InterestRadar";
+import LazySection from "@/components/LazySection";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 
 const CATEGORIES = [
@@ -59,15 +60,31 @@ export default function Home() {
       if (catSlug && catSlug !== "Tümü") url += `&category=${catSlug}`;
       if (debouncedSearch) url += `&search=${encodeURIComponent(debouncedSearch)}`;
       
-      const res = await fetch(url);
+      console.log("[fetchNews] Fetching from:", url);
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'omit'
+      });
+      
+      if (!res.ok) {
+        console.error(`[fetchNews] HTTP Error: ${res.status} ${res.statusText}`);
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+      
       const data = await res.json();
+      console.log("[fetchNews] API Response:", data);
       
       if (data.success) {
         setNews(data.data);
         setTotalPages(data.totalPages || 1);
+      } else {
+        console.warn("[fetchNews] API başarısız:", data);
+        setNews([]);
       }
     } catch (error) {
-      console.error("Haberler yüklenirken hata:", error);
+      console.error("[fetchNews] Error:", error);
+      setNews([]);
     } finally {
       setLoading(false);
     }
@@ -160,12 +177,12 @@ export default function Home() {
           )}
         </div>
 
-        {/* Dashboard Analytics Row */}
+        {/* Dashboard Analytics Row — lazy-mounted via IntersectionObserver */}
         {activeCategory === "Tümü" && !search && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
+          <LazySection minHeight="220px" className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
             <SentimentBiasMap />
             <InterestRadar />
-          </div>
+          </LazySection>
         )}
 
         {/* Ana İçerik */}

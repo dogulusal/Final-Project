@@ -4,7 +4,19 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Activity, BarChart3, Database, FileText, CheckCircle2, TrendingUp } from "lucide-react";
+import { Activity, BarChart3, Database, FileText, CheckCircle2, TrendingUp, Zap, Clock } from "lucide-react";
+
+// env-only — compile-time constants, safe at module scope
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const ADMIN_HEADERS = { "x-api-key": process.env.NEXT_PUBLIC_ADMIN_API_KEY || "ag-agency-secret-token-2026" };
+
+interface SchedulerStatus {
+    isRunning: boolean;
+    lastRun: string | null;
+    nextRun: string | null;
+    todayCount: number;
+    failedSources: string[];
+}
 
 export default function AdminDashboardPage() {
     const [stats, setStats] = useState({
@@ -13,42 +25,48 @@ export default function AdminDashboardPage() {
         mlAccuracy: 85,
         avgConfidence: 89.4,
         abTestCount: 0,
-        recentCategorizations: [] as any[]
+        recentCategorizations: [] as { id: number; baslik: string; tahmin: string; dogruluk: number; tarih: string }[],
+        breakdown: {} as Record<string, number>,
+        llmBreakdown: {} as Record<string, number>,
+        pipeline: { enabled: false, dailyQuota: 100 }
     });
-
+    const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchStats = async () => {
+        const fetchAll = async () => {
             try {
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/stats`, {
-                    headers: {
-                        'x-api-key': process.env.NEXT_PUBLIC_ADMIN_API_KEY || 'ag-agency-secret-token-2026'
-                    }
-                });
-                const data = await response.json();
-                if (data.success) {
+                const [statsRes, schedulerRes] = await Promise.all([
+                    fetch(`${API}/api/admin/stats`, { headers: ADMIN_HEADERS }),
+                    fetch(`${API}/api/admin/scheduler-status`, { headers: ADMIN_HEADERS })
+                ]);
+                const statsData = await statsRes.json();
+                const schedulerData = await schedulerRes.json();
+                if (statsData.success) {
                     setStats({
-                        totalNews: data.stats.totalNews,
-                        activeCategories: data.stats.activeCategories,
-                        mlAccuracy: data.stats.mlAccuracy,
-                        avgConfidence: parseFloat(data.stats.avgConfidence),
-                        abTestCount: data.stats.abTestCount,
-                        recentCategorizations: data.stats.recentCategorizations
+                        totalNews: statsData.stats.totalNews,
+                        activeCategories: statsData.stats.activeCategories,
+                        mlAccuracy: statsData.stats.mlAccuracy,
+                        avgConfidence: parseFloat(statsData.stats.avgConfidence),
+                        abTestCount: statsData.stats.abTestCount,
+                        recentCategorizations: statsData.stats.recentCategorizations,
+                        breakdown: statsData.stats.breakdown || {},
+                        llmBreakdown: statsData.stats.llmBreakdown || {},
+                        pipeline: statsData.stats.pipeline || { enabled: false, dailyQuota: 100 }
                     });
                 }
+                if (schedulerData.success) setScheduler(schedulerData.data);
             } catch (error) {
-                console.error("Stats fetch error:", error);
+                console.error("Admin fetch error:", error);
             } finally {
                 setLoading(false);
             }
         };
-
-        fetchStats();
-    }, []);
+        fetchAll();
+    }, []); // API and ADMIN_HEADERS are module-level constants
 
     const cards = [
-        { title: "Toplam Haber", value: stats.totalNews, icon: <FileText size={20} className="text-blue-500" />, trend: "+12%" },
+        { title: "Toplam Haber", value: stats.totalNews.toLocaleString('tr-TR'), icon: <FileText size={20} className="text-blue-500" />, trend: `Hazır: ${stats.breakdown['hazir'] ?? 0}` },
         { title: "Aktif Kategori", value: stats.activeCategories, icon: <Database size={20} className="text-purple-500" />, trend: "Sabit" },
         { title: "ML Doğruluk", value: `%${stats.mlAccuracy}`, icon: <CheckCircle2 size={20} className="text-emerald-500" />, trend: "+2.4%" },
         { title: "Güven Skoru", value: `%${stats.avgConfidence}`, icon: <TrendingUp size={20} className="text-rose-500" />, trend: "+1.1%" },
@@ -98,6 +116,90 @@ export default function AdminDashboardPage() {
                         ))}
                     </div>
                 )}
+
+                {/* LLM Pipeline Durumu + Scheduler Status */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+                    {/* LLM Pipeline Durumu */}
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="glass-card p-6"
+                    >
+                        <div className="flex items-center gap-2 mb-6">
+                            <Zap className={stats.pipeline.enabled ? "text-emerald-500" : "text-amber-500"} />
+                            <h2 className="text-xl font-bold">LLM Pipeline</h2>
+                            <span className={`ml-auto text-[10px] uppercase font-bold px-2 py-1 rounded-full ${stats.pipeline.enabled ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                {stats.pipeline.enabled ? 'Aktif' : 'Kapalı'}
+                            </span>
+                        </div>
+                        <div className="space-y-3">
+                            {[
+                                { label: 'Hazır (LLM)', key: 'hazir', color: 'bg-emerald-500' },
+                                { label: 'Ham (İşlenmemiş)', key: 'ham', color: 'bg-amber-500' },
+                                { label: 'Yayında', key: 'yayinda', color: 'bg-blue-500' }
+                            ].map(({ label, key, color }) => {
+                                const count = stats.breakdown[key] ?? 0;
+                                const pct = stats.totalNews > 0 ? Math.round((count / stats.totalNews) * 100) : 0;
+                                return (
+                                    <div key={key} className="p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+                                        <div className="flex justify-between text-sm mb-1">
+                                            <span className="text-[var(--text-secondary)]">{label}</span>
+                                            <span className="font-bold">{count.toLocaleString('tr-TR')} <span className="text-[var(--text-muted)] font-normal">(%{pct})</span></span>
+                                        </div>
+                                        <div className="w-full bg-[var(--border-subtle)] rounded-full h-1.5">
+                                            <div className={`${color} h-1.5 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div className="pt-1 text-xs text-[var(--text-muted)]">
+                                {Object.entries(stats.llmBreakdown).map(([provider, count]) => (
+                                    <span key={provider} className="inline-block mr-3">
+                                        <span className="font-semibold text-[var(--text-secondary)]">{provider}:</span> {(count as number).toLocaleString('tr-TR')}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </motion.div>
+
+                    {/* Scheduler Durumu */}
+                    <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="glass-card p-6"
+                    >
+                        <div className="flex items-center gap-2 mb-6">
+                            <Clock className={scheduler?.isRunning ? "text-emerald-500" : "text-rose-500"} />
+                            <h2 className="text-xl font-bold">RSS Scheduler</h2>
+                            <span className={`ml-auto text-[10px] uppercase font-bold px-2 py-1 rounded-full ${scheduler?.isRunning ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                {scheduler?.isRunning ? 'Çalışıyor' : 'Durdu'}
+                            </span>
+                        </div>
+                        {scheduler ? (
+                            <div className="space-y-3 text-sm">
+                                <div className="flex justify-between p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+                                    <span className="text-[var(--text-muted)]">Son Çalışma</span>
+                                    <span className="font-medium">{scheduler.lastRun ? new Date(scheduler.lastRun).toLocaleTimeString('tr-TR') : '—'}</span>
+                                </div>
+                                <div className="flex justify-between p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+                                    <span className="text-[var(--text-muted)]">Sonraki Çalışma</span>
+                                    <span className="font-medium">{scheduler.nextRun ? new Date(scheduler.nextRun).toLocaleTimeString('tr-TR') : '—'}</span>
+                                </div>
+                                <div className="flex justify-between p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+                                    <span className="text-[var(--text-muted)]">Bugün Eklenen</span>
+                                    <span className="font-bold text-emerald-500">{scheduler.todayCount}</span>
+                                </div>
+                                {scheduler.failedSources.length > 0 && (
+                                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400">
+                                        ⚠️ Sağlıksız kaynaklar: {scheduler.failedSources.join(', ')}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="text-[var(--text-muted)] text-sm italic">Scheduler verisi alınamadı.</p>
+                        )}
+                    </motion.div>
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
                     {/* A/B Test Sonuçları Panel */}
@@ -160,11 +262,11 @@ export default function AdminDashboardPage() {
                                                 {item.baslik}
                                             </td>
                                             <td className="py-3 text-center text-[var(--text-secondary)]">
-                                                %{item.guven}
+                                                %{Math.round((item.dogruluk ?? 0) * 100)}
                                             </td>
                                             <td className="py-3 text-right">
-                                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${parseFloat(item.guven) < 60 ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
-                                                    {parseFloat(item.guven) < 60 ? 'Manuel' : 'Oto'}
+                                                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${(item.dogruluk ?? 0) < 0.6 ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
+                                                    {(item.dogruluk ?? 0) < 0.6 ? 'Manuel' : 'Oto'}
                                                 </span>
                                             </td>
                                         </tr>

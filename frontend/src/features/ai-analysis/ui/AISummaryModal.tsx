@@ -31,7 +31,7 @@ export default function AISummaryModal({ newsId }: AISummaryModalProps) {
     const fetchNews = async () => {
       setTimeout(() => { if (active) setStatus("loading"); }, 0);
       try {
-        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
         const res = await fetch(`${API_BASE}/api/news/${newsId}`);
         const result = await res.json();
         if (active) {
@@ -53,7 +53,7 @@ export default function AISummaryModal({ newsId }: AISummaryModalProps) {
   const fetchNewsRetry = async () => {
     setStatus("loading");
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
       const res = await fetch(`${API_BASE}/api/news/${newsId}`);
       const result = await res.json();
       if (result.success && result.data) {
