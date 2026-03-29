@@ -64,7 +64,7 @@ export default function PersonalizedHeroCarousel({ newsItems }: Props) {
   const cfg = SENTIMENT_CONFIG[sentimentKey] ?? SENTIMENT_CONFIG["nötr"];
 
   return (
-    <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 mb-8 group">
+    <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 mb-8 group" aria-roledescription="carousel">
       <div className="flex items-center gap-2 mb-4">
         <Target size={20} className="text-[var(--accent-warm)]" />
         <h2 className="headline-md font-bold text-[var(--accent-primary)] dark:text-white">
@@ -75,7 +75,7 @@ export default function PersonalizedHeroCarousel({ newsItems }: Props) {
         </span>
       </div>
 
-      <div className={`relative h-[240px] md:h-[300px] w-full rounded-2xl overflow-hidden shadow-2xl ${cfg.glow} bg-[var(--bg-secondary)] border-2 ${cfg.border} transition-all duration-500`}>
+      <div className={`relative h-[240px] md:h-[300px] w-full rounded-2xl overflow-hidden shadow-2xl ${cfg.glow} bg-[var(--bg-secondary)] border-2 ${cfg.border} transition-all duration-500`} aria-live="polite">
         {/* Background */}
         <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg-card)] via-[var(--bg-card)] to-transparent z-0 opacity-95 dark:opacity-90 transition-colors duration-500" />
 
@@ -136,6 +136,7 @@ export default function PersonalizedHeroCarousel({ newsItems }: Props) {
               onClick={() => navigate(-1)}
               className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-[var(--bg-glass)] backdrop-blur-sm border border-[var(--border-subtle)] text-[var(--text-primary)] shadow-md opacity-0 group-hover:opacity-100 transition-all duration-200 z-20 hover:scale-110 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent-warm)]"
               aria-label="Önceki haber"
+              type="button"
             >
               <ChevronLeft size={18} />
             </button>
@@ -143,6 +144,7 @@ export default function PersonalizedHeroCarousel({ newsItems }: Props) {
               onClick={() => navigate(1)}
               className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-[var(--bg-glass)] backdrop-blur-sm border border-[var(--border-subtle)] text-[var(--text-primary)] shadow-md opacity-0 group-hover:opacity-100 transition-all duration-200 z-20 hover:scale-110 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-[var(--accent-warm)]"
               aria-label="Sonraki haber"
+              type="button"
             >
               <ChevronRight size={18} />
             </button>
@@ -150,13 +152,16 @@ export default function PersonalizedHeroCarousel({ newsItems }: Props) {
         )}
 
         {/* Dot indicators */}
-        <div className="absolute bottom-4 right-6 flex gap-1.5 z-20">
+        <div className="absolute bottom-4 right-4 sm:right-6 flex gap-1.5 z-20" role="tablist" aria-label="Carousel slaytları">
           {newsItems.map((_, idx) => (
             <button
               key={idx}
               onClick={() => { if (!isAnimating) { setIsAnimating(true); setCurrentIndex(idx); setTimeout(() => setIsAnimating(false), 400); } }}
               className={`rounded-full transition-all duration-300 ${idx === currentIndex ? "w-5 h-1.5 bg-[var(--accent-warm)]" : "w-1.5 h-1.5 bg-[var(--border-medium)] hover:bg-[var(--text-muted)]"}`}
               aria-label={`Slayt ${idx + 1}`}
+              aria-selected={idx === currentIndex}
+              role="tab"
+              type="button"
             />
           ))}
         </div>

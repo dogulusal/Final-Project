@@ -121,7 +121,7 @@ export default function SentimentBiasMap({ apiUrl = "http://localhost:3001", aut
         {error && <span className="text-xs text-amber-500 ml-auto">{error}</span>}
       </div>
 
-      <div className="mb-5 grid grid-cols-[140px_1fr] gap-4 items-center">
+      <div className="mb-5 grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-4 items-center">
         <div className="relative w-[120px] h-[120px] mx-auto">
           <div className="absolute inset-0 rounded-full" style={{ background: chartGradient }} />
           <div className="absolute inset-[14px] rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center">
@@ -138,6 +138,7 @@ export default function SentimentBiasMap({ apiUrl = "http://localhost:3001", aut
               onMouseLeave={() => setHoveredKey(null)}
               className="w-full flex items-center gap-3 text-left rounded-xl px-2 py-1.5 hover:bg-[var(--bg-glass)] transition-colors"
               aria-label={`${item.key} oranı`}
+              type="button"
             >
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
               <span className={`text-xs font-semibold ${item.muted}`}>{item.key}</span>

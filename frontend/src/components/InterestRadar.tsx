@@ -61,7 +61,7 @@ export default function InterestRadar() {
         <h3 className="font-bold text-[var(--text-primary)] tracking-wide">Kişisel İlgi Çarkı</h3>
       </div>
 
-      <div className="flex-grow grid grid-cols-[1fr_220px] gap-4 items-center">
+      <div className="flex-grow grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-4 items-center">
         <div className="flex flex-col gap-4 justify-center">
           {interests.map((item, idx) => (
             <button
@@ -70,6 +70,7 @@ export default function InterestRadar() {
               onMouseLeave={() => setHoveredCategory(null)}
               className="flex items-center gap-4 group/item text-left"
               aria-label={`${item.name} ilgi oranı`}
+              type="button"
             >
             <span className="w-20 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] truncate">
               {item.name}
@@ -87,8 +88,14 @@ export default function InterestRadar() {
           ))}
         </div>
 
-        <div className="relative w-[220px] h-[220px] mx-auto">
-          <svg viewBox={`0 0 ${radarSize} ${radarSize}`} className="w-full h-full">
+        <div className="relative w-[180px] h-[180px] sm:w-[220px] sm:h-[220px] mx-auto">
+          <svg
+            viewBox={`0 0 ${radarSize} ${radarSize}`}
+            className="w-full h-full"
+            role="img"
+            aria-label="Kişisel ilgi radar grafiği"
+          >
+            <title>Kişisel ilgi radar grafiği</title>
             {[...Array(levels)].map((_, levelIdx) => {
               const levelScale = (levelIdx + 1) / levels;
               const ring = interests
