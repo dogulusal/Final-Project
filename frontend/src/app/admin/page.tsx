@@ -2,13 +2,14 @@
 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Activity, BarChart3, Database, FileText, CheckCircle2, TrendingUp, Zap, Clock } from "lucide-react";
+import { getAccessToken, isLoggedIn, apiFetch } from "@/lib/auth";
 
 // env-only — compile-time constants, safe at module scope
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-const ADMIN_HEADERS = { "x-api-key": process.env.NEXT_PUBLIC_ADMIN_API_KEY || "ag-agency-secret-token-2026" };
 
 interface SchedulerStatus {
     isRunning: boolean;
@@ -19,11 +20,14 @@ interface SchedulerStatus {
 }
 
 export default function AdminDashboardPage() {
+    const router = useRouter();
     const [stats, setStats] = useState({
         totalNews: 0,
         activeCategories: 7,
         mlAccuracy: 85,
         avgConfidence: 89.4,
+        mlTrainSize: 0,
+        mlTestSize: 0,
         abTestCount: 0,
         recentCategorizations: [] as { id: number; baslik: string; tahmin: string; dogruluk: number; tarih: string }[],
         breakdown: {} as Record<string, number>,
@@ -34,12 +38,33 @@ export default function AdminDashboardPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Login kontrolü
+        if (!isLoggedIn()) {
+            router.push('/login');
+            return;
+        }
+
         const fetchAll = async () => {
             try {
+                const token = getAccessToken();
+                const headers = {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                };
+
                 const [statsRes, schedulerRes] = await Promise.all([
-                    fetch(`${API}/api/admin/stats`, { headers: ADMIN_HEADERS }),
-                    fetch(`${API}/api/admin/scheduler-status`, { headers: ADMIN_HEADERS })
+                    fetch(`${API}/api/admin/stats`, { headers }),
+                    fetch(`${API}/api/admin/scheduler-status`, { headers })
                 ]);
+
+                // Auth hatası — logout yap
+                if (statsRes.status === 401 || schedulerRes.status === 401) {
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('refreshToken');
+                    router.push('/login');
+                    return;
+                }
+
                 const statsData = await statsRes.json();
                 const schedulerData = await schedulerRes.json();
                 if (statsData.success) {
@@ -48,6 +73,8 @@ export default function AdminDashboardPage() {
                         activeCategories: statsData.stats.activeCategories,
                         mlAccuracy: statsData.stats.mlAccuracy,
                         avgConfidence: parseFloat(statsData.stats.avgConfidence),
+                        mlTrainSize: statsData.stats.mlTrainSize || 0,
+                        mlTestSize: statsData.stats.mlTestSize || 0,
                         abTestCount: statsData.stats.abTestCount,
                         recentCategorizations: statsData.stats.recentCategorizations,
                         breakdown: statsData.stats.breakdown || {},
@@ -63,13 +90,13 @@ export default function AdminDashboardPage() {
             }
         };
         fetchAll();
-    }, []); // API and ADMIN_HEADERS are module-level constants
+    }, [router]);
 
     const cards = [
         { title: "Toplam Haber", value: stats.totalNews.toLocaleString('tr-TR'), icon: <FileText size={20} className="text-blue-500" />, trend: `Hazır: ${stats.breakdown['hazir'] ?? 0}` },
         { title: "Aktif Kategori", value: stats.activeCategories, icon: <Database size={20} className="text-purple-500" />, trend: "Sabit" },
-        { title: "ML Doğruluk", value: `%${stats.mlAccuracy}`, icon: <CheckCircle2 size={20} className="text-emerald-500" />, trend: "+2.4%" },
-        { title: "Güven Skoru", value: `%${stats.avgConfidence}`, icon: <TrendingUp size={20} className="text-rose-500" />, trend: "+1.1%" },
+        { title: "ML Doğruluk", value: `%${stats.mlAccuracy}`, icon: <CheckCircle2 size={20} className="text-emerald-500" />, trend: stats.mlTrainSize > 0 ? `Eğitim: ${stats.mlTrainSize}` : "Model aktif" },
+        { title: "Güven Skoru", value: `%${stats.avgConfidence}`, icon: <TrendingUp size={20} className="text-rose-500" />, trend: stats.mlTestSize > 0 ? `Test: ${stats.mlTestSize}` : "Ortalama" },
     ];
 
     return (

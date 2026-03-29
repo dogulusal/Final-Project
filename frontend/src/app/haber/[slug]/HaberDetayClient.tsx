@@ -9,7 +9,7 @@ import type { NewsItem } from "@/types/news";
 import { Share2 } from "lucide-react";
 import ReadingProgressBar from "@/components/ReadingProgressBar";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
 export default function HaberDetayClient({ params }: { params: Promise<{ slug: string }> }) {
     const [slug, setSlug] = useState<string>("");

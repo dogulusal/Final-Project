@@ -6,6 +6,8 @@ import DashboardShell from "@/ui/layout/DashboardShell";
 import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import { cn } from "@/lib/utils";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+
 const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
@@ -20,9 +22,30 @@ const dmSerifDisplay = DM_Serif_Display({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "AI Haber Ajansı — Yapay Zeka Destekli Haber Platformu",
   description: "Türkiye'nin ilk yapay zeka destekli haberleri otomatik toplayan, kategorize eden ve özgünleştiren haber platformu.",
   keywords: ["yapay zeka", "haber", "AI", "machine learning", "Türkiye"],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    locale: "tr_TR",
+    siteName: "AI Haber Ajansı",
+    url: "/",
+    title: "AI Haber Ajansı — Yapay Zeka Destekli Haber Platformu",
+    description: "Türkiye'nin ilk yapay zeka destekli haberleri otomatik toplayan, kategorize eden ve özgünleştiren haber platformu.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AI Haber Ajansı — Yapay Zeka Destekli Haber Platformu",
+    description: "Türkiye'nin ilk yapay zeka destekli haberleri otomatik toplayan, kategorize eden ve özgünleştiren haber platformu.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

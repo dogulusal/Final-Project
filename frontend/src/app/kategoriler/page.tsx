@@ -9,7 +9,7 @@ import NewsGrid from "@/components/NewsGrid";
 import Footer from "@/components/Footer";
 import { NewsItem } from "@/types/news";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
 interface Kategori {
     id: number;
@@ -38,7 +38,7 @@ function KategorilerContent() {
 
     const fetchNews = async () => {
         try {
-            const res = await fetch(`${API_BASE}/api/news?limit=100`);
+            const res = await fetch(`${API_BASE}/api/news?limit=500`);
             const data = await res.json();
             if (data.success) setNews(data.data);
         } catch {
