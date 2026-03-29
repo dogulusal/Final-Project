@@ -19,17 +19,32 @@ export enum LLMProviderType {
 export const LLM_PROVIDER = (process.env.LLM_PROVIDER || 'ollama') as LLMProviderType;
 export const LLM_API_KEY = process.env.LLM_API_KEY || '';
 export const LLM_MODEL_NAME = process.env.LLM_MODEL_NAME || '';
+
+// Çoklu Gemini API key rotasyonu (503 yükünü dağıtmak için)
+// Boş bırakılan slotlar otomatik atlanır
+export const LLM_API_KEYS: string[] = [
+    process.env.LLM_API_KEY,
+    process.env.LLM_API_KEY_2,
+    process.env.LLM_API_KEY_3,
+    process.env.LLM_API_KEY_4,
+    process.env.LLM_API_KEY_5,
+    process.env.LLM_API_KEY_6,
+].filter((k): k is string => !!k && k.trim() !== '');
 export const LLM_BASE_URL = process.env.LLM_BASE_URL || 'http://localhost:11434';
 export const LLM_FINE_TUNED_MODEL = process.env.LLM_FINE_TUNED_MODEL || '';
 export const LLM_FALLBACK_PROVIDER = process.env.LLM_FALLBACK_PROVIDER || 'ollama';
+export const LLM_FALLBACK_MODEL = process.env.LLM_FALLBACK_MODEL || 'qwen3:8b';
 
 // --- ML Model ---
 export const ML_CONFIDENCE_THRESHOLD = parseFloat(process.env.ML_CONFIDENCE_THRESHOLD || '0.45');
 
 // --- Güvenlik ---
-export const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'ag-agency-secret-token-2026';
+export const JWT_SECRET = process.env.JWT_SECRET || '';
+export const JWT_EXPIRES_IN = '1h';
+export const JWT_REFRESH_EXPIRES_IN = '7d';
+export const ADMIN_API_KEY = process.env.ADMIN_API_KEY || '';
 // CORS_ALLOWED_ORIGINS: virgülle ayrılmış origin listesi (örn: http://localhost:3000,https://yourdomain.com)
-export const CORS_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001,http://localhost:3002')
+export const CORS_ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003')
     .split(',')
     .map(o => o.trim())
     .filter(Boolean);
