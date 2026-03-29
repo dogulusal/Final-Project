@@ -25,6 +25,7 @@ export default function SentimentBiasMap({ apiUrl = "http://localhost:3001", aut
   const [data, setData] = useState<SentimentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!autoFetch) return;
@@ -98,6 +99,20 @@ export default function SentimentBiasMap({ apiUrl = "http://localhost:3001", aut
   const neutralData = data.distribution['Nötr'] || { count: 0, percentage: 0 };
   const negativeData = data.distribution['Negatif'] || { count: 0, percentage: 0 };
 
+  const sentimentItems = [
+    { key: "Pozitif", value: positiveData, color: "#22c55e", muted: "text-green-600 dark:text-green-400" },
+    { key: "Nötr", value: neutralData, color: "#60a5fa", muted: "text-blue-500 dark:text-blue-400" },
+    { key: "Negatif", value: negativeData, color: "#ef4444", muted: "text-red-500 dark:text-red-400" },
+  ];
+
+  const chartGradient = `conic-gradient(
+    ${sentimentItems[0].color} 0 ${sentimentItems[0].value.percentage}%,
+    ${sentimentItems[1].color} ${sentimentItems[0].value.percentage}% ${sentimentItems[0].value.percentage + sentimentItems[1].value.percentage}%,
+    ${sentimentItems[2].color} ${sentimentItems[0].value.percentage + sentimentItems[1].value.percentage}% 100%
+  )`;
+
+  const dominantSentiment = sentimentItems.reduce((a, b) => (a.value.percentage >= b.value.percentage ? a : b));
+
   return (
     <div className="glass-card p-6 flex flex-col h-full relative overflow-hidden group">
       <div className="flex items-center gap-2 mb-6">
@@ -106,39 +121,52 @@ export default function SentimentBiasMap({ apiUrl = "http://localhost:3001", aut
         {error && <span className="text-xs text-amber-500 ml-auto">{error}</span>}
       </div>
 
+      <div className="mb-5 grid grid-cols-[140px_1fr] gap-4 items-center">
+        <div className="relative w-[120px] h-[120px] mx-auto">
+          <div className="absolute inset-0 rounded-full" style={{ background: chartGradient }} />
+          <div className="absolute inset-[14px] rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center">
+            <span className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Baskın</span>
+            <span className="text-xs font-bold text-[var(--text-primary)]">{dominantSentiment.key}</span>
+            <span className="text-[11px] text-[var(--text-secondary)]">%{dominantSentiment.value.percentage}</span>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {sentimentItems.map((item) => (
+            <button
+              key={item.key}
+              onMouseEnter={() => setHoveredKey(item.key)}
+              onMouseLeave={() => setHoveredKey(null)}
+              className="w-full flex items-center gap-3 text-left rounded-xl px-2 py-1.5 hover:bg-[var(--bg-glass)] transition-colors"
+              aria-label={`${item.key} oranı`}
+            >
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+              <span className={`text-xs font-semibold ${item.muted}`}>{item.key}</span>
+              <span className="text-xs text-[var(--text-muted)] ml-auto">%{item.value.percentage}</span>
+            </button>
+          ))}
+          {hoveredKey && (
+            <p className="text-[11px] text-[var(--text-secondary)] pt-1">
+              {hoveredKey}: {data.distribution[hoveredKey]?.count ?? 0} haber
+            </p>
+          )}
+        </div>
+      </div>
+
       <div className="flex flex-col gap-4 flex-grow justify-center">
-        {/* Pozitif */}
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs font-semibold">
-            <span className="text-green-600 dark:text-green-400">Pozitif ({positiveData.percentage}%)</span>
-            <span className="text-[var(--text-muted)]">{positiveData.count} haber</span>
+        {sentimentItems.map((item, idx) => (
+          <div className="space-y-1" key={item.key}>
+            <div className="flex justify-between text-xs font-semibold">
+              <span className={item.muted}>{item.key} ({item.value.percentage}%)</span>
+              <span className="text-[var(--text-muted)]">{item.value.count} haber</span>
+            </div>
+            <div className="w-full bg-[var(--bg-secondary)] rounded-full h-2.5 overflow-hidden">
+              <div
+                className="h-2.5 rounded-full transition-all duration-1000 ease-out"
+                style={{ width: `${item.value.percentage}%`, backgroundColor: item.color, transitionDelay: `${idx * 140}ms` }}
+              />
+            </div>
           </div>
-          <div className="w-full bg-[var(--bg-secondary)] rounded-full h-2.5 overflow-hidden">
-            <div className="bg-green-500 h-2.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${positiveData.percentage}%` }}></div>
-          </div>
-        </div>
-
-        {/* Nötr */}
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs font-semibold">
-            <span className="text-blue-500 dark:text-blue-400">Nötr ({neutralData.percentage}%)</span>
-            <span className="text-[var(--text-muted)]">{neutralData.count} haber</span>
-          </div>
-          <div className="w-full bg-[var(--bg-secondary)] rounded-full h-2.5 overflow-hidden">
-            <div className="bg-blue-400 h-2.5 rounded-full transition-all duration-1000 ease-out delay-150" style={{ width: `${neutralData.percentage}%` }}></div>
-          </div>
-        </div>
-
-        {/* Negatif */}
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs font-semibold">
-            <span className="text-red-500 dark:text-red-400">Negatif ({negativeData.percentage}%)</span>
-            <span className="text-[var(--text-muted)]">{negativeData.count} haber</span>
-          </div>
-          <div className="w-full bg-[var(--bg-secondary)] rounded-full h-2.5 overflow-hidden">
-            <div className="bg-red-500 h-2.5 rounded-full transition-all duration-1000 ease-out delay-300" style={{ width: `${negativeData.percentage}%` }}></div>
-          </div>
-        </div>
+        ))}
       </div>
 
       <div className="mt-6 pt-4 border-t border-[var(--border-subtle)]">
@@ -150,11 +178,12 @@ export default function SentimentBiasMap({ apiUrl = "http://localhost:3001", aut
         </div>
         <div className="flex items-start gap-2">
           <TrendingUp size={14} className="flex-shrink-0 mt-0.5 text-[var(--accent-warm)]" />
-          <p>
-            {positiveData.percentage > negativeData.percentage 
-              ? `Gündem dilinin ortalamadan <span class="font-bold text-[var(--text-primary)]">daha pozitif</span> olduğu tespit edildi.`
-              : `Gündem dilinin ortalamadan <span class="font-bold text-[var(--text-primary)]">daha negatif</span> olduğu tespit edildi.`
-            }
+          <p className="text-xs text-[var(--text-secondary)]">
+            Gündem dilinin ortalamadan{" "}
+            <span className="font-bold text-[var(--text-primary)]">
+              {positiveData.percentage > negativeData.percentage ? "daha pozitif" : "daha negatif"}
+            </span>{" "}
+            olduğu tespit edildi.
           </p>
         </div>
       </div>
