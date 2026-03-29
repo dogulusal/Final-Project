@@ -2,7 +2,7 @@
 
 > **Proje Tipi:** Üniversite Tezi  
 > **Deadline:** Mayıs ortası (~30-45 gün)  
-> **Mevcut Durum:** %90 tamamlanmış (Faz 1 ✅, Faz 2 Adım 6 ✅)  
+> **Mevcut Durum:** %92 tamamlanmış (Faz 1 ✅, Faz 2 Adım 6-7 ✅, ML: 93.9% ✨)  
 > **Strateji:** Veri hattını aç → ML %92+ → Frontend WOW → Tez polish
 
 ---
@@ -13,7 +13,7 @@
 |------|-------|-----|
 | Backend | %95 | TS hataları → 0, Model persist ✅, veri hattı açık |
 | Frontend | %95 | Sitemap ✅, kategori/[slug] ✅, Docker uyumlu |
-| ML | %86.4 accuracy | Naive Bayes + DB persist, accuracy korudu |
+| ML | **%93.9 accuracy** | Naive Bayes v2 + balanced data, +7.5% gain ✨ |
 | Veri | 1,229 haber | Tüm kategoriler 50+ (Teknoloji 222, Sağlık 109) ✅ |
 | DevOps | %95 | Docker+CI/CD var, SSL/Nginx eksik |
 | Dokümantasyon | %70 | API.md eksik, tez formatında özet yok |
@@ -107,10 +107,11 @@
    - **Durum:** Tüm kategoriler 50+ limite ulaştı ✅ (MIN_DB_THRESHOLD karşılandı)
    - **Sonuç:** DB dengeleme için hazır
 
-7. **Eğitim verisi dengeleme scriptini çalıştır/güncelle** *(depends on 6)*
+7. ~~**Eğitim verisi dengeleme scriptini çalıştır/güncelle**~~ **✅ TAMAMLANDI (29 Mar, 16:59)** *(depends on 6)*
    - Dosya: `backend/scripts/balance-training-data.ts`
-   - Hedef: Her kategoride minimum 50 örnek, `dataset.json` güncelle
-   - DB'deki gerçek dağılıma göre upsampling stratejisi belirle
+   - **Sonuç:** 1,218 haber dataset.json'a aktarıldı, shuffle+backup alındı
+   - **Accuracy Sıçraması:** 86.4% → 93.9% (+7.5% ✨)
+   - Training: 1,883 örnek | Test: 362 örnek | Model v2
 
 8. ~~**ML eğitim minimum eşiğini 5→30 yükselt**~~ **✅ TAMAMLANDI**
    - `ml.service.ts`: zaten `dataset.length < 30`
