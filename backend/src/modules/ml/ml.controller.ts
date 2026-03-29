@@ -4,14 +4,22 @@ import { MlCategorizationService } from './ml.service';
 const router = Router();
 export const mlService = new MlCategorizationService();
 
-// Sisteme başladığında otomatik olarak DB'deki onaylı haberleri çek ve modeli eğit
-mlService.loadAndTrainFromDB().then(success => {
-    if (success) {
-        console.log('[ML Controller] Model hazır ve gelen isteklere açık.');
+// Sisteme başladığında önce DB'den kayıtlı modeli yüklemeyi dener, yoksa sıfırdan eğitir.
+void (async () => {
+    const loaded = await mlService.loadModelFromDb();
+
+    if (loaded) {
+        console.log('[ML Controller] Kayıtlı model yüklendi ve gelen isteklere açık.');
+        return;
+    }
+
+    const trained = await mlService.loadAndTrainFromDB();
+    if (trained) {
+        console.log('[ML Controller] Model sıfırdan eğitildi ve gelen isteklere açık.');
     } else {
         console.warn('[ML Controller] Model başlatılırken sorun yaşandı veya JSON yedeği de bulunamadı.');
     }
-});
+})();
 
 router.post('/train', async (_req: Request, res: Response) => {
     try {

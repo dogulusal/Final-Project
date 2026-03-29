@@ -1,6 +1,7 @@
 import natural from 'natural';
 import fs from 'fs';
 import path from 'path';
+import type { Prisma } from '@prisma/client';
 import { INewsCategorizationService, CategoryResult, TrainingData, SentimentResult } from './ml.interface';
 import { tokenizeAndStem } from './turkish-stemmer';
 import { ML_CONFIDENCE_THRESHOLD } from '../../config/constants';
@@ -46,6 +47,56 @@ export class MlCategorizationService implements INewsCategorizationService {
                 }
             }
         });
+    }
+
+    async saveModelToDb(accuracy: number, sampleCount: number): Promise<void> {
+        const serializedClassifier = JSON.stringify(this.classifier);
+        const modelData = JSON.parse(serializedClassifier) as Prisma.InputJsonValue;
+
+        await prisma.modelState.upsert({
+            where: { id: 1 },
+            update: {
+                modelData,
+                accuracy,
+                sampleCount,
+                trainedAt: new Date(),
+                version: { increment: 1 }
+            },
+            create: {
+                id: 1,
+                modelData,
+                accuracy,
+                sampleCount
+            }
+        });
+
+        console.log(`[ML] Model DB'ye kaydedildi. Accuracy=%${(accuracy * 100).toFixed(1)} Sample=${sampleCount}`);
+    }
+
+    async loadModelFromDb(): Promise<boolean> {
+        try {
+            const savedModel = await prisma.modelState.findUnique({ where: { id: 1 } });
+            if (!savedModel) {
+                return false;
+            }
+
+            const serialized = typeof savedModel.modelData === 'string'
+                ? savedModel.modelData
+                : JSON.stringify(savedModel.modelData);
+
+            const restore = (natural.BayesClassifier as unknown as { restore: (classifier: unknown) => natural.BayesClassifier }).restore;
+            this.classifier = restore(JSON.parse(serialized));
+            this.isTrained = true;
+            this.lastAccuracy = savedModel.accuracy ?? this.lastAccuracy;
+            this.trainSize = savedModel.sampleCount;
+            this.testSize = 0;
+
+            console.log(`[ML] Model DB'den yüklendi. Accuracy=%${(this.lastAccuracy * 100).toFixed(1)} Sample=${this.trainSize}`);
+            return true;
+        } catch (error) {
+            console.warn('[ML Warn] Model DB\'den yüklenemedi, yeniden eğitim yapılacak.', error);
+            return false;
+        }
     }
 
     /**
@@ -116,6 +167,7 @@ export class MlCategorizationService implements INewsCategorizationService {
         }
 
         console.log(`[ML] Model başarıyla eğitildi ve RAM'e alındı. (Train: ${this.trainSize}, Test: ${this.testSize}, Accuracy: %${(this.lastAccuracy*100).toFixed(1)})`);
+        await this.saveModelToDb(this.lastAccuracy, this.trainSize);
     }
 
     /**
@@ -139,12 +191,38 @@ export class MlCategorizationService implements INewsCategorizationService {
                 return await this.loadAndTrainFromDiskFallback();
             }
 
-            // Sadece başlık kullan — en diskriminatif sinyal. LLM metaAciklama boilerplate içerir.
-            const rawDataset: Array<TrainingData & { id: number }> = approvedNews.map(news => ({
+            // Başlık + metaAciklama + icerik ilk 300 karakter — zenginleştirilmiş LLM içeriği signal kalitesini artırır
+            let rawDataset: Array<TrainingData & { id: number }> = approvedNews.map(news => ({
                 id: news.id,
-                text: news.baslik.trim(),
+                text: (news.baslik + ' ' + (news.metaAciklama || '') + ' ' + (news.icerik ? news.icerik.slice(0, 300) : '')).trim(),
                 category: news.kategori.ad
             }));
+
+            // DB'de az haber varsa tam, çoksa kontrollü şekilde dataset.json ile takviye et.
+            // Amaç: etiket drift'ini azaltıp doğruluğu daha stabil tutmak.
+            const MIN_DB_THRESHOLD = 500;
+            const ALWAYS_SUPPLEMENT_LIMIT = 600;
+            try {
+                let datasetPath = '/training/naive-bayes/dataset.json';
+                if (!fs.existsSync(datasetPath)) {
+                    datasetPath = path.resolve(__dirname, '../../../../training/naive-bayes/dataset.json');
+                }
+                if (fs.existsSync(datasetPath)) {
+                    const diskDataset: TrainingData[] = JSON.parse(fs.readFileSync(datasetPath, 'utf8'));
+                    const supplementSize = approvedNews.length < MIN_DB_THRESHOLD
+                        ? diskDataset.length
+                        : Math.min(ALWAYS_SUPPLEMENT_LIMIT, diskDataset.length);
+
+                    const selected = diskDataset.slice(0, supplementSize);
+
+                    // Negatif ID'lerle ekle (DB ID'leriyle çakışmasın)
+                    const diskWithIds = selected.map((d, i) => ({ ...d, id: -(100000 + i + 1) }));
+                    rawDataset = [...rawDataset, ...diskWithIds];
+                    console.log(`[ML] dataset.json takviye eklendi (${diskWithIds.length}) → toplam ${rawDataset.length} örnek`);
+                }
+            } catch (e) {
+                console.warn('[ML Warn] dataset.json takviye okunamadı, sadece DB verisi kullanılıyor');
+            }
 
             // Kategori bazlı stratified split — hash deterministik (ID % 5 === 0 → test)
             // Avantaj: zamansal bias yok, her eğitimde aynı sonuç, data leakage yok
@@ -215,47 +293,72 @@ export class MlCategorizationService implements INewsCategorizationService {
     }
 
     /**
-     * Bir haber başlığının kategorisini tahmin eder
+     * Bir haber başlığını (opsiyonel içerik ile) kategorize eder.
+     * Başlık + kısa içerik beraber kullanıldığında özellikle Genel/Siyaset/Dünya ayrımı daha doğru olur.
      */
-    async categorize(title: string): Promise<CategoryResult> {
+    async categorize(title: string, contextText?: string): Promise<CategoryResult> {
         if (!this.isTrained) {
             throw new Error('Model henüz eğitilmedi. Önce train() çağrılmalı.');
         }
 
+        const combinedText = `${title || ''} ${contextText || ''}`.trim();
+        const inferenceText = combinedText.length > 0 ? combinedText : title;
+
         // natural v6'da getClassifications() tüm skorları döner (daha yüksek = daha olası)
-        const classifications = this.classifier.getClassifications(title);
-
-        // natural, en iyi eşleşmeyi döner, ancak normalize edilmiş bir "confidence" (0-1 arası) yüzdesi dönmez.
-        // Confidence'ı hesaplamak için min-max veya softmax varyasyonu kullanabiliriz.
-        // Basitlik açısından en yüksek skoru toplam skora bölerek yaklaşık bir güven yüzdesi bulalım.
-
+        const classifications = this.classifier.getClassifications(inferenceText);
         const scores: Record<string, number> = {};
-        
-        // natural v6 log-probability (negatif değerler) döner.
-        // Hassas normalization için en yüksek skoru 0'a çekip (shift) exp alıyoruz (Softmax stability)
-        const maxLogVal = Math.max(...classifications.map(c => c.value));
-        
-        let totalExp = 0;
-        const expScores = classifications.map(c => {
-            const expVal = Math.exp(c.value - maxLogVal);
-            totalExp += expVal;
-            return { label: c.label, expVal };
+
+        // Doğrudan olasılık normalizasyonu (getClassifications() log-prob değil, küçük olasılık döndürür)
+        const rawTotal = classifications.reduce((sum, c) => sum + c.value, 0);
+        const expScores = classifications.map(c => ({
+            label: c.label,
+            expVal: rawTotal > 0 ? c.value / rawTotal : 1 / classifications.length
+        }));
+        let totalExp = 1; // expScores zaten toplamı 1'e normalize edildi
+
+        // Kelime ipuçları: model kararsız kaldığında kategori drift'ini azaltır.
+        const normalized = inferenceText.toLowerCase();
+        const keywordHints: Record<string, string[]> = {
+            'Spor': ['maç', 'lig', 'gol', 'transfer', 'teknik direktör', 'basketbol', 'futbol', 'voleybol'],
+            'Ekonomi': ['borsa', 'faiz', 'enflasyon', 'dolar', 'euro', 'merkez bankası', 'ihracat', 'altın'],
+            'Teknoloji': ['yapay zeka', 'yazılım', 'siber', 'uydu', 'nasa', 'çip', 'akıllı telefon', 'teknoloji'],
+            'Siyaset': ['meclis', 'bakan', 'cumhurbaşkanı', 'parti', 'seçim', 'milletvekili', 'kanun', 'kabine'],
+            'Dünya': ['nato', 'bm', 'ukrayna', 'israil', 'iran', 'abd', 'avrupa birliği', 'uluslararası'],
+            'Sağlık': ['hastane', 'doktor', 'aşı', 'salgın', 'kanser', 'tedavi', 'sağlık', 'ameliyat'],
+            'Genel': ['son dakika', 'gündem', 'olay', 'açıklama']
+        };
+
+        const hintBonusByCategory: Record<string, number> = {};
+        for (const [category, hints] of Object.entries(keywordHints)) {
+            const hitCount = hints.reduce((acc, h) => acc + (normalized.includes(h) ? 1 : 0), 0);
+            if (hitCount > 0) {
+                hintBonusByCategory[category] = Math.min(0.18, hitCount * 0.06);
+            }
+        }
+
+        // Baz skor + ipucu bonusu ve tekrar normalize
+        let adjustedSum = 0;
+        const adjustedScores = expScores.map(s => {
+            const base = s.expVal / totalExp;
+            const bonus = hintBonusByCategory[s.label] || 0;
+            const adjusted = base + bonus;
+            adjustedSum += adjusted;
+            return { label: s.label, adjusted };
         });
 
         let bestCategory = 'Bilinmeyen';
         let highestConfidence = 0;
 
-        expScores.forEach(s => {
-            const confidence = s.expVal / totalExp;
+        adjustedScores.forEach(s => {
+            const confidence = adjustedSum > 0 ? s.adjusted / adjustedSum : 0;
             scores[s.label] = confidence;
-            
+
             if (confidence > highestConfidence) {
                 highestConfidence = confidence;
                 bestCategory = s.label;
             }
         });
 
-        // Eğer güven skoru tanımlanan barajın altındaysa "İnceleme Gerekiyor" olarak işaretle (İlerde Admin Dashboard için)
         if (highestConfidence < ML_CONFIDENCE_THRESHOLD) {
             console.log(`[ML] Düşük Güven Skoru (${highestConfidence.toFixed(2)}): "${title}" -> Manuel İnceleme Kuyruğuna Eklenecek.`);
         }

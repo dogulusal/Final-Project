@@ -63,6 +63,8 @@ model Haber {
   @@index([yayinlanmaTarihi(sort: Desc)])   // Sıralama: en yeni önce
   @@index([kategoriId])                     // Kategori filtreleme
   @@index([durum, yayinlanmaTarihi(sort: Desc)])  // Kombine: hazir haberler tarih sırası
+  @@index([kategoriId, durum, yayinlanmaTarihi(sort: Desc)]) // Kategori + durum + tarih sıralama
+  @@index([durum, sentiment, yayinlanmaTarihi(sort: Desc)]) // Sentiment admin istatistikleri/trend
   @@map("haberler")
 }
 
@@ -105,4 +107,33 @@ model DeadLetterQueue {
   resolvedAt    DateTime? @map("resolved_at")
 
   @@map("dead_letter_queue")
+}
+
+// --- LLM Token Kullanımı Takibi ---
+model LlmKullanim {
+  id                  Int       @id @default(autoincrement())
+  saglayici           String    // gemini | anthropic | openai | ollama
+  girisTokenSayisi    Int       @map("giris_token_sayisi")
+  cikisTokenSayisi    Int       @map("cikis_token_sayisi")
+  tahminiMaliyet      Float?    @map("tahmini_maliyet") // USD
+  tarih               DateTime  @default(now())
+  durum               String    @default("basarili") // basarili | hata | zaman_asimi
+  hataMesaji          String?   @map("hata_mesaji")
+
+  @@index([saglayici])
+  @@index([tarih(sort: Desc)])
+  @@index([saglayici, tarih(sort: Desc)])
+  @@map("llm_kullanm")
+}
+
+// --- ML Model Durumu ---
+model ModelState {
+  id          Int      @id
+  version     Int      @default(1)
+  modelData   Json     @map("model_data")
+  accuracy    Float?
+  trainedAt   DateTime @default(now()) @map("trained_at")
+  sampleCount Int      @default(0) @map("sample_count")
+
+  @@map("model_state")
 }

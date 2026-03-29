@@ -2,7 +2,7 @@
 
 > **Proje Tipi:** Üniversite Tezi  
 > **Deadline:** Mayıs ortası (~30-45 gün)  
-> **Mevcut Durum:** %85 tamamlanmış  
+> **Mevcut Durum:** %90 tamamlanmış (Faz 1 ✅, Faz 2 Adım 6 ✅)  
 > **Strateji:** Veri hattını aç → ML %92+ → Frontend WOW → Tez polish
 
 ---
@@ -11,13 +11,13 @@
 
 | Alan | Durum | Not |
 |------|-------|-----|
-| Backend | %90 | TS hataları giderildi, RSS limit/dedup/threshold güncellendi |
-| Frontend | %90 | Çalışıyor ama "jüri etkisi" eksik, test yok |
-| ML | %86.9 accuracy | Naive Bayes, in-memory, Docker restart'ta sıfırlanıyor |
-| Veri | 1224 haber | 1214 hazır, 10 ham, 7 kategori dengeli |
+| Backend | %95 | TS hataları → 0, Model persist ✅, veri hattı açık |
+| Frontend | %95 | Sitemap ✅, kategori/[slug] ✅, Docker uyumlu |
+| ML | %86.4 accuracy | Naive Bayes + DB persist, accuracy korudu |
+| Veri | 1,229 haber | Tüm kategoriler 50+ (Teknoloji 222, Sağlık 109) ✅ |
 | DevOps | %95 | Docker+CI/CD var, SSL/Nginx eksik |
 | Dokümantasyon | %70 | API.md eksik, tez formatında özet yok |
-| Bilinen Bug | 2 | Sitemap dynamic URL'ler boş, kategori/[slug] Docker 404 |
+| Bilinen Bug | 0 | Sitemap ✅, kategori/[slug] ✅ — Faz 1 tamamlandı |
 
 ---
 
@@ -73,15 +73,13 @@
 3. ~~**llm-usage.ts TypeScript hatalarını düzelt**~~ **✅ TAMAMLANDI**
    - `npx tsc --noEmit` → 0 hata
 
-4. **Sitemap dynamic URL'leri düzelt**
+4. ~~**Sitemap dynamic URL'leri düzelt**~~ **✅ TAMAMLANDI**
    - Dosya: `frontend/src/app/sitemap.ts`
-   - Sorun: Server-side fetch `http://backend:3000` Docker network'ünde çalışmıyor
-   - Çözüm: `INTERNAL_API_URL` env variable kontrolü + error handling
+   - Uygulandı: Docker-aware API base + runtime (`force-dynamic`) + hata toleranslı fetch
 
-5. **Kategori/[slug] Docker 404'ü düzelt** *(paralel 4 ile)*
+5. ~~**Kategori/[slug] Docker 404'ü düzelt**~~ **✅ TAMAMLANDI** *(paralel 4 ile)*
    - Dosya: `frontend/src/app/kategoriler/[slug]/page.tsx`
-   - Sorun: SSG sırasında API'ye ulaşamıyor (`generateStaticParams`)
-   - Çözüm: `dynamicParams = true` + fallback rendering veya ISR
+   - Uygulandı: slug param fix (`await params`) + Docker API base + dynamic fallback + geçici API kesintisinde 404 yerine güvenli fallback
 
 ### Doğrulama
 - Docker restart sonrası log: `Model DB'den yüklendi` mevcut, yeniden eğitim yok
@@ -101,12 +99,13 @@
 
 ### Adımlar
 
-6. **Güncel DB dağılımını ölç** *(ön koşul)*
-   ```sql
-   SELECT k.ad, COUNT(h.id) FROM haberler h
-   JOIN kategoriler k ON h.kategori_id = k.id
-   GROUP BY k.ad ORDER BY 2 DESC;
-   ```
+6. ~~**Güncel DB dağılımını ölç**~~ **✅ TAMAMLANDI (29 Mar, 16:55)** *(ön koşul)*
+   - **Sonuç:** 1,229 haber ✅
+     | Teknoloji | Dünya | Ekonomi | Spor | Genel | Siyaset | Sağlık |
+     |-----------|-------|---------|------|-------|---------|--------|
+     | 222 (18%) | 218 (18%) | 197 (16%) | 195 (16%) | 158 (13%) | 130 (11%) | 109 (9%) |
+   - **Durum:** Tüm kategoriler 50+ limite ulaştı ✅ (MIN_DB_THRESHOLD karşılandı)
+   - **Sonuç:** DB dengeleme için hazır
 
 7. **Eğitim verisi dengeleme scriptini çalıştır/güncelle** *(depends on 6)*
    - Dosya: `backend/scripts/balance-training-data.ts`
@@ -238,8 +237,8 @@ Faz 4 (Gün 20-35) ─→ Polish + Tez         ← overlap Faz 3 ile
 | Sorun | Etki | Faz | Durum |
 |-------|------|-----|-------|
 | Model yalnızca RAM'de, Docker restart'ta sıfırlanıyor | Her restart'ta yeniden eğitim (dakikalar) | Faz 1 Adım 0 | ⭕ Açık — Kritik |
-| Sitemap dynamic URL'ler boş | SEO hasarı | Faz 1 Adım 4 | ⭕ Açık |
-| Kategori/[slug] Docker 404 | Sayfa erişilemez | Faz 1 Adım 5 | ⭕ Açık |
+| ~~Sitemap dynamic URL'ler boş~~ | ~~SEO hasarı~~ | ~~Faz 1 Adım 4~~ | ✅ Kapandı |
+| ~~Kategori/[slug] Docker 404~~ | ~~Sayfa erişilemez~~ | ~~Faz 1 Adım 5~~ | ✅ Kapandı |
 | Sentiment sözlük yetersiz (154 kelime) | Neredeyse hep Nötr | Faz 2 Adım 10 | ⭕ Açık |
 | Frontend unit test = 0 | Tez kalitesini düşürür | Faz 4 | ⭕ Açık |
 | `API.md` sadece 1/8 endpoint belgelenmiş | Tez eksikliği | Faz 4 | ⭕ Açık |
