@@ -481,6 +481,12 @@ body {
   66%       { transform: translate(-15px, 15px) scale(0.97); }
 }
 
+/* ===== Carousel Progress ===== */
+@keyframes carousel-progress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
 /* ===== Skeleton Refinement ===== */
 @keyframes skeleton-shimmer {
   0% { background-position: -200% 0; }
