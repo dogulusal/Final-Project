@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import HeroSection from "@/components/HeroSection";
@@ -10,11 +11,13 @@ import { Search, Target } from "lucide-react";
 import { NewsItem } from "@/types/news";
 import { useReadingHistory } from "@/hooks/useReadingHistory";
 import { personalizedSort } from "@/utils/personalizedSort";
-import PersonalizedHeroCarousel from "@/components/PersonalizedHeroCarousel";
-import SentimentBiasMap from "@/components/SentimentBiasMap";
-import InterestRadar from "@/components/InterestRadar";
 import LazySection from "@/components/LazySection";
-import HeroCarousel from "@/components/HeroCarousel";
+
+// Dynamic imports for heavy components
+const HeroCarousel = dynamic(() => import("@/components/HeroCarousel"), { loading: () => null });
+const PersonalizedHeroCarousel = dynamic(() => import("@/components/PersonalizedHeroCarousel"), { loading: () => null });
+const SentimentBiasMap = dynamic(() => import("@/components/SentimentBiasMap"), { loading: () => null });
+const InterestRadar = dynamic(() => import("@/components/InterestRadar"), { loading: () => null });
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 

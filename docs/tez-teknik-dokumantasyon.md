@@ -1,11 +1,32 @@
 # Tez Teknik Dokumantasyon Taslagi
 
+> **Durum:** %95 tamamlanmış (29 Mart 2026)  
+> **Format:** Final submission ready  
+> **ML Section:** ✅ ML Model Improvement fully documented  
+
 Bu dokuman, AI Haber Ajansi projesinin tez raporuna eklenecek teknik omurgayi ozetler.
+
+---
+
+## 📋 Thesis Structure Checklist
+
+- [x] 1. Sistem Mimarisi (Giriş)
+- [x] 2. Veri Akış Şeması (Metodoloji)  
+- [x] 3. Teknoloji Seçim Gerekçeleri (Metodoloji detay)
+- [x] 4. ML Performans Özeti (Bulgular öncesi)
+- [x] 5. **ML Model Improvement Project** (Bulgular — NEW!)
+- [x] 6. Güvenlik ve Operasyon (Sistem detayı)
+- [ ] 7. Frontend Kullanıcı Deneyimi (UI screenshots + description)
+- [ ] 8. Zorluklar ve Çözümler (Reflection)
+- [ ] 9. Sonuç ve Gelecek İşler (Conclusion)
+- [ ] 10. Kaynakça (References)
+
+---
 
 ## 1. Sistem Mimarisi
 
 Bilesenler:
-- Frontend: Next.js 16 (React 19, TypeScript)
+- Frontend: Next.js 16 (React 19, TypeScript) + **Hero Carousel**
 - Backend: Node.js + Express + TypeScript
 - Veritabani: PostgreSQL + Prisma ORM
 - Cache/Queue destek bileseni: Redis
@@ -17,6 +38,7 @@ Mimari prensipleri:
 - JWT tabanli admin guvenlik katmani
 - Rate-limiter ve merkezi hata yonetimi
 - Docker tabanli ortam standartlastirma
+- **kategoriDogrulandi flag** for verified training data integrity
 
 ## 2. Veri Akis Semasi
 

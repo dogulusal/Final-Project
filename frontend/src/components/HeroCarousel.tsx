@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { NewsItem } from "@/types/news";
 import Link from "next/link";
+import Image from "next/image";
 
 interface HeroCarouselProps {
   news: NewsItem[];
@@ -64,12 +65,14 @@ export default function HeroCarousel({ news, autoPlayInterval = 5000 }: HeroCaro
             idx === currentIndex ? "opacity-100" : "opacity-0"
           }`}
         >
-          {/* Background Image */}
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage: `url('https://images.unsplash.com/photo-${1585829365295 + idx}?w=1200&h=600&fit=crop')`,
-            }}
+          {/* Optimized Next.js Image */}
+          <Image
+            src="https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&h=600&fit=crop"
+            alt={item.baslik}
+            fill
+            priority={idx === currentIndex}
+            className="object-cover"
+            sizes="(max-width: 768px) 500px, 600px"
           />
 
           {/* Gradient Overlay */}
