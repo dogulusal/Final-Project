@@ -180,7 +180,7 @@ export default function Home() {
         {/* Dashboard Analytics Row — lazy-mounted via IntersectionObserver */}
         {activeCategory === "Tümü" && !search && (
           <LazySection minHeight="220px" className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
-            <SentimentBiasMap />
+            <SentimentBiasMap apiUrl={process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002"} />
             <InterestRadar />
           </LazySection>
         )}

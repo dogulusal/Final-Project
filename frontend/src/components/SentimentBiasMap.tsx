@@ -21,7 +21,7 @@ interface SentimentData {
   totalArticles: number;
 }
 
-export default function SentimentBiasMap({ apiUrl = "http://localhost:3001", autoFetch = true }: Props) {
+export default function SentimentBiasMap({ apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002", autoFetch = true }: Props) {
   const [data, setData] = useState<SentimentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
