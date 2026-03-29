@@ -4,9 +4,9 @@
 
 | Metrik | Value | Status |
 |--------|-------|--------|
-| TypeScript Check | 11.1s | ✅ Normal |
-| Static Generation | 902ms | ✅ Good |
-| Total Build Time | ~40s | ✅ Fast |
+| TypeScript Check | 11.6s | ✅ Normal |
+| Static Generation | 741ms | ✅ Good |
+| Total Build Time | ~22s | ✅ Fast |
 | TypeScript Errors | 0 | ✅ Clean |
 
 ---
@@ -14,15 +14,15 @@
 ## Performance Optimizations (Recommended)
 
 ### Priority 1: Critical (Must Do)
-- [ ] **1. Image Optimization**
+- [x] **1. Image Optimization**
   - Status: Unsplash placeholder images used
-  - Fix: Add `next/image` optimization to carousel + news cards
+  - Fix: `next/image` optimization HeroCarousel üzerinde aktif
   - Expected: ~20-30% image size reduction
   - Impact: Core Web Vitals LCP improvement
 
-- [ ] **2. Code Splitting**
-  - Status: Carousel + InterestRadar are dynamic imports?
-  - Check: Verify `dynamic()` imports in page.tsx
+- [x] **2. Code Splitting**
+  - Status: Dynamic import aktif
+  - Check: `dynamic()` ile HeroCarousel, PersonalizedHeroCarousel, SentimentBiasMap, InterestRadar lazy yükleniyor
   - Expected: ~15% faster initial load
   - Impact: Time to Interactive (TTI) improvement
 
@@ -92,9 +92,9 @@ lighthouse http://localhost:3000 --view
 
 ## Next Steps
 
-1. **Week 1 (Current):** Address Priority 1 items
-2. **Week 2:** Monitor backfill progress + apply Priority 2
-3. **Final Week:** Thesis polish + last-minute fixes
+1. Priority 2 maddeleri (animation + bundle analizi) tamamla
+2. Lighthouse raporunu ölç ve skorları dokümana ekle
+3. News kart görsellerinde `next/image` kullanımını genişlet
 
 **Estimated effort:** 4-6 hours total for all optimizations
 **Risk:** Low — All changes are safe and reversible

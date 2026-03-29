@@ -10,8 +10,21 @@ export default function InterestRadar() {
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
 
   useEffect(() => {
+    const storageKey = "interest-radar-category-map";
+    const cached = typeof window !== "undefined" ? sessionStorage.getItem(storageKey) : null;
+    if (cached) {
+      try {
+        setCategoryMap(JSON.parse(cached));
+        return;
+      } catch {
+        // Ignore parse errors and continue with network fetch.
+      }
+    }
+
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
-    fetch(`${apiUrl}/api/news/categories`)
+    const controller = new AbortController();
+
+    fetch(`${apiUrl}/api/news/categories`, { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => {
         if (data.success && Array.isArray(data.data)) {
@@ -20,9 +33,14 @@ export default function InterestRadar() {
             map[cat.id] = cat.ad;
           });
           setCategoryMap(map);
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem(storageKey, JSON.stringify(map));
+          }
         }
       })
       .catch(() => {});
+
+    return () => controller.abort();
   }, []);
 
   const interests = useMemo(() => {

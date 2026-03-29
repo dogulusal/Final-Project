@@ -24,11 +24,19 @@ class BackupScheduler {
     private task: ScheduledTask | null = null;
 
     constructor() {
+        const scriptCandidates = [
+            path.resolve(__dirname, './backup-db.sh'),
+            path.resolve(__dirname, '../../scripts/backup-db.sh'),
+            path.resolve(process.cwd(), 'scripts/backup-db.sh')
+        ];
+        const resolvedScriptPath = scriptCandidates.find((candidate) => fs.existsSync(candidate))
+            || scriptCandidates[scriptCandidates.length - 1];
+
         this.config = {
             enabled: process.env.BACKUP_ENABLED !== 'false',
             schedule: process.env.BACKUP_SCHEDULE || '0 2 * * *', // 02:00 UTC daily
-            scriptPath: path.resolve(__dirname, './backup-db.sh'),
-            logDir: path.resolve(__dirname, '../backups')
+            scriptPath: resolvedScriptPath,
+            logDir: path.resolve(process.cwd(), 'backups')
         };
     }
 

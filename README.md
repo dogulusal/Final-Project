@@ -37,9 +37,19 @@ docker compose up -d
 cd backend && npm run prisma:seed
 
 # 5. Admin panele giriş
-# Frontend: http://localhost:3000/login
+# Frontend: http://localhost:3003/login
 # Email: admin@newsagency.com  |  Şifre: admin123456
+
+# 6. Servis sağlık kontrolleri
+# Liveness:  http://localhost:3002/api/health
+# Readiness: http://localhost:3002/api/ready
 ```
+
+## Son Güncellemeler
+
+- ML model doğruluk akışı doğrulanmış veri (`kategoriDogrulandi=true`) üzerinden yönetilir.
+- Ana sayfada ağır bileşenler `next/dynamic` ile kod bölünerek yüklenir.
+- Backend tarafında `/api/ready` endpointi DB + Redis readiness kontrolü yapar.
 
 ## Proje Yapısı
 
@@ -57,6 +67,7 @@ cd backend && npm run prisma:seed
 ├── frontend/              # Next.js + Tailwind
 │   ├── src/app/           # pages (login, admin, haber vb.)
 │   ├── src/components/    # UI components
+│   ├── src/features/      # feature-based UI/domain modules
 │   └── .env.example       # Frontend config şablonu
 ├── training/              # ML & LLM eğitim verileri
 ├── docs/                  # Dokümantasyon

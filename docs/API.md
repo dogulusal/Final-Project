@@ -1,6 +1,6 @@
 # AI Haber Ajansı — API Referansı
 
-**Base URL:** `http://localhost:3001`  
+**Base URL:** `http://localhost:3002`  
 **Content-Type:** `application/json`  
 **Auth:** `Authorization: Bearer <access_token>` (korumalı endpointler için)
 
@@ -59,6 +59,33 @@ Sistem durumu kontrolü. **Public endpoint.**
   "status": "ok",
   "environment": "development",
   "timestamp": "2026-03-28T10:00:00.000Z"
+}
+```
+
+### GET /api/ready
+Readiness kontrolü. Veritabanı ve Redis erişimi doğrulanır. **Public endpoint.**
+
+**Response (200):**
+```json
+{
+  "status": "ready",
+  "checks": {
+    "db": true,
+    "redis": true
+  },
+  "timestamp": "2026-03-29T18:54:42.323Z"
+}
+```
+
+**Response (503):**
+```json
+{
+  "status": "degraded",
+  "checks": {
+    "db": true,
+    "redis": false
+  },
+  "timestamp": "2026-03-29T18:54:42.323Z"
 }
 ```
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -61,6 +61,16 @@ export default function Home() {
   const limit = 20;
 
   const { getInterests, isPersonalized } = useReadingHistory();
+  const interests = useMemo(() => getInterests(), [getInterests]);
+  const canShowPersonalized = isPersonalized && Object.keys(interests).length >= 3;
+  const personalizedNews = useMemo(
+    () => (isPersonalized && activeCategory === "Tümü" ? personalizedSort(news, interests) : news),
+    [isPersonalized, activeCategory, news, interests]
+  );
+  const personalizedCarouselItems = useMemo(
+    () => (canShowPersonalized ? personalizedSort(news, interests).slice(0, 3) : []),
+    [canShowPersonalized, news, interests]
+  );
 
   // Debounce search
   useEffect(() => {
@@ -149,8 +159,8 @@ export default function Home() {
       <HeroSection />
 
       {/* Sizin İçin Seçilenler Carousel */}
-      {!loading && isPersonalized && news.length > 0 && Object.keys(getInterests()).length >= 3 && (
-        <PersonalizedHeroCarousel newsItems={personalizedSort(news, getInterests()).slice(0, 3)} />
+      {!loading && canShowPersonalized && news.length > 0 && (
+        <PersonalizedHeroCarousel newsItems={personalizedCarouselItems} />
       )}
 
       <div id="news" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -199,7 +209,7 @@ export default function Home() {
             </span>
           </div>
           
-          {isPersonalized && activeCategory === "Tümü" && Object.keys(getInterests()).length >= 3 && (
+          {canShowPersonalized && activeCategory === "Tümü" && (
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--surface-warm)] border border-[var(--accent-warm)]/20 animate-in fade-in slide-in-from-right-4 duration-500">
               <Target size={14} className="text-[var(--accent-warm)]" />
               <span className="text-[10px] font-bold text-[var(--accent-warm)] uppercase tracking-wider">🎯 Senin İçin Kişiselleştirildi</span>
@@ -218,7 +228,7 @@ export default function Home() {
         {/* Ana İçerik */}
         <ErrorBoundary>
             <NewsFeed 
-                newsItems={isPersonalized && activeCategory === "Tümü" ? personalizedSort(news, getInterests()) : news} 
+            newsItems={personalizedNews}
                 loading={loading} 
             />
         </ErrorBoundary>

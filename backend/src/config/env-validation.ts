@@ -43,6 +43,22 @@ export function validateEnvironment(): EnvValidationResult {
         warnings.push('JWT_SECRET is shorter than recommended (32+ characters)');
     }
 
+    if (process.env.NODE_ENV === 'production') {
+        if (!process.env.LLM_API_KEY) {
+            warnings.push('LLM_API_KEY eksik: production ortamda LLM tabanlı içerik zenginleştirme devre dışı kalabilir');
+        }
+
+        const originsRaw = process.env.CORS_ALLOWED_ORIGINS || '';
+        const origins = originsRaw
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+        if (origins.length === 0) {
+            warnings.push('CORS_ALLOWED_ORIGINS boş: production ortamda CORS kuralı beklenenden daha geniş olabilir');
+        }
+    }
+
     // === Validate NODE_ENV ===
     const validNodeEnv = ['development', 'production', 'test'];
     if (process.env.NODE_ENV && !validNodeEnv.includes(process.env.NODE_ENV)) {
