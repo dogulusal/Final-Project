@@ -17,7 +17,7 @@
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const CONFIDENCE_THRESHOLD = 0.40; // Bu altındaki haberler muhtemel yanlış kategori
+const CONFIDENCE_THRESHOLD = 0.75; // Bu altındaki haberler incelemeye alınır
 const LIMIT = 30;
 
 async function main() {
@@ -86,7 +86,13 @@ async function main() {
         } else {
             await prisma.haber.update({
                 where: { id: haberId },
-                data: { kategoriId }
+                data: {
+                    kategori: {
+                        connect: { id: kategoriId }
+                    },
+                    mlConfidence: null,
+                    kategoriDogrulandi: true
+                } as any
             });
             console.log(`\n✅ Haber #${haberId} → '${kat.ad}' olarak güncellendi.`);
             console.log('   Şimdi modeli yeniden eğitin: POST /api/ml/train');

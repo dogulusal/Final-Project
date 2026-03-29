@@ -55,8 +55,9 @@ export class NewsService implements INewsService {
                 durum: data.durum || 'ham',
                 mlConfidence: data.mlConfidence || null,
                 llmProvider: data.llmProvider || null,
+                kategoriDogrulandi: data.kategoriDogrulandi || false,
                 okumaSuresiDakika: data.icerik ? Math.ceil(data.icerik.split(' ').length / 200) : null,
-            },
+            } as any,
             include: {
                 kategori: true
             }

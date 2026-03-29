@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 
 export default function ReadingProgressBar({ targetId }: { targetId?: string }) {
   const [readingProgress, setReadingProgress] = useState(0);
+  const [isTrackable, setIsTrackable] = useState(false);
 
   useEffect(() => {
     const updateScroll = () => {
@@ -22,8 +23,10 @@ export default function ReadingProgressBar({ targetId }: { targetId?: string }) 
       }
 
       if (scrollHeight > 0) {
+        setIsTrackable(scrollHeight > 240);
         setReadingProgress(Math.round((currentScroll / scrollHeight) * 100));
       } else {
+        setIsTrackable(false);
         setReadingProgress(0);
       }
     };
@@ -42,6 +45,7 @@ export default function ReadingProgressBar({ targetId }: { targetId?: string }) 
   }, [targetId]);
 
   const isFinished = readingProgress >= 98;
+  if (!isTrackable) return null;
 
   return (
     <>

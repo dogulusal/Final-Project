@@ -36,7 +36,8 @@ export const LLM_FALLBACK_PROVIDER = process.env.LLM_FALLBACK_PROVIDER || 'ollam
 export const LLM_FALLBACK_MODEL = process.env.LLM_FALLBACK_MODEL || 'qwen3:8b';
 
 // --- ML Model ---
-export const ML_CONFIDENCE_THRESHOLD = parseFloat(process.env.ML_CONFIDENCE_THRESHOLD || '0.45');
+// 0.45 çok düşük kaldığı için yanlış etiketleri artırıyordu; varsayılanı yükseltiyoruz.
+export const ML_CONFIDENCE_THRESHOLD = parseFloat(process.env.ML_CONFIDENCE_THRESHOLD || '0.65');
 
 // --- Güvenlik ---
 export const JWT_SECRET = process.env.JWT_SECRET || '';

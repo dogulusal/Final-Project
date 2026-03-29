@@ -32,15 +32,25 @@ function KategorilerContent() {
     const [loading, setLoading] = useState(true);
     const [activeCategory, setActiveCategory] = useState<string | null>(initialCat);
 
+    const dedupe = (items: NewsItem[]) => {
+        const seen = new Set<string>();
+        return items.filter((n) => {
+            const key = (n.slug || "").toLowerCase().trim() || `${(n.baslik || "").toLowerCase().trim()}::${(n.kaynakUrl || "").toLowerCase().trim()}`;
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    };
+
     useEffect(() => {
         fetchNews();
     }, []);
 
     const fetchNews = async () => {
         try {
-            const res = await fetch(`${API_BASE}/api/news?limit=500`);
+            const res = await fetch(`${API_BASE}/api/news?limit=500&status=hazir`);
             const data = await res.json();
-            if (data.success) setNews(data.data);
+            if (data.success) setNews(dedupe(data.data));
         } catch {
             // API erişim hatası
         } finally {

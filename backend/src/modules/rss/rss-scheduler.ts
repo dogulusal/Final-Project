@@ -173,13 +173,14 @@ export class RssScheduler {
                         mlService.analyzeSentiment(item.title + " " + contentFallback).catch(() => null)
                     ]);
 
-                    let finalCatId = 1; // Default
-
-                    if (catRes && catRes.confidence > ML_CONFIDENCE_THRESHOLD) {
-                        finalCatId = kategoriMap.get(catRes.kategori.toLowerCase()) ?? 1;
-                    } else {
-                        finalCatId = kategoriMap.get((source.category || '').toLowerCase()) ?? 1;
-                    }
+                    const genelCatId = kategoriMap.get('genel') ?? 1;
+                    const mlStrong = !!(catRes && catRes.confidence >= ML_CONFIDENCE_THRESHOLD);
+                    const mlCatId = mlStrong
+                        ? (kategoriMap.get(catRes!.kategori.toLowerCase()) ?? genelCatId)
+                        : null;
+                    let finalCatId = mlStrong
+                        ? mlCatId!
+                        : genelCatId;
 
                     // 4. LLM Zenginleştirme (LLM_PIPELINE_ENABLED=true ile etkinleştirilir)
                     let llmBaslik = item.title;
@@ -188,6 +189,8 @@ export class RssScheduler {
                     let llmSentiment = sentRes ? sentRes.label : "Nötr";
                     let newsdurum: 'ham' | 'hazir' = 'ham';
                     let llmProviderName = 'none';
+                    let llmSucceeded = false;
+                    let kategoriDogrulandi = false;
 
                     const articleUrl = item.link || '';
                     const quotaAvailable = LLM_PIPELINE_ENABLED &&
@@ -211,7 +214,7 @@ export class RssScheduler {
                                 const llmCatId = kategoriMap.get(llmResult.kategori.toLowerCase());
                                 if (llmCatId) finalCatId = llmCatId;
                             }
-                            newsdurum = 'hazir';
+                            llmSucceeded = true;
                             llmProviderName = 'gemini';
                             this.llmDailyCount++;
                             if (articleUrl) this.llmProcessedUrls.add(articleUrl);
@@ -224,6 +227,16 @@ export class RssScheduler {
                         console.warn(`[Scheduler LLM] ⛔ Günlük kota doldu (${LLM_DAILY_QUOTA}). Bu döngüdeki kalan haberler ham kaydedilecek.`);
                     }
 
+                    // LLM başarılıysa hazır kabul et. LLM yoksa sadece güçlü ML tahmini olanları hazıra al.
+                    if (llmSucceeded || mlStrong) {
+                        newsdurum = 'hazir';
+                    }
+
+                    // ML ve nihai kategori uyumu varsa doğrulanmış kabul et.
+                    if (mlStrong && mlCatId && mlCatId === finalCatId) {
+                        kategoriDogrulandi = true;
+                    }
+
                     // 5. DB Kayıt
                     await this.newsService.createNews({
                         baslik: llmBaslik,
@@ -231,11 +244,12 @@ export class RssScheduler {
                         metaAciklama: llmMetaAciklama,
                         kategoriId: finalCatId,
                         sentiment: llmSentiment,
-                        mlConfidence: catRes ? catRes.confidence : 0,
+                        mlConfidence: catRes ? catRes.confidence : undefined,
                         gorselUrl: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167",
                         kaynakUrl: item.link,
                         durum: newsdurum,
-                        llmProvider: llmProviderName
+                        llmProvider: llmProviderName,
+                        kategoriDogrulandi
                     });
                     
                     cycleAdded++;

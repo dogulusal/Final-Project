@@ -221,10 +221,11 @@
     - docker-compose'a nginx servisi ekle
     - Let's Encrypt veya self-signed cert
 
-23. **Son veri kontrolü ve backup**
+23. **Son veri kontrolü ve backup** ✅
     - Target: 3000+ haber
     - Binary-safe backup: `docker exec pg_dump -F c`
     - dataset.json yedekle
+  - Durum (29.03.2026): hazir=1224, gunluk ortalama=612, 3000 hedefi icin tahmini 2.90 gun
 
 ### Doğrulama
 - API.md'de tüm endpoint'ler belgelenmiş

@@ -165,6 +165,60 @@ router.get('/scheduler-status', verifyJwtToken, requireRole([UserRole.ADMIN]), c
 });
 
 /**
+ * PATCH /api/admin/news/:id/category
+ * Haber kategorisini manuel düzeltir.
+ */
+router.patch('/news/:id/category', verifyJwtToken, requireRole([UserRole.ADMIN]), async (req: Request, res: Response) => {
+    try {
+        const newsId = parseInt(req.params.id, 10);
+        const kategoriId = parseInt(req.body?.kategoriId, 10);
+
+        if (!Number.isInteger(newsId) || !Number.isInteger(kategoriId)) {
+            return res.status(400).json({ success: false, error: 'Geçerli haberId ve kategoriId zorunludur' });
+        }
+
+        const [news, kategori] = await Promise.all([
+            prisma.haber.findUnique({ where: { id: newsId } }),
+            prisma.kategori.findUnique({ where: { id: kategoriId } })
+        ]);
+
+        if (!news) {
+            return res.status(404).json({ success: false, error: 'Haber bulunamadı' });
+        }
+
+        if (!kategori) {
+            return res.status(404).json({ success: false, error: 'Kategori bulunamadı' });
+        }
+
+        const updated = await prisma.haber.update({
+            where: { id: newsId },
+            data: {
+                kategori: {
+                    connect: { id: kategoriId }
+                },
+                mlConfidence: null,
+                kategoriDogrulandi: true
+            } as any,
+            include: {
+                kategori: true
+            }
+        });
+
+        return res.json({
+            success: true,
+            data: {
+                id: updated.id,
+                baslik: updated.baslik,
+                kategoriId: updated.kategoriId,
+                kategori: updated.kategori.ad
+            }
+        });
+    } catch (error: any) {
+        return res.status(500).json({ success: false, error: error.message || 'Kategori güncellenemedi' });
+    }
+});
+
+/**
  * GET /api/admin/llm-usage
  * LLM token kullanımı ve maliyet istatistikleri
  * Query params:

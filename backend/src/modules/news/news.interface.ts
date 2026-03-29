@@ -9,6 +9,7 @@ export interface CreateNewsDto {
     durum?: 'ham' | 'hazir' | 'yayinda';
     mlConfidence?: number;
     llmProvider?: string;
+    kategoriDogrulandi?: boolean;
 }
 
 export interface INewsService {

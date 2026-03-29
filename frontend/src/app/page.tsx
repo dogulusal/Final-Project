@@ -17,6 +17,23 @@ import LazySection from "@/components/LazySection";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
+const makeNewsIdentity = (item: NewsItem) => {
+  const slugKey = (item.slug || "").trim().toLowerCase();
+  const titleKey = (item.baslik || "").trim().toLowerCase();
+  const sourceKey = (item.kaynakUrl || "").trim().toLowerCase();
+  return slugKey || `${titleKey}::${sourceKey}`;
+};
+
+const dedupeNewsItems = (items: NewsItem[]) => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = makeNewsIdentity(item);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 
 const CATEGORIES = [
     { name: "Tümü", slug: "Tümü", icon: "🏠" },
@@ -76,7 +93,7 @@ export default function Home() {
       console.log("[fetchNews] API Response:", data);
       
       if (data.success) {
-        setNews(data.data);
+        setNews(dedupeNewsItems(data.data));
         setTotalPages(data.totalPages || 1);
       } else {
         console.warn("[fetchNews] API başarısız:", data);
@@ -100,8 +117,10 @@ export default function Home() {
         const newItem = JSON.parse(event.data);
         if (newItem.durum === "hazir") {
           setNews((prev) => {
-            if (prev.some(n => n.id === newItem.id)) return prev;
-            return [newItem, ...prev].slice(0, limit);
+            if (prev.some(n => n.id === newItem.id || makeNewsIdentity(n) === makeNewsIdentity(newItem))) {
+              return prev;
+            }
+            return dedupeNewsItems([newItem, ...prev]).slice(0, limit);
           });
         }
       } catch (e) {

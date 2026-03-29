@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { NewsItem } from "@/types/news";
+import { useReadingHistory } from "@/hooks/useReadingHistory";
 
 const BADGE_MAP: Record<string, string> = {
     Spor: "badge-spor",
@@ -37,6 +38,7 @@ interface Props {
 }
 
 export default function NewsCard({ news }: Props) {
+    const { recordClick } = useReadingHistory();
     const categoryName = news.kategori?.ad || "Genel";
     const badgeClass = BADGE_MAP[categoryName] || "badge-genel";
 
@@ -57,7 +59,7 @@ export default function NewsCard({ news }: Props) {
     }
 
     return (
-        <Link href={`/haber/${news.slug}`} className="block h-full cursor-pointer">
+        <Link href={`/haber/${news.slug}`} className="block h-full cursor-pointer" onClick={() => recordClick(news.kategoriId)}>
             <article className={`news-card p-5 flex flex-col h-full group ${glowClass} relative overflow-hidden transition-all duration-300`}>
                 {/* Header */}
                 <div className="flex items-center justify-between mb-3 relative z-10">

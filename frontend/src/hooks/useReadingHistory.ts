@@ -14,16 +14,37 @@ export interface CategoryHistory {
 
 export function useReadingHistory() {
     const [isPersonalized, setIsPersonalized] = useState(false);
+    const [historyVersion, setHistoryVersion] = useState(0);
 
-    useEffect(() => {
-        // localStorage sadece client-side'da mevcut
+    const syncPersonalizationState = useCallback(() => {
         if (typeof window === 'undefined') return;
-        
         const consent = localStorage.getItem(CONSENT_KEY) === "true";
         const enabled = localStorage.getItem(PERSONALIZATION_KEY) === "true";
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setIsPersonalized(consent && enabled); // reading localStorage in mount effect, no cascade risk
+        setIsPersonalized(consent && enabled);
     }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        syncPersonalizationState();
+
+        const onStorage = () => {
+            syncPersonalizationState();
+            setHistoryVersion(v => v + 1);
+        };
+        const onHistoryUpdated = () => {
+            syncPersonalizationState();
+            setHistoryVersion(v => v + 1);
+        };
+
+        window.addEventListener('storage', onStorage);
+        window.addEventListener('reading-history-updated', onHistoryUpdated);
+
+        return () => {
+            window.removeEventListener('storage', onStorage);
+            window.removeEventListener('reading-history-updated', onHistoryUpdated);
+        };
+    }, [syncPersonalizationState]);
 
     const recordClick = useCallback((categoryId: number) => {
         if (typeof window === 'undefined') return;
@@ -45,6 +66,7 @@ export function useReadingHistory() {
         }
 
         localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+        window.dispatchEvent(new CustomEvent('reading-history-updated'));
     }, []);
 
     const getInterests = useCallback(() => {
@@ -63,5 +85,5 @@ export function useReadingHistory() {
         return counts;
     }, []);
 
-    return { recordClick, getInterests, isPersonalized };
+    return { recordClick, getInterests, isPersonalized, historyVersion };
 }

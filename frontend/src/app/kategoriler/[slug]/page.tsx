@@ -98,6 +98,16 @@ export default async function KategoriPage({ params }: PageProps) {
   let news: NewsItem[] = [];
   let fetchFailed = false;
 
+  const dedupeNews = (items: NewsItem[]) => {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      const key = (item.slug || "").toLowerCase().trim() || `${(item.baslik || "").toLowerCase().trim()}::${(item.kaynakUrl || "").toLowerCase().trim()}`;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   try {
     // Kategori bilgisini ve haberlerini paralel fetch et
     const [kategorilerRes, haberlerRes] = await Promise.all([
@@ -115,7 +125,7 @@ export default async function KategoriPage({ params }: PageProps) {
 
     if (haberlerRes.ok) {
       const haberData = await haberlerRes.json();
-      news = Array.isArray(haberData?.data) ? haberData.data : [];
+      news = Array.isArray(haberData?.data) ? dedupeNews(haberData.data) : [];
     }
   } catch (error) {
     fetchFailed = true;

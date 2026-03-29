@@ -54,10 +54,21 @@ async function processBatch(batch: any[]): Promise<any[]> {
 Sen deneyimli bir haber editörüsün. Sana verilen haber başlıklarını şu kategorilerden birine ve YALNIZCA BİRİNE ata:
 Spor, Ekonomi, Teknoloji, Siyaset, Dünya, Sağlık, Genel.
 
+KATEGORİ TANIMLARI (kesin referans):
+- Spor: Futbol, basketbol, tenis, olimpiyat, maç sonucu, transfer, sporcu, lig, turnuva
+- Ekonomi: Borsa, faiz, enflasyon, dolar/euro, merkez bankası, şirket kazancı, ihracat, bütçe, vergi, kredi
+- Teknoloji: Yapay zeka, yazılım, donanım, telefon, bilgisayar, siber güvenlik, uzay, robot, uygulama, oyun
+- Siyaset: Meclis, bakan, cumhurbaşkanı, seçim, parti, kanun, yasa, hükümet kararı, anayasa
+- Dünya: Yabancı ülke haberleri, savaş, uluslararası ilişkiler, NATO, BM, küresel olaylar, yabancı lider
+- Sağlık: Hastalık, tedavi, aşı, hastane, doktor, ilaç, kanser, salgın, medikal araştırma
+- Genel: Kaza, suç, cinayet, yangın, sel, deprem, trafik kazası, soygun, gasp, tutuklanma, yerel haber, sosyal olay, magazin, insan ilgisi hikayesi
+
 KURALLAR:
 1. Kesinlikle başka kelime kullanma! Listelenen kategoriler dışında hiçbir şey yazma.
 2. Çıktıyı JSON array formatında ver: [{"id": 1, "kategori": "Siyaset"}, {"id": 2, "kategori": "Dünya"}]
 3. Her haber için kesinlikle doğru tek bir analiz yap.
+4. Kazalar, suçlar, yerel olaylar, afetler MUTLAKA Genel kategorisine girmeli.
+5. Sağlık haberleri varsa (hastalık, aşı, hastane) Sağlık kategorisi kullan, Genel değil.
 `;
 
     const userPrompt = `
@@ -109,16 +120,22 @@ async function fixDataset(isDryRun: boolean) {
     });
 
     console.log(`Filtreleme sonrası işlenecek toplam ${allNews.length} haber var. (Atlanan: ${processedIds.length})`);
-    
-    if (allNews.length === 0) {
+
+    let selectedNews = allNews;
+    if (LIMIT > 0) {
+        selectedNews = RANDOM_SAMPLE ? shuffleArray(allNews).slice(0, LIMIT) : allNews.slice(0, LIMIT);
+        console.log(`Örneklem modu: ${selectedNews.length} haber (${RANDOM_SAMPLE ? 'rastgele' : 'ilk kayıtlar'}) işlenecek.`);
+    }
+
+    if (selectedNews.length === 0) {
         console.log("İşlem tamamlandı veya işlenecek yeni haber yok!");
         return;
     }
 
     // Haberleri 10'arlı batch'lere ayır
     const batches = [];
-    for (let i = 0; i < allNews.length; i += BATCH_SIZE) {
-        batches.push(allNews.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < selectedNews.length; i += BATCH_SIZE) {
+        batches.push(selectedNews.slice(i, i + BATCH_SIZE));
     }
 
     const limit = pLimit(CONCURRENCY_LIMIT);
@@ -140,9 +157,19 @@ async function fixDataset(isDryRun: boolean) {
                 if (newCatId !== newsItem.kategoriId) {
                      await prisma.haber.update({
                          where: { id: res.id },
-                         data: { kategoriId: newCatId }
+                         data: {
+                             kategoriId: newCatId,
+                             kategoriDogrulandi: true,
+                             mlConfidence: null
+                         } as any
                      });
                      console.log(`[UPDATED] ID ${res.id} -> ${categoryName}`);
+                } else {
+                     // Kategori aynı ama doğrulanmış olarak işaretle
+                     await prisma.haber.update({
+                         where: { id: res.id },
+                         data: { kategoriDogrulandi: true } as any
+                     });
                 }
             }
             
@@ -174,6 +201,17 @@ async function fixDataset(isDryRun: boolean) {
 
 const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
+const LIMIT = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1] || '0', 10);
+const RANDOM_SAMPLE = args.includes('--random-sample');
+
+function shuffleArray<T>(input: T[]): T[] {
+    const arr = [...input];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
 
 fixDataset(isDryRun).catch(e => {
     console.error("Script fatal error:", e);

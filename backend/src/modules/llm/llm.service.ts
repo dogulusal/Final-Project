@@ -78,6 +78,16 @@ KURALLAR:
 2. icerik alanı, haberi 3-5 adet kısa madde işaretine (bullet points) bölerek özetlemelidir.
 3. sentiment alanı sadece "Pozitif", "Negatif" veya "Nötr" değerlerinden biri olmalıdır.
 4. confidence alanı haberin doğruluğuna dair güven skorun olmalıdır (0.0-1.0 arası).
+5. kategori alanı için SADECE aşağıdaki tanımlara bakarak karar ver — önerileni körü körüne kabul etme:
+
+KATEGORİ TANIMLARI (kesin referans):
+- Spor: Futbol, basketbol, tenis, olimpiyat, maç sonucu, transfer, sporcu, lig, turnuva
+- Ekonomi: Borsa, faiz, enflasyon, dolar/euro, merkez bankası, şirket kazancı, ihracat, bütçe, vergi, kredi
+- Teknoloji: Yapay zeka, yazılım, donanım, telefon, bilgisayar, siber güvenlik, uzay, robot, uygulama, oyun
+- Siyaset: Meclis, bakan, cumhurbaşkanı, seçim, parti, kanun, yasa, hükümet kararı, anayasa
+- Dünya: Yabancı ülke haberleri, savaş, uluslararası ilişkiler, NATO, BM, küresel olaylar, yabancı lider
+- Sağlık: Hastalık, tedavi, aşı, hastane, doktor, ilaç, kanser, salgın, medikal araştırma
+- Genel: Kaza, suç, cinayet, yangın, sel, deprem, sosyal olay, magazin, eğlence, yerel haber, insan ilgisi
 
 SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
 {
@@ -93,7 +103,7 @@ SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
 
         const userPrompt = `
 LÜTFEN BU HABERİ YENİDEN YAZ (JSON OLARAK DÖN):
-Kategori: ${input.kategori}
+Önerilen Kategori (doğrula veya düzelt): ${input.kategori}
 Kaynak URL: ${input.kaynak_url}
 
 HAM BAŞLIK: 

@@ -79,6 +79,16 @@ export default function AISummaryModal({ newsId }: AISummaryModalProps) {
     return { emoji: "⚪", label: "Nötr", cls: "bg-gray-500/10 text-gray-500 border-gray-500/20" };
   }
 
+  function getSummaryPoints(content: string): string[] {
+    return content
+      .replace(/\s+/g, " ")
+      .split(/\.\s+|\n+/)
+      .map((pt) => pt.trim())
+      .filter(Boolean)
+      .slice(0, 8)
+      .map((pt) => (pt.length > 220 ? `${pt.slice(0, 217)}...` : pt));
+  }
+
   return (
     <Dialog open={true} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl bg-[var(--bg-primary)] border-[var(--border-subtle)] sm:rounded-2xl gap-0 p-0 font-sans max-h-[90vh] flex flex-col overflow-hidden">
@@ -204,7 +214,7 @@ export default function AISummaryModal({ newsId }: AISummaryModalProps) {
                     Önemli Noktalar
                   </h4>
                   <ul className="space-y-2.5">
-                    {data.icerik.split('. ').filter(Boolean).map((pt: string, i: number) => (
+                    {getSummaryPoints(data.icerik).map((pt: string, i: number) => (
                       <li key={i} className="flex gap-3 text-sm text-[var(--text-secondary)] leading-relaxed">
                         <span className="text-[var(--accent-warm)] font-black flex-shrink-0 mt-0.5">·</span>
                         <span>{pt}.</span>

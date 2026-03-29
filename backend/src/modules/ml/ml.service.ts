@@ -32,8 +32,8 @@ export class MlCategorizationService implements INewsCategorizationService {
 
     private initializeTrainingPipeline(): void {
         newsEventEmitter.on('new-news', (news: any) => {
-            // Ham dahil tüm düzenli haberleri (hata hariç) eğitime katıp modelin kelime dağarcığını genişletiyoruz
-            if (news.durum === 'ham' || news.durum === 'hazir' || news.durum === 'yayinda') {
+            // Sadece yayına hazır ve yeterli güvenli haberlerle yeniden eğitimi tetikle
+            if ((news.durum === 'hazir' || news.durum === 'yayinda') && news.kategoriDogrulandi === true) {
                 this.newsSinceLastTrain++;
                 console.log(`[ML Pipeline] Yeni temiz veri yakalandı! Sıradaki eğitim için: ${this.newsSinceLastTrain}/${this.BATCH_TRAIN_THRESHOLD}`);
 
@@ -52,8 +52,14 @@ export class MlCategorizationService implements INewsCategorizationService {
     async saveModelToDb(accuracy: number, sampleCount: number): Promise<void> {
         const serializedClassifier = JSON.stringify(this.classifier);
         const modelData = JSON.parse(serializedClassifier) as Prisma.InputJsonValue;
+        const modelStateRepo = (prisma as any).modelState;
 
-        await prisma.modelState.upsert({
+        if (!modelStateRepo) {
+            console.warn('[ML Warn] Prisma client modelState erişimi yok, model DB kaydı atlandı.');
+            return;
+        }
+
+        await modelStateRepo.upsert({
             where: { id: 1 },
             update: {
                 modelData,
@@ -75,7 +81,12 @@ export class MlCategorizationService implements INewsCategorizationService {
 
     async loadModelFromDb(): Promise<boolean> {
         try {
-            const savedModel = await prisma.modelState.findUnique({ where: { id: 1 } });
+            const modelStateRepo = (prisma as any).modelState;
+            if (!modelStateRepo) {
+                return false;
+            }
+
+            const savedModel = await modelStateRepo.findUnique({ where: { id: 1 } });
             if (!savedModel) {
                 return false;
             }
@@ -176,15 +187,28 @@ export class MlCategorizationService implements INewsCategorizationService {
      */
     async loadAndTrainFromDB(): Promise<boolean> {
         try {
-            // Sadece durum = 'hazir' veya 'yayinda' olan temiz haberleri getir (Data Poisoning engeli)
-            const approvedNews = await prisma.haber.findMany({
+            // Öncelik: güçlü güvene sahip onaylı haberlerden eğitim havuzu oluştur.
+            const trustedNews = await prisma.haber.findMany({
                 where: {
-                    durum: { in: ['hazir', 'yayinda'] }
-                },
+                    durum: { in: ['hazir', 'yayinda'] },
+                    kategoriDogrulandi: true
+                } as any,
                 include: {
                     kategori: true
                 }
             });
+
+            const approvedNews = trustedNews.length >= 300
+                ? trustedNews
+                : await prisma.haber.findMany({
+                    where: {
+                        durum: { in: ['hazir', 'yayinda'] },
+                        llmProvider: { not: 'none' }
+                    } as any,
+                    include: {
+                        kategori: true
+                    }
+                });
 
             if (approvedNews.length === 0) {
                 console.warn('[ML Warn] Veritabanında eğitilecek onaylı haber (hazir/yayinda) bulunamadı. JSON yedeğe dönülüyor...');
@@ -200,7 +224,7 @@ export class MlCategorizationService implements INewsCategorizationService {
 
             // DB'de az haber varsa tam, çoksa kontrollü şekilde dataset.json ile takviye et.
             // Amaç: etiket drift'ini azaltıp doğruluğu daha stabil tutmak.
-            const MIN_DB_THRESHOLD = 500;
+            const MIN_DB_THRESHOLD = 600;
             const ALWAYS_SUPPLEMENT_LIMIT = 600;
             try {
                 let datasetPath = '/training/naive-bayes/dataset.json';

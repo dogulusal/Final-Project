@@ -15,14 +15,24 @@ export default function NewsFeedCard({ news, layout = "standard" }: NewsFeedCard
     const isHero = layout === "hero";
     const isCompact = layout === "compact";
     const imageUrl = getNewsImage(news);
+    const effectiveCategoryName =
+        news.mlConfidence !== null && news.mlConfidence < 0.75
+            ? "Genel"
+            : (news.kategori?.ad || "Genel");
 
-    // Smart Brevity - İçeriği madde işaretlerine bölüyoruz
-    const bulletPoints = news.icerik 
-        ? news.icerik.split('. ').filter(Boolean).slice(0, isHero ? 3 : 2).map((s: string) => s + '.') 
+    // Smart Brevity - kısa, okunabilir maddeler üret
+    const bulletPoints = news.icerik
+        ? news.icerik
+            .replace(/\s+/g, " ")
+            .split(/\.\s+|\n+/)
+            .map((s: string) => s.trim())
+            .filter(Boolean)
+            .slice(0, isHero ? 2 : 2)
+            .map((s: string) => (s.length > 160 ? `${s.slice(0, 157)}...` : `${s}.`))
         : [];
 
     return (
-        <article className={`glass-card p-5 flex ${isCompact ? 'flex-row gap-4 items-center' : 'flex-col'} group relative h-full`}>
+        <article className={`glass-card p-5 flex ${isCompact ? 'flex-row gap-4 items-center' : 'flex-col'} group relative h-full ${isHero ? 'max-h-[680px] overflow-hidden' : ''}`}>
             {/* Thumbnail — deterministik görsel */}
             {!isCompact && (
                 <div className={`relative w-full ${isHero ? 'h-64' : 'h-40'} mb-4 rounded-lg overflow-hidden shrink-0`}>
@@ -54,8 +64,11 @@ export default function NewsFeedCard({ news, layout = "standard" }: NewsFeedCard
                 {/* Kategori ve Tarih (Meta) */}
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: news.kategori?.renkKodu || 'var(--accent-warm)' }}>
-                            {news.kategori?.ad || "Genel"}
+                        <span
+                            className="text-[10px] font-bold uppercase tracking-wider"
+                            style={{ color: effectiveCategoryName === "Genel" ? 'var(--accent-warm)' : (news.kategori?.renkKodu || 'var(--accent-warm)') }}
+                        >
+                            {effectiveCategoryName}
                         </span>
                         <span className="text-[10px] text-[var(--text-muted)]">
                             {new Date(news.yayinlanmaTarihi).toLocaleDateString("tr-TR", { day: 'numeric', month: 'short' })}
@@ -84,15 +97,15 @@ export default function NewsFeedCard({ news, layout = "standard" }: NewsFeedCard
                 {!isCompact && news.metaAciklama && (
                     <div className="mb-3">
                         <span className="font-bold text-[var(--text-primary)] text-sm">Neden önemli: </span>
-                        <span className="text-sm text-[var(--text-secondary)]">{news.metaAciklama}</span>
+                        <span className={`text-sm text-[var(--text-secondary)] ${isHero ? 'line-clamp-2' : ''}`}>{news.metaAciklama}</span>
                     </div>
                 )}
 
                 {/* Madde İşaretleri */}
                 {!isCompact && bulletPoints.length > 0 && (
-                    <ul className="list-disc pl-5 mb-4 space-y-1">
+                    <ul className={`list-disc pl-5 mb-4 space-y-1 ${isHero ? 'max-h-[150px] overflow-hidden' : ''}`}>
                         {bulletPoints.map((pt: string, idx: number) => (
-                            <li key={idx} className="text-sm text-[var(--text-secondary)] leading-relaxed marker:text-[var(--accent-warm)]">{pt}</li>
+                            <li key={idx} className="text-sm text-[var(--text-secondary)] leading-relaxed marker:text-[var(--accent-warm)] line-clamp-2">{pt}</li>
                         ))}
                     </ul>
                 )}

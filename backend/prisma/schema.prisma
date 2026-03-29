@@ -55,6 +55,7 @@ model Haber {
   durum               String    @default("ham") // ham | hazir | yayinda
   mlConfidence        Float?    @map("ml_confidence")
   llmProvider         String?   @map("llm_provider")
+  kategoriDogrulandi  Boolean   @default(false) @map("kategori_dogrulandi")
 
   kategori            Kategori  @relation(fields: [kategoriId], references: [id])
   okumaGecmisi        OkumaGecmisi[]

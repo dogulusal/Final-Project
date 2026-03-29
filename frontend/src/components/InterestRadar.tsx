@@ -5,7 +5,7 @@ import { Radar, Compass } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
 
 export default function InterestRadar() {
-  const { getInterests, isPersonalized } = useReadingHistory();
+  const { getInterests, isPersonalized, historyVersion } = useReadingHistory();
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
   const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
 
@@ -38,7 +38,7 @@ export default function InterestRadar() {
       score: Number(raw[cat]),
       pct: Math.round((Number(raw[cat]) / maxScore) * 100)
     })).sort((a,b) => b.score - a.score).slice(0, 5); // top 5
-  }, [getInterests]); // getInterests is stable (useCallback)
+  }, [getInterests, historyVersion, categoryMap]);
 
   if (!isPersonalized || interests.length === 0) {
     return (
