@@ -1,16 +1,17 @@
 import { ILLMProvider, LLMResponse } from '../llm.interface';
-import { LLM_BASE_URL, LLM_MODEL_NAME } from '../../../config/constants';
+import { LLM_BASE_URL, LLM_MODEL_NAME, LLM_FALLBACK_MODEL } from '../../../config/constants';
 
 export class OllamaProvider implements ILLMProvider {
     readonly name = 'ollama';
     private baseUrl: string;
     private model: string;
 
-    constructor() {
-        this.baseUrl = LLM_BASE_URL; // varsayılan: http://localhost:11434 VEYA http://host.docker.internal:11434
-        // Eğer env değişkeninde model tanımlanmamışsa, varsayılan olarak "llama3" kullanalım 
-        // Daha çok Türkçe desteği olan "gemma" veya "mixtral" da olabilir. "llama3" şimdilik ideal.
-        this.model = LLM_MODEL_NAME || 'llama3';
+    constructor(useFallbackModel = false) {
+        this.baseUrl = LLM_BASE_URL;
+        // Fallback olarak çağrıldığında LLM_FALLBACK_MODEL kullan, ana model ise LLM_MODEL_NAME
+        this.model = useFallbackModel
+            ? (LLM_FALLBACK_MODEL || 'qwen3:8b')
+            : (LLM_MODEL_NAME || 'llama3');
     }
 
     async isAvailable(): Promise<boolean> {

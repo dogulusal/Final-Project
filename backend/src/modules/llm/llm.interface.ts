@@ -24,6 +24,7 @@ export interface GeneratedNewsContent {
     etiketler: string[];
     sentiment?: string;    // "Pozitif" | "Negatif" | "Nötr"
     confidence?: number;   // 0.0 - 1.0
+    kategori?: string;     // LLM'in belirlediği kategori (opsiyonel override)
 }
 
 export interface ABTestResult {

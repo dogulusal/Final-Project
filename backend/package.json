@@ -22,8 +22,12 @@
     "dependencies": {
         "@napi-rs/canvas": "^0.1.66",
         "@prisma/client": "^5.7.0",
+        "@types/bcrypt": "^6.0.0",
         "@types/ioredis": "^4.28.10",
+        "@types/jsonwebtoken": "^9.0.10",
+        "@types/node-cron": "^3.0.11",
         "@types/snowball-stemmers": "^0.6.2",
+        "bcrypt": "^6.0.0",
         "canvas": "^2.11.2",
         "cors": "^2.8.5",
         "dotenv": "^16.3.1",
@@ -31,7 +35,9 @@
         "express-rate-limit": "^7.1.4",
         "helmet": "^8.1.0",
         "ioredis": "^5.10.0",
+        "jsonwebtoken": "^9.0.3",
         "natural": "^6.10.0",
+        "node-cron": "^4.2.1",
         "rss-parser": "^3.13.0",
         "snowball-stemmers": "^0.6.0"
     },

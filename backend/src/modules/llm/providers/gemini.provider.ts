@@ -1,18 +1,28 @@
 import { ILLMProvider, LLMResponse } from '../llm.interface';
-import { LLM_API_KEY, LLM_MODEL_NAME } from '../../../config/constants';
+import { LLM_API_KEY, LLM_API_KEYS, LLM_MODEL_NAME } from '../../../config/constants';
+import { llmUsageService } from '../llm-usage';
 
 export class GeminiProvider implements ILLMProvider {
     name = 'Gemini (Google)';
     private baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
+    private keyIndex = 0;
 
     constructor() {
-        if (!LLM_API_KEY) {
+        if (LLM_API_KEYS.length === 0) {
             console.warn('[Gemini] LLM_API_KEY (Gemini API Key) bulunamadı!');
+        } else if (LLM_API_KEYS.length > 1) {
+            console.log(`[Gemini] ${LLM_API_KEYS.length} API key yüklendi, round-robin rotasyon aktif.`);
         }
     }
 
+    private nextKey(): string {
+        const key = LLM_API_KEYS[this.keyIndex % LLM_API_KEYS.length];
+        this.keyIndex++;
+        return key;
+    }
+
     async isAvailable(): Promise<boolean> {
-        if (!LLM_API_KEY) return false;
+        if (LLM_API_KEYS.length === 0) return false;
         return true;
     }
 
@@ -23,12 +33,13 @@ export class GeminiProvider implements ILLMProvider {
     }
 
     async generateContent(userPrompt: string, systemPrompt?: string): Promise<LLMResponse> {
-        if (!LLM_API_KEY) {
+        if (LLM_API_KEYS.length === 0) {
             throw new Error('Gemini API anahtarı eksik!');
         }
 
+        const apiKey = this.nextKey();
         const modelName = LLM_MODEL_NAME || 'gemini-1.5-flash';
-        const url = `${this.baseUrl}/${modelName}:generateContent?key=${LLM_API_KEY}`;
+        const url = `${this.baseUrl}/${modelName}:generateContent?key=${apiKey}`;
 
         const combinedPrompt = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
 
@@ -64,12 +75,28 @@ export class GeminiProvider implements ILLMProvider {
 
             const textResponse = data.candidates[0].content.parts[0].text;
 
-            let tokensUsed = 0;
+            // Extract token usage from API response
+            let inputTokens = 0;
+            let outputTokens = 0;
+            
             if (data.usageMetadata) {
-                tokensUsed = data.usageMetadata.totalTokenCount || 0;
+                inputTokens = data.usageMetadata.promptTokenCount || 0;
+                outputTokens = data.usageMetadata.candidatesTokenCount || 0;
             } else {
-                tokensUsed = Math.ceil(textResponse.split(' ').length * 1.5);
+                // Fallback estimate if metadata not available
+                inputTokens = Math.ceil(combinedPrompt.split(' ').length * 1.3);
+                outputTokens = Math.ceil(textResponse.split(' ').length * 1.5);
             }
+
+            const tokensUsed = inputTokens + outputTokens;
+
+            // Log usage for billing tracking
+            await llmUsageService.logUsage({
+                saglayici: 'gemini',
+                girisTokenSayisi: inputTokens,
+                cikisTokenSayisi: outputTokens,
+                durum: 'basarili'
+            });
 
             return {
                 content: textResponse,
@@ -79,6 +106,15 @@ export class GeminiProvider implements ILLMProvider {
             };
 
         } catch (error) {
+            // Log error usage
+            await llmUsageService.logUsage({
+                saglayici: 'gemini',
+                girisTokenSayisi: 0,
+                cikisTokenSayisi: 0,
+                durum: 'hata',
+                hataMesaji: error instanceof Error ? error.message : String(error)
+            }).catch(err => console.error('[Gemini] Usage logging failed:', err));
+            
             console.error('[Gemini] İstek atılırken kritik hata:', error);
             throw error;
         }

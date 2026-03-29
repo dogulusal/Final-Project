@@ -1,6 +1,5 @@
 import { IContentGenerationService, ILLMProvider, RawNewsInput, GeneratedNewsContent, ABTestResult } from './llm.interface';
 import { OllamaProvider } from './providers/ollama.provider';
-import { OpenAiProvider } from './providers/openai.provider';
 import { GeminiProvider } from './providers/gemini.provider';
 import { LLM_PROVIDER, LLM_FALLBACK_PROVIDER, LLMProviderType } from '../../config/constants';
 import * as fs from 'fs';
@@ -15,23 +14,21 @@ export class ContentGenerationService implements IContentGenerationService {
 
         // Eğer env değişkeninde fallback belirtilmişse, ve asıl provider'dan farklıysa kur
         if (LLM_FALLBACK_PROVIDER && LLM_FALLBACK_PROVIDER !== LLM_PROVIDER) {
-            this.fallbackProvider = this.createProvider(LLM_FALLBACK_PROVIDER as LLMProviderType);
+            this.fallbackProvider = this.createProvider(LLM_FALLBACK_PROVIDER as LLMProviderType, true);
             console.log(`[LLM] Fallback Sağlayıcısı aktif edildi: ${this.fallbackProvider.name}`);
         }
     }
 
-    private createProvider(providerType: LLMProviderType | string): ILLMProvider {
+    private createProvider(providerType: LLMProviderType | string, isFallback = false): ILLMProvider {
         switch (providerType) {
-            case LLMProviderType.OPENAI:
-                return new OpenAiProvider();
             case LLMProviderType.GEMINI:
                 return new GeminiProvider();
             case LLMProviderType.ANTHROPIC:
                 // TODO: Anthropic Provider (ileride)
-                return new OllamaProvider();
+                return new OllamaProvider(isFallback);
             case LLMProviderType.OLLAMA:
             default:
-                return new OllamaProvider(); // Varsayılan ücretsiz çözüm
+                return new OllamaProvider(isFallback); // Varsayılan ücretsiz çözüm
         }
     }
 
@@ -65,7 +62,8 @@ export class ContentGenerationService implements IContentGenerationService {
                 meta_aciklama: `Bu haberin önemi: ${input.ozet.substring(0, 100)}...`,
                 etiketler: [input.kategori],
                 sentiment: "Nötr",
-                confidence: 0.5
+                confidence: 0.5,
+                kategori: input.kategori
             };
         }
     }
@@ -88,7 +86,8 @@ SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
   "icerik": "Madde 1. Madde 2. Madde 3.",
   "etiketler": ["etiket1", "etiket2"],
   "sentiment": "Pozitif|Negatif|Nötr",
-  "confidence": 0.95
+  "confidence": 0.95,
+  "kategori": "Spor|Ekonomi|Teknoloji|Siyaset|Dünya|Sağlık|Genel"
 }
 `;
 
