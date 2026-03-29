@@ -14,6 +14,9 @@
 }
 
 :root {
+  /* === Transitions === */
+  color-scheme: light;
+  
   /* === Light Mode === */
   --bg-primary:    #f9f8f6;
   --bg-secondary:  #f2f0ec;
@@ -92,6 +95,9 @@
 }
 
 .dark {
+  /* === Transitions === */
+  color-scheme: dark;
+  
   /* === Dark Mode === */
   --bg-primary:    #111219;
   --bg-secondary:  #181a24;
@@ -204,12 +210,35 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  transition: 
+    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.3s ease,
+    background-color 0.3s ease;
+  position: relative;
+}
+
+.news-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.news-card:hover::before {
+  opacity: 1;
 }
 
 .news-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 
+    0 4px 12px -2px rgba(0, 0, 0, 0.06),
+    0 16px 40px -8px rgba(0, 0, 0, 0.12),
+    0 0 1px rgba(0, 0, 0, 0.04);
   border-color: var(--border-hover);
 }
 
@@ -218,12 +247,33 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-xl);
   overflow: hidden;
-  transition: box-shadow 0.25s ease, transform 0.25s ease;
+  transition: 
+    box-shadow 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.news-card-featured::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.news-card-featured:hover::before {
+  opacity: 1;
 }
 
 .news-card-featured:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-3px);
+  transform: translateY(-6px) scale(1.015);
+  box-shadow:
+    0 4px 12px -2px rgba(0, 0, 0, 0.08),
+    0 20px 50px -12px rgba(0, 0, 0, 0.16),
+    0 0 2px rgba(0, 0, 0, 0.05);
 }
 
 /* ===== Category Badges ===== */
@@ -252,18 +302,44 @@ body {
 .sentiment-negatif { color: #dc2626; }
 .sentiment-notr    { color: #9394a8; }
 
-/* Desature ve Hover-Only Glow */
+/* Enhanced Sentiment Glow with Glassmorphism */
+.sentiment-glow-pozitif {
+  border: 1.5px solid rgba(22, 163, 74, 0.2);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
 .sentiment-glow-pozitif:hover {
-  box-shadow: 0 8px 24px -10px rgba(22, 163, 74, 0.15);
-  border-color: rgba(22, 163, 74, 0.12) !important;
+  border-color: rgba(22, 163, 74, 0.4);
+  box-shadow: 
+    0 0 20px -5px rgba(22, 163, 74, 0.25),
+    0 8px 24px -10px rgba(22, 163, 74, 0.15),
+    inset 0 1px 0 rgba(22, 163, 74, 0.1);
+  background-color: rgba(22, 163, 74, 0.02);
+}
+
+.sentiment-glow-negatif {
+  border: 1.5px solid rgba(220, 38, 38, 0.2);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
 }
 .sentiment-glow-negatif:hover {
-  box-shadow: 0 8px 24px -10px rgba(220, 38, 38, 0.15);
-  border-color: rgba(220, 38, 38, 0.12) !important;
+  border-color: rgba(220, 38, 38, 0.4);
+  box-shadow:
+    0 0 20px -5px rgba(220, 38, 38, 0.25),
+    0 8px 24px -10px rgba(220, 38, 38, 0.15),
+    inset 0 1px 0 rgba(220, 38, 38, 0.1);
+  background-color: rgba(220, 38, 38, 0.02);
+}
+
+.sentiment-glow-notr {
+  border: 1.5px solid rgba(37, 99, 235, 0.15);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
 }
 .sentiment-glow-notr:hover {
-  box-shadow: 0 8px 24px -10px rgba(37, 99, 235, 0.12);
-  border-color: rgba(37, 99, 235, 0.1) !important;
+  border-color: rgba(37, 99, 235, 0.3);
+  box-shadow:
+    0 0 20px -5px rgba(37, 99, 235, 0.2),
+    0 8px 24px -10px rgba(37, 99, 235, 0.12),
+    inset 0 1px 0 rgba(37, 99, 235, 0.08);
+  background-color: rgba(37, 99, 235, 0.02);
 }
 
 /* ===== Section Divider ===== */
