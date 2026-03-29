@@ -10,7 +10,7 @@ const FALLBACK_CATEGORIES = [
     { id: 7, ad: "Genel", slug: "genel", renkKodu: "#2c3e50", ikon: "📰" },
 ];
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
 export default async function CategorySidebar() {
     let categories = FALLBACK_CATEGORIES;
