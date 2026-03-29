@@ -2,8 +2,8 @@
 
 > **Proje Tipi:** Üniversite Tezi  
 > **Deadline:** Mayıs ortası (~30-45 gün)  
-  > **Mevcut Durum:** %97 tamamlanmış (✅ Faz 1 + Faz 2 + Faz 3 başlandı, ML: 93.9%, Frontend: WOW başladı)  
-> **Strateji:** Veri hattı ✅ → ML %92+ ✅ → Frontend WOW → Tez polish
+> **Mevcut Durum:** %97 tamamlanmış — Faz 1 ✅ | Faz 2 ✅ | Faz 3 %33 (13-14✅, 15-18⏳) | Git temizlendi ✅  
+> **Strateji:** Veri hattı ✅ → ML 93.9% ✅ → Frontend WOW (devam) → Tez polish
 
 ---
 
@@ -11,13 +11,13 @@
 
 | Alan | Durum | Not |
 |------|-------|-----|
-| Backend | %95 | TS hataları → 0, Model persist ✅, veri hattı açık |
-  | Frontend | %98 | Sitemap ✅, kategori/[slug] ✅, Animasyonlar ✨ (Step 13-14) |
-| ML | **%93.9 accuracy** | Naive Bayes v2 + balanced data, +7.5% gain ✨ |
-| Veri | 1,229 haber | Tüm kategoriler 50+ (Teknoloji 222, Sağlık 109) ✅ |
-| DevOps | %95 | Docker+CI/CD var, SSL/Nginx eksik |
-| Dokümantasyon | %70 | API.md eksik, tez formatında özet yok |
-  | Faz Durumu | ✅✅⏳ | Faz 1: Done | Faz 2: Done | Faz 3: In Progress |
+| Backend | ✅ %100 | Security ✅, LLM tracking ✅, migrations ✅, 0 TS hata |
+| Frontend | %75 | Sitemap ✅, slug ✅, hover ✅ — Carousel/ProgressBar/Radar ⏳ |
+| ML | ✅ **%93.9** | Naive Bayes v2, 1,883 training, tüm haberler reclassify ✅ |
+| Veri | ✅ 1,229 haber | 7 kategori dengeli, 782 reclassified, 315 flagged |
+| DevOps | %90 | Docker ✅, n8n kaldırıldı ✅, SSL/Nginx ⏳ (Faz 4 karar) |
+| Dokümantasyon | %80 | API.md ✅, README ✅, tez format ⏳ |
+| Git | ✅ Temiz | 9 görev bazlı commit, 0 pis dosya |
 
 ---
 
@@ -165,31 +165,29 @@
 
 ### Adımlar
 
-13. **Modern tipografi ve tema geçişleri**
-    - Dosya: `frontend/src/app/globals.css`, `layout.tsx`
-    - Inter/Outfit font, smooth tema transition (0.5s ease)
+13. ~~**Modern tipografi ve tema geçişleri**~~ **✅ TAMAMLANDI (29 Mar)**
+    - `globals.css`: color-scheme, cubic-bezier transitions, 0.3-0.5s ease
+    - Tema geçişleri pürüzsüz (light ↔ dark), font smoothing korundu
 
-14. **NewsCard hover efektleri + SentimentGlow** *(paralel 13 ile)*
-    - Dosya: `frontend/src/components/NewsCard.tsx`
-    - Hover: image scale, depth shadow, AI özet fade-in
-    - Sentiment Glow: border color yeşil/kırmızı/mavi
+14. ~~**NewsCard hover efektleri + SentimentGlow**~~ **✅ TAMAMLANDI (29 Mar)**
+    - Depth shadow (multi-layer), scale(1.01/1.015), glassmorphism overlay
+    - Sentiment glow: Pozitif=yeşil, Negatif=kırmızı, Nötr=mavi (hover-only)
 
-15. **"Senin İçin Seçilenler" Hero Carousel** *(depends on 13)*
+15. **"Senin İçin Seçilenler" Hero Carousel** ⏳ *(depends on 13 — SIRADAKI)*
     - Dosya: `frontend/src/app/page.tsx` (HeroSection modify)
     - Kişisel skor bazlı 3 haber, gradyan arka plan, yatay kaydırma
 
-16. **ReadingProgressBar** *(paralel 15 ile)*
+16. **ReadingProgressBar** ⏳ *(paralel 15 ile)*
     - Yeni component: haber detay sayfasında scroll progress
     - Dosya: `frontend/src/components/ReadingProgressBar.tsx`
 
-17. **SentimentBiasMap & InterestRadar iyileştirme**
-    - Dosya: `frontend/src/components/SentimentBiasMap.tsx`
-    - Recharts/framer-motion ile daha etkileşimli
-    - Glassmorphism efekti güçlendir
+17. **SentimentBiasMap & InterestRadar iyileştirme** ⏳
+    - `SentimentBiasMap.tsx`'i daha etkileşimli yap
+    - Glassmorphism efektini güçlendir (commit dc5edbf temel attı)
 
-18. **Responsive ve erişilebilirlik kontrolü**
-    - Tüm sayfaları mobil/tablet test et
-    - Lighthouse skor kontrolü (target: 90+)
+18. **Responsive ve erişilebilirlik kontrolü** ⏳
+    - Tüm sayfaları mobil/tablet test
+    - Lighthouse skor (target: 90+)
 
 ### Doğrulama
 - Ana sayfa açıldığında görsel olarak etkileyici (jüri bakış açısıyla değerlendir)
@@ -254,10 +252,10 @@ Faz 4 (Gün 20-35) ─→ Polish + Tez         ← overlap Faz 3 ile
 
 | Sorun | Etki | Faz | Durum |
 |-------|------|-----|-------|
-| Model yalnızca RAM'de, Docker restart'ta sıfırlanıyor | Her restart'ta yeniden eğitim (dakikalar) | Faz 1 Adım 0 | ⭕ Açık — Kritik |
+| ~~Model yalnızca RAM'de, Docker restart'ta sıfırlanıyor~~ | ~~Her restart yeniden eğitim~~ | ~~Faz 1 Adım 0~~ | ✅ Kapandı — Prisma persist |
 | ~~Sitemap dynamic URL'ler boş~~ | ~~SEO hasarı~~ | ~~Faz 1 Adım 4~~ | ✅ Kapandı |
 | ~~Kategori/[slug] Docker 404~~ | ~~Sayfa erişilemez~~ | ~~Faz 1 Adım 5~~ | ✅ Kapandı |
-| Sentiment sözlük yetersiz (154 kelime) | Neredeyse hep Nötr | Faz 2 Adım 10 | ⭕ Açık |
+| ~~Sentiment sözlük yetersiz (154 kelime)~~ | ~~Neredeyse hep Nötr~~ | ~~Faz 2 Adım 10~~ | ✅ Kapandı — 400+ kelime |
 | Frontend unit test = 0 | Tez kalitesini düşürür | Faz 4 | ⭕ Açık |
 | `API.md` sadece 1/8 endpoint belgelenmiş | Tez eksikliği | Faz 4 | ⭕ Açık |
 | ~~`llm-usage.ts` TS hataları~~ | ~~Build kırılır~~ | ~~Faz 1~~ | ✅ Kapandı |
