@@ -26,6 +26,7 @@ export default function SentimentBiasMap({ apiUrl = process.env.NEXT_PUBLIC_API_
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const CIRCUMFERENCE = 2 * Math.PI * 38; // r=38 inside 100×100 viewbox
 
   useEffect(() => {
     if (!autoFetch) return;
@@ -114,79 +115,97 @@ export default function SentimentBiasMap({ apiUrl = process.env.NEXT_PUBLIC_API_
   const dominantSentiment = sentimentItems.reduce((a, b) => (a.value.percentage >= b.value.percentage ? a : b));
 
   return (
-    <div className="glass-card p-6 flex flex-col h-full relative overflow-hidden group">
-      <div className="flex items-center gap-2 mb-6">
-        <Brain className="text-[var(--accent-blue)]" size={20} />
+    <div className="glass-card p-6 flex flex-col h-full relative overflow-hidden">
+      <div className="flex items-center gap-2 mb-5">
+        <Brain className="text-[var(--accent-warm)]" size={18} />
         <h3 className="font-bold text-[var(--text-primary)] tracking-wide">Gündem Duygu Haritası</h3>
-        {error && <span className="text-xs text-amber-500 ml-auto">{error}</span>}
+        {error && (
+          <span className="text-[10px] text-amber-500 ml-auto border border-amber-400/30 rounded-full px-2 py-0.5 bg-amber-50">
+            {error}
+          </span>
+        )}
       </div>
 
-      <div className="mb-5 grid grid-cols-1 sm:grid-cols-[140px_1fr] gap-4 items-center">
-        <div className="relative w-[120px] h-[120px] mx-auto">
-          <div className="absolute inset-0 rounded-full" style={{ background: chartGradient }} />
-          <div className="absolute inset-[14px] rounded-full bg-[var(--bg-card)] border border-[var(--border-subtle)] flex flex-col items-center justify-center text-center">
-            <span className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Baskın</span>
-            <span className="text-xs font-bold text-[var(--text-primary)]">{dominantSentiment.key}</span>
-            <span className="text-[11px] text-[var(--text-secondary)]">%{dominantSentiment.value.percentage}</span>
+      {/* Donut + list */}
+      <div className="flex items-center gap-5 flex-grow">
+        {/* SVG Donut */}
+        <div className="relative w-[96px] h-[96px] flex-shrink-0">
+          <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90" aria-hidden="true">
+            <circle cx="50" cy="50" r="38" fill="none" stroke="var(--bg-secondary)" strokeWidth="14" />
+            {sentimentItems.map((item, idx) => {
+              const dash = (item.value.percentage / 100) * CIRCUMFERENCE;
+              const offset = sentimentItems
+                .slice(0, idx)
+                .reduce((acc, s) => acc + (s.value.percentage / 100) * CIRCUMFERENCE, 0);
+              return (
+                <circle
+                  key={item.key}
+                  cx="50" cy="50" r="38"
+                  fill="none"
+                  stroke={item.color}
+                  strokeWidth="14"
+                  strokeDasharray={`${dash} ${CIRCUMFERENCE - dash}`}
+                  strokeDashoffset={-offset}
+                  strokeLinecap="butt"
+                />
+              );
+            })}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+            <span className="text-[8px] uppercase tracking-[0.12em] text-[var(--text-muted)]">Baskın</span>
+            <span className="text-[11px] font-bold text-[var(--text-primary)] leading-tight">{dominantSentiment.key}</span>
+            <span className="text-[10px] text-[var(--text-secondary)]">%{dominantSentiment.value.percentage}</span>
           </div>
         </div>
-        <div className="space-y-2">
+
+        {/* Legend list */}
+        <div className="flex-grow space-y-3.5">
           {sentimentItems.map((item) => (
             <button
               key={item.key}
+              type="button"
               onMouseEnter={() => setHoveredKey(item.key)}
               onMouseLeave={() => setHoveredKey(null)}
-              className="w-full flex items-center gap-3 text-left rounded-xl px-2 py-1.5 hover:bg-[var(--bg-glass)] transition-colors"
+              className="w-full text-left group/item"
               aria-label={`${item.key} oranı`}
-              type="button"
             >
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-              <span className={`text-xs font-semibold ${item.muted}`}>{item.key}</span>
-              <span className="text-xs text-[var(--text-muted)] ml-auto">%{item.value.percentage}</span>
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.color }} />
+                  <span className={`text-[11px] font-semibold ${item.muted}`}>{item.key}</span>
+                </div>
+                <span className="text-[11px] text-[var(--text-muted)]">
+                  {hoveredKey === item.key
+                    ? `${item.value.count} haber`
+                    : `%${item.value.percentage}`}
+                </span>
+              </div>
+              <div className="h-1.5 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-1000 ease-out"
+                  style={{ width: `${item.value.percentage}%`, backgroundColor: item.color }}
+                />
+              </div>
             </button>
           ))}
-          {hoveredKey && (
-            <p className="text-[11px] text-[var(--text-secondary)] pt-1">
-              {hoveredKey}: {data.distribution[hoveredKey]?.count ?? 0} haber
-            </p>
-          )}
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 flex-grow justify-center">
-        {sentimentItems.map((item, idx) => (
-          <div className="space-y-1" key={item.key}>
-            <div className="flex justify-between text-xs font-semibold">
-              <span className={item.muted}>{item.key} ({item.value.percentage}%)</span>
-              <span className="text-[var(--text-muted)]">{item.value.count} haber</span>
-            </div>
-            <div className="w-full bg-[var(--bg-secondary)] rounded-full h-2.5 overflow-hidden">
-              <div
-                className="h-2.5 rounded-full transition-all duration-1000 ease-out"
-                style={{ width: `${item.value.percentage}%`, backgroundColor: item.color, transitionDelay: `${idx * 140}ms` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-6 pt-4 border-t border-[var(--border-subtle)]">
-        <div className="text-[11px] text-[var(--text-muted)] leading-relaxed mb-3">
-          <div className="flex items-center gap-2">
-            <span>Güven Skoru: <span className="font-bold text-[var(--text-primary)]">%{data.confidence.average}</span></span>
-            <span className="text-[var(--text-secondary)]">(Min: %{data.confidence.min}, Max: %{data.confidence.max})</span>
-          </div>
-        </div>
-        <div className="flex items-start gap-2">
-          <TrendingUp size={14} className="flex-shrink-0 mt-0.5 text-[var(--accent-warm)]" />
-          <p className="text-xs text-[var(--text-secondary)]">
-            Gündem dilinin ortalamadan{" "}
-            <span className="font-bold text-[var(--text-primary)]">
+      {/* Footer */}
+      <div className="mt-5 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-between gap-4">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <TrendingUp size={12} className="flex-shrink-0 text-[var(--accent-warm)]" />
+          <p className="text-[11px] text-[var(--text-secondary)] truncate">
+            Gündem{" "}
+            <span className="font-semibold text-[var(--text-primary)]">
               {positiveData.percentage > negativeData.percentage ? "daha pozitif" : "daha negatif"}
-            </span>{" "}
-            olduğu tespit edildi.
+            </span>
+            {" "}yönelimde
           </p>
-        </div>
+            </div>
+        <span className="text-[10px] text-[var(--text-muted)] flex-shrink-0 whitespace-nowrap">
+          Güven %{data.confidence.average}
+        </span>
       </div>
     </div>
   );

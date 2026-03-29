@@ -2,11 +2,28 @@
 
 import { useReadingHistory } from "@/hooks/useReadingHistory";
 import { Radar, Compass } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 
 export default function InterestRadar() {
   const { getInterests, isPersonalized } = useReadingHistory();
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
+  const [categoryMap, setCategoryMap] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
+    fetch(`${apiUrl}/api/news/categories`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data)) {
+          const map: Record<number, string> = {};
+          data.data.forEach((cat: { id: number; ad: string }) => {
+            map[cat.id] = cat.ad;
+          });
+          setCategoryMap(map);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const interests = useMemo(() => {
     const raw = getInterests() as Record<string, number>;
@@ -17,7 +34,7 @@ export default function InterestRadar() {
     const maxScore = Math.max(...Object.values(raw).map(val => Number(val)));
     
     return categories.map(cat => ({
-      name: cat,
+      name: categoryMap[Number(cat)] || cat,
       score: Number(raw[cat]),
       pct: Math.round((Number(raw[cat]) / maxScore) * 100)
     })).sort((a,b) => b.score - a.score).slice(0, 5); // top 5
@@ -26,9 +43,17 @@ export default function InterestRadar() {
   if (!isPersonalized || interests.length === 0) {
     return (
       <div className="glass-card p-6 flex flex-col items-center justify-center h-full text-center min-h-[250px] relative overflow-hidden group">
-        <Radar size={48} className="text-[var(--text-muted)] opacity-30 mb-4" />
-        <h3 className="font-bold text-[var(--text-primary)] mb-2">İlgi Radarınız Boş</h3>
-        <p className="text-sm text-[var(--text-secondary)]">Sizin için özelleştirilmiş analizleri görmek için birkaç haber okuyun.</p>
+        <Radar size={40} className="text-[var(--accent-warm)] opacity-25 mb-4" />
+        <h3 className="font-semibold text-[var(--text-primary)] mb-2">Kişisel İlgi Çarkı</h3>
+        {!isPersonalized ? (
+          <p className="text-xs text-[var(--text-secondary)] max-w-[220px] leading-relaxed">
+            Sayfanın altındaki çerez bildirimini kabul ettikten sonra okuduğunuz haberlere göre ilgi alanlarınız burada görünür.
+          </p>
+        ) : (
+          <p className="text-xs text-[var(--text-secondary)] max-w-[220px] leading-relaxed">
+            Birkaç haber okuyun — kategorileriniz otomatik olarak burada şekillenecek.
+          </p>
+        )}
       </div>
     );
   }

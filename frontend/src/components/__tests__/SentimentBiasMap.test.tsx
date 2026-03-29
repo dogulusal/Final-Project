@@ -12,7 +12,7 @@ describe("SentimentBiasMap", () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
-    delete (global as { fetch?: unknown }).fetch;
+    delete (global as unknown as { fetch?: unknown }).fetch;
   });
 
   it("renders fetched sentiment data", async () => {
@@ -29,7 +29,7 @@ describe("SentimentBiasMap", () => {
       },
     };
 
-    (global as { fetch: jest.Mock }).fetch = jest.fn().mockResolvedValue({
+    (global as unknown as { fetch: jest.Mock }).fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => mockResponse,
     } as Response);
@@ -43,11 +43,11 @@ describe("SentimentBiasMap", () => {
     expect(screen.getByRole("button", { name: /Pozitif oranı/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Nötr oranı/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Negatif oranı/i })).toBeInTheDocument();
-    expect(screen.getByText(/%88/)).toBeInTheDocument();
+    expect(screen.getByText(/Güven %88/i)).toBeInTheDocument();
   });
 
   it("shows demo fallback message when API fails", async () => {
-    (global as { fetch: jest.Mock }).fetch = jest.fn().mockRejectedValue(new Error("Network fail"));
+    (global as unknown as { fetch: jest.Mock }).fetch = jest.fn().mockRejectedValue(new Error("Network fail"));
 
     render(<SentimentBiasMap autoFetch apiUrl="http://localhost:3001" />);
 
@@ -55,6 +55,6 @@ describe("SentimentBiasMap", () => {
       expect(screen.getByText(/Demo verisi gösteriliyor/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/Güven Skoru:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Güven %/i)).toBeInTheDocument();
   });
 });
