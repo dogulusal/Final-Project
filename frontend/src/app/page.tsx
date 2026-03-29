@@ -14,6 +14,7 @@ import PersonalizedHeroCarousel from "@/components/PersonalizedHeroCarousel";
 import SentimentBiasMap from "@/components/SentimentBiasMap";
 import InterestRadar from "@/components/InterestRadar";
 import LazySection from "@/components/LazySection";
+import HeroCarousel from "@/components/HeroCarousel";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
@@ -135,6 +136,13 @@ export default function Home() {
     <main className="min-h-screen bg-[var(--bg-primary)]">
       <Navbar />
       
+      {/* Hero Carousel — Spotlight Haberler */}
+      {!loading && news.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <HeroCarousel news={news} autoPlayInterval={6000} />
+        </div>
+      )}
+
       <HeroSection />
 
       {/* Sizin İçin Seçilenler Carousel */}
