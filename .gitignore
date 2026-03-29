@@ -31,11 +31,9 @@ npm-debug.log*
 # Docker
 docker-compose.override.yml
 
-# n8n credentials (sensitive)
-n8n/credentials/
-
 # Training outputs
 training/naive-bayes/*.model
+training/naive-bayes/dataset.backup-*.json
 training/fine-tune/output/
 
 # Generated images
@@ -43,6 +41,24 @@ backend/assets/generated/
 
 # Coverage
 coverage/
+
+# Database dumps (binary, large)
+*.dump
+
+# Debug / one-off scripts (not part of app)
+backend/category-stats.js
+backend/catstats.js
+backend/check-categories.js
+backend/check-siyaset.js
+backend/check-siyaset2.js
+backend/durum-stats.js
+backend/durum-stats2.js
+backend/fix-categories.js
+backend/fix-siyaset.js
+backend/listmodels.js
+
+# Runtime logs
+backend/backfill_log.txt
 
 
 
