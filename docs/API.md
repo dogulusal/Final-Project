@@ -281,6 +281,25 @@ Duygu analizi istatistikleri.
 
 > `Authorization: Bearer <token>` veya `x-api-key` gerektirir.
 
+### POST /api/ml/train
+DB'deki onaylı haberlerden modeli yeniden eğitir.
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Model DB üzerindeki Onaylı Haberler ile başarıyla eğitildi."
+}
+```
+
+**Error (500):**
+```json
+{
+  "success": false,
+  "message": "Model eğitimi başarısız oldu."
+}
+```
+
 ### POST /api/ml/categorize
 Metin kategorize et.
 
@@ -296,9 +315,161 @@ Metin kategorize et.
 ```json
 {
   "success": true,
+  "query": "TBMM Toplantısı",
   "kategori": "Gündem",
-  "confidence": 0.89,
-  "sentiment": "Nötr"
+  "guven_skoru": 0.89,
+  "detayli_skorlar": [
+    { "label": "Gündem", "value": 0.89 },
+    { "label": "Siyaset", "value": 0.08 }
+  ],
+  "uyari": null
+}
+```
+
+---
+
+## RSS
+
+### GET /api/rss/test
+Test RSS kaynaklarından örnek haberleri döner.
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "totalItems": 24,
+  "sample": [
+    {
+      "title": "Örnek Haber",
+      "source": "NTV Son Dakika",
+      "link": "https://..."
+    }
+  ]
+}
+```
+
+### POST /api/rss/health
+Tek bir RSS URL'inin erişilebilirliğini ve parse edilebilirliğini kontrol eder.
+
+**Request:**
+```json
+{ "url": "https://feeds.bbci.co.uk/turkce/rss.xml" }
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "url": "https://feeds.bbci.co.uk/turkce/rss.xml",
+  "isHealthy": true
+}
+```
+
+**Error (400):**
+```json
+{
+  "success": false,
+  "error": "Yalnızca HTTP/HTTPS protokolüne izin verilir"
+}
+```
+
+---
+
+## LLM
+
+> `Authorization: Bearer <token>` veya `x-api-key` gerektirir.
+
+### POST /api/llm/generate
+Başlık + özetten özgün haber metni üretir.
+
+**Request:**
+```json
+{
+  "title": "Merkez Bankası Faiz Kararı",
+  "summary": "Politika faizi sabit tutuldu.",
+  "category": "Ekonomi",
+  "url": "https://kaynak.com/haber"
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "original_title": "Merkez Bankası Faiz Kararı",
+  "generated": {
+    "baslik": "Merkez Bankası Faizi Sabit Tuttu",
+    "ozet": "...",
+    "icerik": "...",
+    "kaynak_url": "https://kaynak.com/haber"
+  }
+}
+```
+
+---
+
+## Render
+
+### POST /api/render/generate
+Haber başlığından sosyal medya görseli üretir (PNG binary döner).
+
+**Request:**
+```json
+{
+  "title": "Örnek Başlık",
+  "category": "Teknoloji",
+  "source": "AI Haber Ajansı",
+  "date": "29.03.2026",
+  "preset": "TWITTER_POST"
+}
+```
+
+**Response (200):**
+- `Content-Type: image/png`
+- `X-Image-Width`, `X-Image-Height` header'ları ile boyut bilgisi
+- Body: PNG binary
+
+### GET /api/render/presets
+Desteklenen render preset boyutlarını döner.
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "presets": [
+    { "name": "TWITTER_POST", "width": 1200, "height": 675 }
+  ]
+}
+```
+
+---
+
+## Social
+
+### POST /api/social/publish
+Sosyal medya dağıtımını tetikler (şu an mock mode).
+
+**Request:**
+```json
+{
+  "baslik": "Örnek Başlık",
+  "ozet": "Örnek özet",
+  "gorsel_url": "https://.../image.png",
+  "haber_url": "https://.../haber",
+  "etiketler": ["gundem", "ekonomi"]
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "⚠️ MOCK MODE: Sosyal medya paylaşımları simüle edildi. Gerçek API entegrasyonu henüz yapılmadı.",
+  "mock": true,
+  "data": {
+    "twitter": { "success": true },
+    "telegram": { "success": true }
+  }
 }
 ```
 

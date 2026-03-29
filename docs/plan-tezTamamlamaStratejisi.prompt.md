@@ -204,15 +204,15 @@
 
 ### Adımlar
 
-19. **API.md tamamla** — tüm endpoint'ler, request/response örnekleri
+19. **API.md tamamla** — tüm endpoint'ler, request/response örnekleri ✅
     - Dosya: `docs/API.md`
     - 8 modülün tüm endpoint'leri
 
-20. **Frontend unit test ekle** (kritik component'lar) *(paralel 19 ile)*
+20. **Frontend unit test ekle** (kritik component'lar) *(paralel 19 ile)* ✅
     - Jest + React Testing Library
-    - En az: NewsCard, SentimentBiasMap, CategoryFilter
+  - En az: NewsCard, SentimentBiasMap, CategoryFilter (10/10 test passing)
 
-21. **Tez raporu için teknik dokümantasyon hazırla** *(depends on 19)*
+21. **Tez raporu için teknik dokümantasyon hazırla** *(depends on 19)* ✅
     - Mimari diyagram, veri akış şeması, teknoloji gerekçeleri
     - ML accuracy grafikleri (zaman serisi)
     - Screenshot'lar
@@ -256,8 +256,8 @@ Faz 4 (Gün 20-35) ─→ Polish + Tez         ← overlap Faz 3 ile
 | ~~Sitemap dynamic URL'ler boş~~ | ~~SEO hasarı~~ | ~~Faz 1 Adım 4~~ | ✅ Kapandı |
 | ~~Kategori/[slug] Docker 404~~ | ~~Sayfa erişilemez~~ | ~~Faz 1 Adım 5~~ | ✅ Kapandı |
 | ~~Sentiment sözlük yetersiz (154 kelime)~~ | ~~Neredeyse hep Nötr~~ | ~~Faz 2 Adım 10~~ | ✅ Kapandı — 400+ kelime |
-| Frontend unit test = 0 | Tez kalitesini düşürür | Faz 4 | ⭕ Açık |
-| `API.md` sadece 1/8 endpoint belgelenmiş | Tez eksikliği | Faz 4 | ⭕ Açık |
+| ~~Frontend unit test = 0~~ | ~~Tez kalitesini düşürür~~ | ~~Faz 4~~ | ✅ Kapandı — 10 test passing |
+| ~~`API.md` sadece 1/8 endpoint belgelenmiş~~ | ~~Tez eksikliği~~ | ~~Faz 4~~ | ✅ Kapandı — 8/8 endpoint grubu dokümante |
 | ~~`llm-usage.ts` TS hataları~~ | ~~Build kırılır~~ | ~~Faz 1~~ | ✅ Kapandı |
 | ~~Confidence threshold uyumsuzluğu~~ | ~~Yanlış kategorilendirme~~ | ~~Faz 2~~ | ✅ Kapandı |
 
