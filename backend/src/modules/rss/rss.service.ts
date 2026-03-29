@@ -4,6 +4,36 @@ import { IRssParserService, IRssSource, ParsedRssItem } from './rss.interface';
 export class RssParserService implements IRssParserService {
     private parser: Parser;
 
+    private normalizeText(value: unknown): string {
+        if (typeof value === 'string') {
+            return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        if (typeof value === 'number' || typeof value === 'boolean') {
+            return String(value);
+        }
+
+        if (Array.isArray(value)) {
+            return value.map((item) => this.normalizeText(item)).filter(Boolean).join(' ').trim();
+        }
+
+        if (value && typeof value === 'object') {
+            const record = value as Record<string, unknown>;
+            const preferred = record['#text'] ?? record._ ?? record.value ?? record.content;
+            if (preferred !== undefined) {
+                return this.normalizeText(preferred);
+            }
+
+            try {
+                return JSON.stringify(record);
+            } catch {
+                return '';
+            }
+        }
+
+        return '';
+    }
+
     constructor() {
         this.parser = new Parser({
             timeout: 10000, // 10 saniye zaman aşımı
@@ -19,10 +49,10 @@ export class RssParserService implements IRssParserService {
             const feed = await this.parser.parseURL(source.url);
 
             const items: ParsedRssItem[] = feed.items.map((item) => ({
-                title: item.title || 'Başlıksız',
-                link: item.link || '',
+                title: this.normalizeText(item.title) || 'Başlıksız',
+                link: this.normalizeText(item.link),
                 pubDate: item.isoDate || item.pubDate || new Date().toISOString(),
-                contentSnippet: item.contentSnippet || item.content || '',
+                contentSnippet: this.normalizeText(item.contentSnippet || item.content || (item as any).summary),
                 source: source.name,
                 category: source.category,
             }));

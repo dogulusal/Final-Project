@@ -1,4 +1,3 @@
-import Parser from 'rss-parser';
 import { RSS_SOURCES, LLM_PIPELINE_ENABLED, LLM_DAILY_QUOTA, ML_CONFIDENCE_THRESHOLD } from '../../config/constants';
 import { ContentQualityFilter } from '../news/content-quality-filter';
 import { NewsService } from '../news/news.service';
@@ -6,6 +5,7 @@ import { mlService } from '../ml/ml.controller';
 import { prisma } from '../../config/database';
 import { ContentGenerationService } from '../llm/llm.service';
 import { RawNewsInput } from '../llm/llm.interface';
+import { RssParserService } from './rss.service';
 
 export interface SchedulerStatus {
     isRunning: boolean;
@@ -34,9 +34,39 @@ export class RssScheduler {
     private readonly MAX_FAILURES = 5;
     
     // Dependencies
-    private parser = new Parser({ timeout: 15000 });
+    private rssParserService = new RssParserService();
     private qualityFilter = new ContentQualityFilter();
     private newsService = new NewsService();
+
+    private normalizeText(value: unknown): string {
+        if (typeof value === 'string') {
+            return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        if (typeof value === 'number' || typeof value === 'boolean') {
+            return String(value);
+        }
+
+        if (Array.isArray(value)) {
+            return value.map((item) => this.normalizeText(item)).filter(Boolean).join(' ').trim();
+        }
+
+        if (value && typeof value === 'object') {
+            const record = value as Record<string, unknown>;
+            const preferred = record['#text'] ?? record._ ?? record.value ?? record.content;
+            if (preferred !== undefined) {
+                return this.normalizeText(preferred);
+            }
+
+            try {
+                return JSON.stringify(record);
+            } catch {
+                return '';
+            }
+        }
+
+        return '';
+    }
 
     constructor(private intervalMinutes: number = 10) {}
 
@@ -138,122 +168,138 @@ export class RssScheduler {
             }
 
             try {
-                const feed = await this.parser.parseURL(source.url);
+                const feedItems = await this.rssParserService.fetchFeed(source);
                 this.sourceFailures[source.id] = 0; // Başarılıysa sıfırla
 
-                if (!feed.items || feed.items.length === 0) continue;
+                if (!feedItems || feedItems.length === 0) continue;
 
                 // Hız kazandırmak için mevcut linkleri tek seferde çekelim (N+1 engelleme)
-                const candidateLinks = feed.items.filter(item => item.link).map(item => item.link!);
+                const candidateLinks = feedItems
+                    .map((item) => this.normalizeText(item.link))
+                    .filter((link) => !!link);
                 const existingLinks = await prisma.haber.findMany({
                     where: { kaynakUrl: { in: candidateLinks } },
                     select: { kaynakUrl: true }
                 }).then(rows => new Set(rows.map(r => r.kaynakUrl)));
 
                 // En yeni x tane habere bak
-                for (let i = 0; i < Math.min(feed.items.length, 15); i++) {
-                    const item = feed.items[i];
-                    if (!item.title) continue;
+                for (let i = 0; i < Math.min(feedItems.length, 15); i++) {
+                    try {
+                        const item = feedItems[i];
+                        const safeTitle = this.normalizeText(item.title);
+                        if (!safeTitle) continue;
 
-                    // 1. Kalite Filtresi
-                    const contentFallback = item.contentSnippet || item.content || item.summary || "";
-                    const quality = this.qualityFilter.validateQuality(item.title, contentFallback);
-                    if (!quality.isValid) continue;
+                        const safeLink = this.normalizeText(item.link);
 
-                    // 2. Duplicate Kontrolü (Redis Optimized)
-                    const duplicateCheck = await this.newsService.isDuplicate(item.title);
-                    if (duplicateCheck.duplicate) continue;
+                        // 1. Kalite Filtresi
+                        const contentFallback = this.normalizeText(item.contentSnippet);
+                        const quality = this.qualityFilter.validateQuality(safeTitle, contentFallback);
+                        if (!quality.isValid) continue;
 
-                    // URL kontrolü (Batch üzerinden)
-                    if (item.link && existingLinks.has(item.link)) continue;
+                        // 2. Duplicate Kontrolü (Redis Optimized)
+                        const duplicateCheck = await this.newsService.isDuplicate(safeTitle);
+                        if (duplicateCheck.duplicate) continue;
 
-                    // 3. ML Processing (Parallel) — başlık + özet ile daha güçlü kategorizasyon
-                    const [catRes, sentRes] = await Promise.all([
-                        mlService.categorize(item.title, contentFallback).catch(() => null),
-                        mlService.analyzeSentiment(item.title + " " + contentFallback).catch(() => null)
-                    ]);
+                        // URL kontrolü (Batch üzerinden)
+                        if (safeLink && existingLinks.has(safeLink)) continue;
 
-                    const genelCatId = kategoriMap.get('genel') ?? 1;
-                    const mlStrong = !!(catRes && catRes.confidence >= ML_CONFIDENCE_THRESHOLD);
-                    const mlCatId = mlStrong
-                        ? (kategoriMap.get(catRes!.kategori.toLowerCase()) ?? genelCatId)
-                        : null;
-                    let finalCatId = mlStrong
-                        ? mlCatId!
-                        : genelCatId;
+                        // 3. ML Processing (Parallel) — başlık + özet ile daha güçlü kategorizasyon
+                        const [catRes, sentRes] = await Promise.all([
+                            mlService.categorize(safeTitle, contentFallback).catch(() => null),
+                            mlService.analyzeSentiment(safeTitle + " " + contentFallback).catch(() => null)
+                        ]);
 
-                    // 4. LLM Zenginleştirme (LLM_PIPELINE_ENABLED=true ile etkinleştirilir)
-                    let llmBaslik = item.title;
-                    let llmIcerik = contentFallback;
-                    let llmMetaAciklama = contentFallback.substring(0, 150) + "...";
-                    let llmSentiment = sentRes ? sentRes.label : "Nötr";
-                    let newsdurum: 'ham' | 'hazir' = 'ham';
-                    let llmProviderName = 'none';
-                    let llmSucceeded = false;
-                    let kategoriDogrulandi = false;
+                        const genelCatId = kategoriMap.get('genel') ?? 1;
+                        const mlStrong = !!(catRes && catRes.confidence >= ML_CONFIDENCE_THRESHOLD);
+                        const mlCatId = mlStrong
+                            ? (kategoriMap.get(catRes!.kategori.toLowerCase()) ?? genelCatId)
+                            : null;
+                        let finalCatId = mlStrong
+                            ? mlCatId!
+                            : genelCatId;
 
-                    const articleUrl = item.link || '';
-                    const quotaAvailable = LLM_PIPELINE_ENABLED &&
-                        this.llmDailyCount < LLM_DAILY_QUOTA &&
-                        !this.llmProcessedUrls.has(articleUrl);
+                        // 4. LLM Zenginleştirme (LLM_PIPELINE_ENABLED=true ile etkinleştirilir)
+                        let llmBaslik = safeTitle;
+                        let llmIcerik = contentFallback;
+                        let llmMetaAciklama = contentFallback.substring(0, 150) + "...";
+                        let llmSentiment = sentRes ? sentRes.label : "Nötr";
+                        let newsdurum: 'ham' | 'hazir' = 'ham';
+                        let llmProviderName = 'none';
+                        let llmSucceeded = false;
+                        let kategoriDogrulandi = false;
 
-                    if (quotaAvailable) {
-                        try {
-                            const llmInput: RawNewsInput = {
-                                baslik: item.title,
-                                ozet: contentFallback,
-                                kategori: catRes?.kategori || source.category || 'Genel',
-                                kaynak_url: articleUrl
-                            };
-                            const llmResult = await this.callLLMWithRetry(llmInput);
-                            llmBaslik = llmResult.baslik || item.title;
-                            llmIcerik = llmResult.icerik || contentFallback;
-                            llmMetaAciklama = llmResult.meta_aciklama || llmMetaAciklama;
-                            if (llmResult.sentiment) llmSentiment = llmResult.sentiment as 'Pozitif' | 'Negatif' | 'Nötr';
-                            if (llmResult.kategori) {
-                                const llmCatId = kategoriMap.get(llmResult.kategori.toLowerCase());
-                                if (llmCatId) finalCatId = llmCatId;
+                        const articleUrl = safeLink || '';
+                        const quotaAvailable = LLM_PIPELINE_ENABLED &&
+                            this.llmDailyCount < LLM_DAILY_QUOTA &&
+                            !this.llmProcessedUrls.has(articleUrl);
+
+                        if (quotaAvailable) {
+                            try {
+                                const llmInput: RawNewsInput = {
+                                    baslik: safeTitle,
+                                    ozet: contentFallback,
+                                    kategori: catRes?.kategori || source.category || 'Genel',
+                                    kaynak_url: articleUrl
+                                };
+                                const llmResult = await this.callLLMWithRetry(llmInput);
+                                llmBaslik = this.normalizeText(llmResult.baslik) || safeTitle;
+                                llmIcerik = this.normalizeText(llmResult.icerik) || contentFallback;
+                                llmMetaAciklama = this.normalizeText(llmResult.meta_aciklama) || llmMetaAciklama;
+
+                                const normalizedSentiment = this.normalizeText(llmResult.sentiment);
+                                if (normalizedSentiment === 'Pozitif' || normalizedSentiment === 'Negatif' || normalizedSentiment === 'Nötr') {
+                                    llmSentiment = normalizedSentiment;
+                                }
+
+                                const normalizedKategori = this.normalizeText(llmResult.kategori).toLowerCase();
+                                if (normalizedKategori) {
+                                    const llmCatId = kategoriMap.get(normalizedKategori);
+                                    if (llmCatId) finalCatId = llmCatId;
+                                }
+                                llmSucceeded = true;
+                                llmProviderName = 'gemini';
+                                this.llmDailyCount++;
+                                if (articleUrl) this.llmProcessedUrls.add(articleUrl);
+                                console.log(`[Scheduler LLM] ✅ "${llmBaslik.substring(0, 50)}..." zenginleştirildi (kota: ${this.llmDailyCount}/${LLM_DAILY_QUOTA})`);
+                            } catch (llmErr: any) {
+                                console.warn(`[Scheduler LLM] ⚠️ LLM başarısız, ham kaydediliyor: ${llmErr.message}`);
                             }
-                            llmSucceeded = true;
-                            llmProviderName = 'gemini';
-                            this.llmDailyCount++;
-                            if (articleUrl) this.llmProcessedUrls.add(articleUrl);
-                            console.log(`[Scheduler LLM] ✅ "${llmBaslik.substring(0, 50)}..." zenginleştirildi (kota: ${this.llmDailyCount}/${LLM_DAILY_QUOTA})`);
-                        } catch (llmErr: any) {
-                            console.warn(`[Scheduler LLM] ⚠️ LLM başarısız, ham kaydediliyor: ${llmErr.message}`);
+                        } else if (LLM_PIPELINE_ENABLED && this.llmDailyCount >= LLM_DAILY_QUOTA && !this.llmQuotaLoggedThisCycle) {
+                            this.llmQuotaLoggedThisCycle = true;
+                            console.warn(`[Scheduler LLM] ⛔ Günlük kota doldu (${LLM_DAILY_QUOTA}). Bu döngüdeki kalan haberler ham kaydedilecek.`);
                         }
-                    } else if (LLM_PIPELINE_ENABLED && this.llmDailyCount >= LLM_DAILY_QUOTA && !this.llmQuotaLoggedThisCycle) {
-                        this.llmQuotaLoggedThisCycle = true;
-                        console.warn(`[Scheduler LLM] ⛔ Günlük kota doldu (${LLM_DAILY_QUOTA}). Bu döngüdeki kalan haberler ham kaydedilecek.`);
-                    }
 
-                    // LLM başarılıysa hazır kabul et. LLM yoksa sadece güçlü ML tahmini olanları hazıra al.
-                    if (llmSucceeded || mlStrong) {
-                        newsdurum = 'hazir';
-                    }
+                        // LLM başarılıysa hazır kabul et. LLM yoksa sadece güçlü ML tahmini olanları hazıra al.
+                        if (llmSucceeded || mlStrong) {
+                            newsdurum = 'hazir';
+                        }
 
-                    // ML ve nihai kategori uyumu varsa doğrulanmış kabul et.
-                    if (mlStrong && mlCatId && mlCatId === finalCatId) {
-                        kategoriDogrulandi = true;
-                    }
+                        // ML ve nihai kategori uyumu varsa doğrulanmış kabul et.
+                        if (mlStrong && mlCatId && mlCatId === finalCatId) {
+                            kategoriDogrulandi = true;
+                        }
 
-                    // 5. DB Kayıt
-                    await this.newsService.createNews({
-                        baslik: llmBaslik,
-                        icerik: llmIcerik,
-                        metaAciklama: llmMetaAciklama,
-                        kategoriId: finalCatId,
-                        sentiment: llmSentiment,
-                        mlConfidence: catRes ? catRes.confidence : undefined,
-                        gorselUrl: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167",
-                        kaynakUrl: item.link,
-                        durum: newsdurum,
-                        llmProvider: llmProviderName,
-                        kategoriDogrulandi
-                    });
-                    
-                    cycleAdded++;
-                    this.todayCount++;
+                        // 5. DB Kayıt
+                        await this.newsService.createNews({
+                            baslik: llmBaslik,
+                            icerik: llmIcerik,
+                            metaAciklama: llmMetaAciklama,
+                            kategoriId: finalCatId,
+                            sentiment: llmSentiment,
+                            mlConfidence: catRes ? catRes.confidence : undefined,
+                            gorselUrl: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167",
+                            kaynakUrl: safeLink,
+                            durum: newsdurum,
+                            llmProvider: llmProviderName,
+                            kategoriDogrulandi
+                        });
+
+                        cycleAdded++;
+                        this.todayCount++;
+                    } catch (itemError: any) {
+                        console.warn(`[Scheduler Warn] Haber atlandı (${source.id}): ${itemError?.message || itemError}`);
+                        continue;
+                    }
                 }
 
             } catch (error: any) {
