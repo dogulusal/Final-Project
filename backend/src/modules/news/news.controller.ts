@@ -3,6 +3,7 @@ import { NewsService, newsEventEmitter } from './news.service';
 import { ValidationError } from '../../middleware/error-handler';
 import { mlService } from '../ml/ml.controller';
 import { cacheMiddleware } from '../../middleware/cache.middleware';
+import { ML_CONFIDENCE_THRESHOLD } from '../../config/constants';
 
 const router = Router();
 const newsService = new NewsService();
@@ -93,7 +94,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
         // ML işlemlerini (Sentiment & Kategorizasyon) paralel yürüt (Sorun 4 & Sorun 3: Hata yönetimi iyileştirildi)
         const [mlCategoryResult, mlSentimentResult] = await Promise.all([
-            mlService.categorize(req.body.baslik).catch((e) => {
+            mlService.categorize(req.body.baslik, req.body.icerik || '').catch((e) => {
                 console.error("[ML Error] Categorization failed:", e);
                 return null;
             }),
@@ -120,8 +121,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         // 1. Manuel Kategori Ataması (Requestten gelen)
         let finalKategoriId = dbKategoriId;
 
-        // 2. ML Otomatik Kategori Ataması (Eğer Confidence Yüksekse - Sorun 4 İyileştirmesi)
-        if (mlCategoryResult && mlCategoryResult.confidence > 0.4) {
+        // 2. ML Otomatik Kategori Ataması (Yalnızca güven yüksekse)
+        if (mlCategoryResult && mlCategoryResult.confidence > ML_CONFIDENCE_THRESHOLD) {
             const { prisma } = require('../../config/database');
             const mlCatName = mlCategoryResult.kategori;
             const mlFoundCat = await prisma.kategori.findFirst({ 
@@ -162,7 +163,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
  * 3) GET /api/news/categories
  * Tüm kategorileri listeler (CategorySidebar için).
  */
-router.get('/categories', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/categories', cacheMiddleware(600), async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { prisma } = require('../../config/database');
         const categories = await prisma.kategori.findMany({ orderBy: { ad: 'asc' } });
@@ -198,7 +199,45 @@ router.post('/check-duplicate', async (req: Request, res: Response, next: NextFu
 });
 
 /**
- * 4) GET /api/news/:slug
+ * 4) GET /api/news/:id (by ID)
+ * Haberi ID ile alır (API integrations için)
+ */
+router.get('/id/:id', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { id } = req.params;
+        const newsId = parseInt(id);
+
+        if (isNaN(newsId)) {
+            throw ValidationError('Geçerli bir haber ID\'si gereklidir.');
+        }
+
+        const { prisma } = require('../../config/database');
+        const newsItem = await prisma.haber.findUnique({
+            where: { id: newsId },
+            include: {
+                kategori: true,
+                okumaGecmisi: { take: 5, orderBy: { okumaTarihi: 'desc' } }
+            }
+        });
+
+        if (!newsItem) {
+            return res.status(404).json({
+                success: false,
+                error: 'Haber bulunamadı'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: newsItem
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+/**
+ * 5) GET /api/news/:slug
  * Okuyucu tıklayıp haberi okumak istediğinde
  */
 router.get('/:slug', async (req: Request, res: Response, next: NextFunction) => {

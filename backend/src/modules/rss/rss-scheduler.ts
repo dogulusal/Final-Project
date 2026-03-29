@@ -167,9 +167,9 @@ export class RssScheduler {
                     // URL kontrolü (Batch üzerinden)
                     if (item.link && existingLinks.has(item.link)) continue;
 
-                    // 3. ML Processing (Parallel)
+                    // 3. ML Processing (Parallel) — başlık + özet ile daha güçlü kategorizasyon
                     const [catRes, sentRes] = await Promise.all([
-                        mlService.categorize(item.title).catch(() => null),
+                        mlService.categorize(item.title, contentFallback).catch(() => null),
                         mlService.analyzeSentiment(item.title + " " + contentFallback).catch(() => null)
                     ]);
 
@@ -207,6 +207,10 @@ export class RssScheduler {
                             llmIcerik = llmResult.icerik || contentFallback;
                             llmMetaAciklama = llmResult.meta_aciklama || llmMetaAciklama;
                             if (llmResult.sentiment) llmSentiment = llmResult.sentiment as 'Pozitif' | 'Negatif' | 'Nötr';
+                            if (llmResult.kategori) {
+                                const llmCatId = kategoriMap.get(llmResult.kategori.toLowerCase());
+                                if (llmCatId) finalCatId = llmCatId;
+                            }
                             newsdurum = 'hazir';
                             llmProviderName = 'gemini';
                             this.llmDailyCount++;

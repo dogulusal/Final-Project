@@ -25,7 +25,8 @@ router.post('/publish', async (req: Request, res: Response, next: NextFunction) 
 
         res.status(200).json({
             success: true,
-            message: "Sosyal medya paylaşımları simüle edildi.",
+            message: "⚠️ MOCK MODE: Sosyal medya paylaşımları simüle edildi. Gerçek API entegrasyonu henüz yapılmadı.",
+            mock: true,
             data: results
         });
     } catch (error) {
