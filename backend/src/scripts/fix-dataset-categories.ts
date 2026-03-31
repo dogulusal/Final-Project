@@ -116,7 +116,7 @@ async function fixDataset(isDryRun: boolean) {
             id: { notIn: processedIds.length > 0 ? processedIds : [0] }
         },
         select: { id: true, baslik: true, kategoriId: true },
-        orderBy: { id: 'asc' }
+        orderBy: { id: LATEST_FIRST ? 'desc' : 'asc' }
     });
 
     console.log(`Filtreleme sonrası işlenecek toplam ${allNews.length} haber var. (Atlanan: ${processedIds.length})`);
@@ -124,7 +124,10 @@ async function fixDataset(isDryRun: boolean) {
     let selectedNews = allNews;
     if (LIMIT > 0) {
         selectedNews = RANDOM_SAMPLE ? shuffleArray(allNews).slice(0, LIMIT) : allNews.slice(0, LIMIT);
-        console.log(`Örneklem modu: ${selectedNews.length} haber (${RANDOM_SAMPLE ? 'rastgele' : 'ilk kayıtlar'}) işlenecek.`);
+        const modeLabel = RANDOM_SAMPLE
+            ? 'rastgele'
+            : (LATEST_FIRST ? 'en yeni kayıtlar' : 'en eski kayıtlar');
+        console.log(`Örneklem modu: ${selectedNews.length} haber (${modeLabel}) işlenecek.`);
     }
 
     if (selectedNews.length === 0) {
@@ -160,7 +163,8 @@ async function fixDataset(isDryRun: boolean) {
                          data: {
                              kategoriId: newCatId,
                              kategoriDogrulandi: true,
-                             mlConfidence: null
+                             mlConfidence: null,
+                             augmentedAt: new Date()
                          } as any
                      });
                      console.log(`[UPDATED] ID ${res.id} -> ${categoryName}`);
@@ -168,7 +172,7 @@ async function fixDataset(isDryRun: boolean) {
                      // Kategori aynı ama doğrulanmış olarak işaretle
                      await prisma.haber.update({
                          where: { id: res.id },
-                         data: { kategoriDogrulandi: true } as any
+                         data: { kategoriDogrulandi: true, augmentedAt: new Date() } as any
                      });
                 }
             }
@@ -203,6 +207,7 @@ const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
 const LIMIT = parseInt(args.find(a => a.startsWith('--limit='))?.split('=')[1] || '0', 10);
 const RANDOM_SAMPLE = args.includes('--random-sample');
+const LATEST_FIRST = args.includes('--latest');
 
 function shuffleArray<T>(input: T[]): T[] {
     const arr = [...input];

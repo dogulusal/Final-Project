@@ -10,6 +10,7 @@ export interface CreateNewsDto {
     mlConfidence?: number;
     llmProvider?: string;
     kategoriDogrulandi?: boolean;
+    augmentedAt?: Date;
 }
 
 export interface INewsService {

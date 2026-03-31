@@ -3,13 +3,17 @@ import fs from 'fs';
 import path from 'path';
 import type { Prisma } from '@prisma/client';
 import { INewsCategorizationService, CategoryResult, TrainingData, SentimentResult } from './ml.interface';
-import { tokenizeAndStem } from './turkish-stemmer';
 import { ML_CONFIDENCE_THRESHOLD } from '../../config/constants';
 import { prisma } from '../../config/database';
 import { newsEventEmitter } from '../news/news.service';
 
+type ClassifierType = 'naive-bayes' | 'logistic-regression';
+type PreprocessingMode = 'unigram' | 'unigram-bigram' | 'unigram-bigram-filtered';
+
 export class MlCategorizationService implements INewsCategorizationService {
-    public classifier: natural.BayesClassifier;
+    public classifier: any = null;
+    private classifierType: ClassifierType = 'naive-bayes';
+    private preprocessingMode: PreprocessingMode = 'unigram';
     private isTrained: boolean = false;
     private newsSinceLastTrain: number = 0;
     private lastAccuracy: number = 0;
@@ -17,17 +21,63 @@ export class MlCategorizationService implements INewsCategorizationService {
     private testSize: number = 0;
     private readonly BATCH_TRAIN_THRESHOLD = 20;
 
-    constructor() {
-        // Türkçe dil desteği için kendi tokenizer'ımızı oluşturuyoruz
-        natural.PorterStemmer.tokenizeAndStem = function (text: string) {
-            return tokenizeAndStem(text);
-        };
-
-        // Custom stemmer'ı classifier'a veriyoruz
-        this.classifier = new natural.BayesClassifier(natural.PorterStemmer);
+    constructor(classifierType: ClassifierType = 'naive-bayes', preprocessingMode: PreprocessingMode = 'unigram-bigram') {
+        this.classifierType = classifierType;
+        this.preprocessingMode = preprocessingMode;
+        this.initializeClassifier();
 
         // Faz 4: Oto-Öğrenim Pipeline Gözlemcisi (Observer)
         this.initializeTrainingPipeline();
+    }
+
+    private initializeClassifier(): void {
+        if (this.classifierType === 'logistic-regression') {
+            this.classifier = new (natural.LogisticRegressionClassifier as any)();
+        } else {
+            this.classifier = new natural.BayesClassifier();
+        }
+    }
+
+    /**
+     * Faz 3: N-gram preprocessing
+     * Config A: Unigram only (baseline)
+     * Config B: Unigram + Bigram (en etkili)
+     * Config C: Unigram + Bigram + min 3 char filter
+     */
+    private preprocessText(text: string, type: 'unigram' | 'bigram' = 'unigram'): string[] {
+        // Normalize ve tokenize
+        const normalized = text.toLowerCase().trim();
+        const tokens = normalized.match(/\b\w+\b/g) || [];
+        
+        if (type === 'unigram') {
+            return tokens;
+        }
+        
+        // Bigram: ardışık iki kelime
+        const bigrams: string[] = [];
+        for (let i = 0; i < tokens.length - 1; i++) {
+            bigrams.push(`${tokens[i]}_${tokens[i + 1]}`);
+        }
+        return [...tokens, ...bigrams];
+    }
+
+    private shouldFilterToken(token: string, minLength: number = 3): boolean {
+        return token.length < minLength;
+    }
+
+    private preprocess(text: string, mode: PreprocessingMode): string[] {
+        let tokens = this.preprocessText(text, 'unigram');
+        
+        if (mode === 'unigram-bigram' || mode === 'unigram-bigram-filtered') {
+            const bigrams = this.preprocessText(text, 'bigram');
+            tokens = bigrams; // Bigram + unigram already merged
+        }
+        
+        if (mode === 'unigram-bigram-filtered') {
+            tokens = tokens.filter(t => !this.shouldFilterToken(t, 3));
+        }
+        
+        return tokens;
     }
 
     private initializeTrainingPipeline(): void {
@@ -150,11 +200,13 @@ export class MlCategorizationService implements INewsCategorizationService {
         this.testSize = testSet.length;
 
         // Eski eğitimi temizle
-        this.classifier = new natural.BayesClassifier(natural.PorterStemmer);
+        this.initializeClassifier();
 
         trainSet.forEach((data) => {
             if (data.text && data.category) {
-                this.classifier.addDocument(data.text, data.category);
+                const tokens = this.preprocess(data.text, this.preprocessingMode);
+                const processedText = tokens.join(' ');
+                this.classifier.addDocument(processedText, data.category);
             }
         });
 
@@ -166,7 +218,9 @@ export class MlCategorizationService implements INewsCategorizationService {
         if (this.testSize > 0) {
             testSet.forEach(item => {
                 try {
-                    const guess = this.classifier.classify(item.text);
+                    const tokens = this.preprocess(item.text, this.preprocessingMode);
+                    const processedText = tokens.join(' ');
+                    const guess = this.classifier.classify(processedText);
                     if (guess === item.category) {
                         correctGuesses++;
                     }
@@ -177,7 +231,7 @@ export class MlCategorizationService implements INewsCategorizationService {
             this.lastAccuracy = 0;
         }
 
-        console.log(`[ML] Model başarıyla eğitildi ve RAM'e alındı. (Train: ${this.trainSize}, Test: ${this.testSize}, Accuracy: %${(this.lastAccuracy*100).toFixed(1)})`);
+        console.log(`[ML] ${this.classifierType.toUpperCase()} (${this.preprocessingMode}) başarıyla eğitildi. (Train: ${this.trainSize}, Test: ${this.testSize}, Accuracy: %${(this.lastAccuracy*100).toFixed(2)})`);
         await this.saveModelToDb(this.lastAccuracy, this.trainSize);
     }
 
@@ -215,11 +269,27 @@ export class MlCategorizationService implements INewsCategorizationService {
                 return await this.loadAndTrainFromDiskFallback();
             }
 
+            const parseBackfillStartTime = (): Date | null => {
+                const raw = process.env.ML_BACKFILL_START_AT;
+                if (!raw) return null;
+                const parsed = new Date(raw);
+                if (Number.isNaN(parsed.getTime())) {
+                    console.warn(`[ML Warn] ML_BACKFILL_START_AT parse edilemedi: ${raw}`);
+                    return null;
+                }
+                return parsed;
+            };
+
+            const backfillStartTime = parseBackfillStartTime();
+
             // Başlık + metaAciklama + icerik ilk 300 karakter — zenginleştirilmiş LLM içeriği signal kalitesini artırır
-            let rawDataset: Array<TrainingData & { id: number }> = approvedNews.map(news => ({
+            let rawDataset: Array<TrainingData & { id: number; publishedAt: Date; augmentedAt?: Date | null; source: 'db' | 'disk' }> = approvedNews.map(news => ({
                 id: news.id,
                 text: (news.baslik + ' ' + (news.metaAciklama || '') + ' ' + (news.icerik ? news.icerik.slice(0, 300) : '')).trim(),
-                category: news.kategori.ad
+                category: news.kategori.ad,
+                publishedAt: news.yayinlanmaTarihi,
+                augmentedAt: (news as any).augmentedAt ?? null,
+                source: 'db'
             }));
 
             // DB'de az haber varsa tam, çoksa kontrollü şekilde dataset.json ile takviye et.
@@ -239,8 +309,14 @@ export class MlCategorizationService implements INewsCategorizationService {
 
                     const selected = diskDataset.slice(0, supplementSize);
 
-                    // Negatif ID'lerle ekle (DB ID'leriyle çakışmasın)
-                    const diskWithIds = selected.map((d, i) => ({ ...d, id: -(100000 + i + 1) }));
+                    // Negatif ID'lerle ekle (DB ID'leriyle çakışmasın), disk örnekleri test setine alınmaz.
+                    const diskWithIds = selected.map((d, i) => ({
+                        ...d,
+                        id: -(100000 + i + 1),
+                        publishedAt: new Date(0),
+                        augmentedAt: null,
+                        source: 'disk' as const
+                    }));
                     rawDataset = [...rawDataset, ...diskWithIds];
                     console.log(`[ML] dataset.json takviye eklendi (${diskWithIds.length}) → toplam ${rawDataset.length} örnek`);
                 }
@@ -248,8 +324,7 @@ export class MlCategorizationService implements INewsCategorizationService {
                 console.warn('[ML Warn] dataset.json takviye okunamadı, sadece DB verisi kullanılıyor');
             }
 
-            // Kategori bazlı stratified split — hash deterministik (ID % 5 === 0 → test)
-            // Avantaj: zamansal bias yok, her eğitimde aynı sonuç, data leakage yok
+            // Kategori bazlı temporal split: her kategoride en yeni %20 test, eski %80 train.
             const byCategory: Record<string, Array<TrainingData & { id: number }>> = {};
             rawDataset.forEach(d => {
                 if (!byCategory[d.category]) byCategory[d.category] = [];
@@ -261,14 +336,35 @@ export class MlCategorizationService implements INewsCategorizationService {
 
             for (const [, examples] of Object.entries(byCategory)) {
                 if (examples.length < 3) continue; // Kategori guard
-                // ID % 5 === 0 → test (yaklaşık %20), geri kalan → train
-                const catTest = examples.filter(e => e.id % 5 === 0);
-                const catTrain = examples.filter(e => e.id % 5 !== 0);
+
+                const fromDisk = examples.filter((e: any) => e.source === 'disk');
+                const fromDb = examples.filter((e: any) => e.source === 'db');
+
+                const temporal = [...fromDb].sort((a: any, b: any) => {
+                    return a.publishedAt.getTime() - b.publishedAt.getTime();
+                });
+
+                const splitIndex = Math.max(1, Math.floor(temporal.length * 0.8));
+                const catTrainBase = temporal.slice(0, splitIndex);
+                const catTestBase = temporal.slice(splitIndex);
+
+                const leakedFromTest = backfillStartTime
+                    ? catTestBase.filter((e: any) => !!e.augmentedAt && e.augmentedAt >= backfillStartTime)
+                    : [];
+
+                const leakIds = new Set(leakedFromTest.map((e: any) => e.id));
+                const catTest = catTestBase.filter((e: any) => !leakIds.has(e.id));
+                const catTrain = [...catTrainBase, ...leakedFromTest, ...fromDisk];
 
                 if (catTrain.length < 2) continue;
 
                 // Upsampling sadece train setine uygulanır (test kirletilmez)
-                const maxTrainCount = Math.max(...Object.values(byCategory).map(arr => arr.filter(e => e.id % 5 !== 0).length));
+                const maxTrainCount = Math.max(
+                    ...Object.values(byCategory).map(arr => {
+                        const onlyDb = (arr as any[]).filter(x => x.source === 'db').length;
+                        return Math.max(2, Math.floor(onlyDb * 0.8));
+                    })
+                );
                 const target = Math.min(maxTrainCount, catTrain.length * 3); // Max 3x upsampling
                 let i = 0;
                 const upsampled = [...catTrain];
@@ -276,8 +372,8 @@ export class MlCategorizationService implements INewsCategorizationService {
                     upsampled.push({ ...catTrain[i % catTrain.length] });
                     i++;
                 }
-                trainSet.push(...upsampled.map(({ id: _id, ...rest }) => rest));
-                testSet.push(...catTest.map(({ id: _id, ...rest }) => rest));
+                trainSet.push(...upsampled.map(({ id: _id, publishedAt: _publishedAt, augmentedAt: _augmentedAt, source: _source, ...rest }: any) => rest));
+                testSet.push(...catTest.map(({ id: _id, publishedAt: _publishedAt, augmentedAt: _augmentedAt, source: _source, ...rest }: any) => rest));
             }
 
             console.log(`[ML] DB'den ${approvedNews.length} haber yüklendi → train: ${trainSet.length} (upsampled), test: ${testSet.length} (temiz)`);
@@ -328,13 +424,16 @@ export class MlCategorizationService implements INewsCategorizationService {
         const combinedText = `${title || ''} ${contextText || ''}`.trim();
         const inferenceText = combinedText.length > 0 ? combinedText : title;
 
+        const tokens = this.preprocess(inferenceText, this.preprocessingMode);
+        const processedText = tokens.join(' ');
+
         // natural v6'da getClassifications() tüm skorları döner (daha yüksek = daha olası)
-        const classifications = this.classifier.getClassifications(inferenceText);
+        const classifications: Array<{ label: string; value: number }> = this.classifier.getClassifications(processedText) || [];
         const scores: Record<string, number> = {};
 
         // Doğrudan olasılık normalizasyonu (getClassifications() log-prob değil, küçük olasılık döndürür)
-        const rawTotal = classifications.reduce((sum, c) => sum + c.value, 0);
-        const expScores = classifications.map(c => ({
+        const rawTotal = classifications.reduce((sum: number, c: any) => sum + c.value, 0);
+        const expScores = classifications.map((c: any) => ({
             label: c.label,
             expVal: rawTotal > 0 ? c.value / rawTotal : 1 / classifications.length
         }));
@@ -362,7 +461,7 @@ export class MlCategorizationService implements INewsCategorizationService {
 
         // Baz skor + ipucu bonusu ve tekrar normalize
         let adjustedSum = 0;
-        const adjustedScores = expScores.map(s => {
+        const adjustedScores = expScores.map((s: any) => {
             const base = s.expVal / totalExp;
             const bonus = hintBonusByCategory[s.label] || 0;
             const adjusted = base + bonus;
@@ -373,7 +472,7 @@ export class MlCategorizationService implements INewsCategorizationService {
         let bestCategory = 'Bilinmeyen';
         let highestConfidence = 0;
 
-        adjustedScores.forEach(s => {
+        adjustedScores.forEach((s: any) => {
             const confidence = adjustedSum > 0 ? s.adjusted / adjustedSum : 0;
             scores[s.label] = confidence;
 

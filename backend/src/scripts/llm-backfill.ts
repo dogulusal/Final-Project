@@ -67,7 +67,8 @@ async function processWithProvider(
             metaAciklama: normalize(result.meta_aciklama, ''),
             sentiment: (result.sentiment || 'Nötr') as any,
             durum: 'hazir' as any,
-            llmProvider: providerName
+            llmProvider: providerName,
+            augmentedAt: new Date()
         };
 
         // LLM kategori override (güvenilir ise)

@@ -38,6 +38,80 @@ export class RssScheduler {
     private qualityFilter = new ContentQualityFilter();
     private newsService = new NewsService();
 
+    private getValueType(value: unknown): string {
+        if (Array.isArray(value)) return 'array';
+        if (value === null) return 'null';
+        return typeof value;
+    }
+
+    private getValueSample(value: unknown): string {
+        if (typeof value === 'string') {
+            return value.substring(0, 50);
+        }
+
+        try {
+            return JSON.stringify(value).substring(0, 50);
+        } catch {
+            return String(value).substring(0, 50);
+        }
+    }
+
+    private logParserFieldType(sourceId: string, fieldName: string, value: unknown): void {
+        if (typeof value === 'string') return;
+
+        console.error(
+            `[Parser Error] source: ${sourceId} | field: ${fieldName} | actual_type: ${this.getValueType(value)} | value_sample: ${this.getValueSample(value)}`
+        );
+    }
+
+    private normalizeCategoryKey(value: string): string {
+        return value
+            .toLowerCase()
+            .trim()
+            .replace(/ğ/g, 'g')
+            .replace(/ü/g, 'u')
+            .replace(/ş/g, 's')
+            .replace(/ı/g, 'i')
+            .replace(/ö/g, 'o')
+            .replace(/ç/g, 'c');
+    }
+
+    private resolveCategoryId(categoryText: string, kategoriMap: Map<string, number>): number | null {
+        const normalizedInput = this.normalizeCategoryKey(categoryText);
+        if (!normalizedInput) return null;
+
+        const aliases: Record<string, string> = {
+            gundem: 'genel',
+            yasam: 'genel',
+            magazin: 'genel',
+            politika: 'siyaset',
+            dunya: 'dunya',
+            spor: 'spor',
+            ekonomi: 'ekonomi',
+            saglik: 'saglik',
+            teknoloji: 'teknoloji',
+            genel: 'genel'
+        };
+
+        for (const [name, id] of kategoriMap.entries()) {
+            const normalizedName = this.normalizeCategoryKey(name);
+            if (normalizedName === normalizedInput) {
+                return id;
+            }
+        }
+
+        const aliasTarget = aliases[normalizedInput];
+        if (!aliasTarget) return null;
+
+        for (const [name, id] of kategoriMap.entries()) {
+            if (this.normalizeCategoryKey(name) === aliasTarget) {
+                return id;
+            }
+        }
+
+        return null;
+    }
+
     private normalizeText(value: unknown): string {
         if (typeof value === 'string') {
             return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -186,6 +260,10 @@ export class RssScheduler {
                 for (let i = 0; i < Math.min(feedItems.length, 15); i++) {
                     try {
                         const item = feedItems[i];
+                        this.logParserFieldType(source.id, 'title', item.title);
+                        this.logParserFieldType(source.id, 'link', item.link);
+                        this.logParserFieldType(source.id, 'contentSnippet', item.contentSnippet);
+
                         const safeTitle = this.normalizeText(item.title);
                         if (!safeTitle) continue;
 
@@ -210,13 +288,17 @@ export class RssScheduler {
                         ]);
 
                         const genelCatId = kategoriMap.get('genel') ?? 1;
+                        const sourceCatId = this.resolveCategoryId(source.category, kategoriMap) ?? genelCatId;
                         const mlStrong = !!(catRes && catRes.confidence >= ML_CONFIDENCE_THRESHOLD);
                         const mlCatId = mlStrong
-                            ? (kategoriMap.get(catRes!.kategori.toLowerCase()) ?? genelCatId)
+                            ? (this.resolveCategoryId(catRes!.kategori, kategoriMap) ?? null)
                             : null;
-                        let finalCatId = mlStrong
-                            ? mlCatId!
-                            : genelCatId;
+                        let finalCatId = sourceCatId;
+
+                        // ML sadece çok güvenli olduğunda ya da kaynak kategorisiyle aynıysa override etsin.
+                        if (mlStrong && mlCatId && (mlCatId === sourceCatId || catRes!.confidence >= 0.93)) {
+                            finalCatId = mlCatId;
+                        }
 
                         // 4. LLM Zenginleştirme (LLM_PIPELINE_ENABLED=true ile etkinleştirilir)
                         let llmBaslik = safeTitle;
@@ -251,10 +333,14 @@ export class RssScheduler {
                                     llmSentiment = normalizedSentiment;
                                 }
 
-                                const normalizedKategori = this.normalizeText(llmResult.kategori).toLowerCase();
+                                const normalizedKategori = this.normalizeText(llmResult.kategori);
                                 if (normalizedKategori) {
-                                    const llmCatId = kategoriMap.get(normalizedKategori);
-                                    if (llmCatId) finalCatId = llmCatId;
+                                    const llmCatId = this.resolveCategoryId(normalizedKategori, kategoriMap);
+                                    if (llmCatId) {
+                                        finalCatId = llmCatId;
+                                    } else {
+                                        console.warn(`[Scheduler LLM] Geçersiz kategori (${normalizedKategori}) source=${source.id}. Kaynak kategorisi korunuyor.`);
+                                    }
                                 }
                                 llmSucceeded = true;
                                 llmProviderName = 'gemini';
@@ -274,8 +360,11 @@ export class RssScheduler {
                             newsdurum = 'hazir';
                         }
 
-                        // ML ve nihai kategori uyumu varsa doğrulanmış kabul et.
-                        if (mlStrong && mlCatId && mlCatId === finalCatId) {
+                        // Kategori doğrulaması: LLM geçerli kategori üretmişse veya güçlü ML + kaynak uyumu varsa true.
+                        if (
+                            (llmSucceeded && finalCatId !== sourceCatId) ||
+                            (mlStrong && mlCatId && mlCatId === finalCatId && mlCatId === sourceCatId)
+                        ) {
                             kategoriDogrulandi = true;
                         }
 
@@ -291,7 +380,8 @@ export class RssScheduler {
                             kaynakUrl: safeLink,
                             durum: newsdurum,
                             llmProvider: llmProviderName,
-                            kategoriDogrulandi
+                            kategoriDogrulandi,
+                            augmentedAt: llmSucceeded ? new Date() : undefined
                         });
 
                         cycleAdded++;
