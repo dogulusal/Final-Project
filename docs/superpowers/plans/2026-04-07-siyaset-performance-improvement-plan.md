@@ -147,6 +147,97 @@ git commit -m "feat(ml): enhance confusion matrix logging with Siyaset-specific 
 
 ---
 
+## Chunk 1.5: Faz 0.5 — Label Consistency Audit (KRITIK)
+
+> **KRITIK:** Bu faz Faz 1'den ÖNCE yapılmalıdır. Eğer etiketleme tutarsızlığı varsa, tüm hard negative injection Faz 2'de bu hatalı veriye uygulanır.
+
+### Task 0.5: Manual Label Verification
+
+**Files:**
+- Query: PostgreSQL (Apr 4 backfill denetimi)
+
+#### Step 1: Düşük confidence Siyaset haberlerini listele (Apr 4 civarı)
+
+- [ ] PostgreSQL'de şu sorguyu çalıştır:
+
+```sql
+SELECT 
+  h.id,
+  h.baslik,
+  h.ml_confidence,
+  h.augmented_at,
+  SUBSTRING(h.icerik, 1, 300) as preview
+FROM haberler h
+JOIN kategoriler k ON h.kategori_id = k.id
+WHERE k.ad = 'Siyaset'
+  AND kategori_dogrulandi = true
+  AND ml_confidence < 0.65
+  AND augmented_at >= '2026-04-02'::timestamp
+  AND durum IN ('hazir', 'yayinda')
+ORDER BY ml_confidence ASC
+LIMIT 30;
+```
+
+- [ ] **Expected:** 10-30 row dönmeli. Eğer 0 row ise, bütün Apr 4 kayıtları yüksek confidence ile etiketlenmiş demektir (şüpheli).
+
+#### Step 2: Her makalelyi manuel oku ve tutarlılığını kontrol et
+
+- [ ] Dönen 30 makale için **her birine:**
+  1. **Q1: Gerçekten siyasi haber mi?** (YES/NO)
+     - Makaleyi oku: başlık + ilk 300 char
+     - Siyaset = "Meclis", "parti", "kanun", "hükümet kararı", "seçim", "milletvekili" içeriğine sahip
+     - Genel = "Belediye haber", "resmi duyuru", "vali açıklaması" gibi sadece büro bildirimi
+  2. **Q2: Eğer NO, doğru kategori ne?**
+  3. **Q3: Yanlış etiketlenme sebebi?** (örn: "bakan" kelimesi geçtiği için)
+
+- [ ] **Spreadsheet'te kaydet (mental note yerine):**
+  ```
+  ID | Başlık | ml_confidence | Our_Judgment | Correct? | True_Category
+  1234 | "Bakan açıklaması..." | 0.52 | Siyaset | NO | Genel
+  5678 | "Meclis'te..." | 0.58 | Siyaset | YES | Siyaset
+  ...
+  ```
+
+#### Step 3: Hatalı etiketlenen kayıtları düzelt
+
+- [ ] Her hatalı kayıt için (Our_Judgment ≠ Correct_Category):
+  - **Eğer şüpheli:** `kategori_dogrulandi=false` yaparak manuel queue'ye geri al
+    ```sql
+    UPDATE haberler SET kategori_dogrulandi = false
+    WHERE id = <HABER_ID>;
+    ```
+  - **Eğer kesin doğru kategori biliyorsan:** kategoriyi değiştir
+    ```sql
+    UPDATE haberler 
+    SET kategori_id = (SELECT id FROM kategoriler WHERE ad = '<CORRECT_CAT>'),
+        kategori_dogrulandi = true
+    WHERE id = <HABER_ID>;
+    ```
+
+#### Step 4: Audit sonuçlarını özetле
+
+- [ ] **Sayılar:**
+  - "Doğru etiketlenen" sayısı: ? / 30 
+  - "Yanlış etiketlenen" sayısı: ? / 30
+  - "Şüpheli, geri alınan" sayısı: ? / 30
+
+- [ ] **Karar tablosu:**
+  | Audit Sonucu | Aksiyon |
+  |---|---|
+  | Correct >= 27/30 (90%+) | ✅ Veri tutarlı → Faz 1 devam et |
+  | Correct 20-27/30 (70-90%) | ⚠️ Kısmı tutarsız → Faz 1 manuel validasyon arttırılmalı |
+  | Correct < 20/30 (70% altı) | 🔴 Veri kontaminasyonu yüksek → HOLD, pr problem araştır |
+
+#### Step 5: Commit
+
+- [ ] Değişiklikleri commit et:
+```bash
+git add -A
+git commit -m "fix(data): Faz 0.5 label consistency audit — Apr 4 backfill validation, corrected X records"
+```
+
+---
+
 ## Chunk 2: Faz 1 — Veri Kalite ve Hacim
 
 > **CRITICAL:** Before proceeding, invoke `dataset-quality-guard` skill to validate approach.
@@ -415,7 +506,7 @@ git commit -m "feat(ml): expand genelSignals list and soften genelPool filter"
 
 #### Step 2: Mevcut genelToSiyaset injection satırını bul ve güncelle
 
-- [ ] L171-L175 satırlarını bul:
+- [ ] L171-L180 satırlarını bul (Pool tanımlamalarından hemen sonra, injection satırları).
 
 Mevcut:
 ```typescript
@@ -424,15 +515,15 @@ const siyasetToGenel = injectFromPool(siyasetPool, 10);
 const siyasetToTeknoloji = injectFromPool(siyasetTechPool, 8);
 ```
 
-**Karar:** Faz 0 loglarına bak. Eğer Siyaset→Genel ≤ 3 ise 10'a düşür, ≥ 4 ise tuttur/arttır:
+**Karar:** Faz 0 loglarına bak ve karar matrisini uygula. Sonrasında injection satırlarını güncelle:
 
 ```typescript
-// Decision: based on Faz 0 leak analysis
-// If Siyaset->Genel is 3 or less: reduce injection to prevent overfitting
-// If Siyaset->Genel is 4+: keep or increase
-const genelToSiyaset = injectFromPool(genelPool, 10);  // Adjusted from 14 if needed
+// Decision: based on Faz 0 leak analysis (use decision table above)
+const genelToSiyaset = injectFromPool(genelPool, 10);  // or 6, 18 per decision table
 const siyasetToGenel = injectFromPool(siyasetPool, 10);
 const siyasetToTeknoloji = injectFromPool(siyasetTechPool, 8);
+const siyasetToDunya = injectFromPool(siyasetDunyaPool, 6);  // or 3 per decision table
+const siyasetToEkonomi = injectFromPool(siyasetEkonomiPool, 4);  // or 2 per decision table
 ```
 
 #### Step 3: Yeni confusion pair ekle — Siyaset↔Dünya
@@ -441,8 +532,8 @@ const siyasetToTeknoloji = injectFromPool(siyasetTechPool, 8);
 
 ```typescript
 const dunyaSignals = [
-    'buyukelci', 'disisleri', 'nato', 'ab', 'birlesmes milletler', 'diplomatik',
-    'dis politika', 'uluslararasi', 'antlas', 'misyon', 'konsolos'
+    'buyukelci', 'disisleri', 'nato', 'ab', 'birlesmes_milletler', 'diplomatik',
+    'dis_politika', 'uluslararasi', 'antlas', 'misyon', 'konsolos'
 ];
 
 const siyasetDunyaPool = trainSet.filter(item => {
@@ -495,8 +586,8 @@ interface HardNegativeBatchSummary {
     siyasetToTeknoloji: number;
     totalInjected: number;
 }
-```
 
+@@    'birlesmes_milletler', 'diplomatik',
 Yeni:
 ```typescript
 interface HardNegativeBatchSummary {
@@ -557,9 +648,57 @@ git commit -m "feat(ml): expand hard negative injection with Dünya and Ekonomi 
 
 ---
 
-## Chunk 4: Faz 3 & 4 — Keyword Boost ve Upsampling
+---
 
-### Task 3.1: Keyword Hint Boost Ayarı
+## Chunk 3.5: Faz 2.5 — Faz 0-2 Etkisinin Değerlendirilmesi
+
+> **DECISION GATE:** Faz 3'ün CONDITIONAL yapılmasını belirler.
+
+### Task 2.5: Benchmark & Faz 3 Karar
+
+**Files:**
+- Run: [backend/scripts/benchmark-faz5a.ts](backend/scripts/benchmark-faz5a.ts)
+
+#### Step 1: Faz 2 sonrası benchmark çalıştır
+
+- [ ] Terminal:
+```bash
+docker compose exec -e FORCE_DISK_FALLBACK=0 -e ML_DISK_SUPPLEMENT_LIMIT=0 -T backend sh -c "cd /app; npx ts-node scripts/benchmark-faz5a.ts --disk-supplement=0 --mode=unigram-bigram --manual-only"
+```
+
+#### Step 2: Siyaset F1 değerini not et
+
+- [ ] Benchmark output'unda şu satırı ara:
+  ```
+  [ML][Diagnostics][Siyaset] P=? R=? F1=? Support=?
+  ```
+  
+- [ ] **F1 değerini not al:** F1 = **?**
+
+#### Step 3: Karar ver — Faz 3 gerekli mi?
+
+- [ ] Karar matrisi:
+
+  | Siyaset F1 | Karar |
+  |---|---|
+  | **>= 0.62** | ✅ **SKIP Faz 3** — Keyword boost riskli, gerek yok |
+  | **0.58-0.62** | ⚠️ **CONDITIONAL Faz 3** — Yap ama +0.20 cap (conservative) |
+  | **< 0.58** | 🔴 **HOLD** — Faz 0-2'yi debug et, label audit'i tekrar kontrol et |
+
+- [ ] **Senin kararını aşağıya yaz:**
+  - Siyaset F1 = `[___]`
+  - Faz 3 yapılsın mı? YES / NO / CONDITIONAL
+
+- [ ] **Eğer YES veya CONDITIONAL:** Task 3.1'e geç
+- [ ] **Eğer NO veya SKIP:** Direkt Task 4.1'e atla
+
+---
+
+## Chunk 4: Faz 3 (Conditional) — Keyword Boost ve Upsampling
+
+> **CONDITIONAL FAZE:** Faz 2.5 sonrası kararına göre çalışabilir. **Eğer Siyaset F1 >= 0.62 ise bu faz SKIP edilir.**
+
+### Task 3.1: Keyword Hint Boost Ayarı (CONDITIONAL)
 
 **Files:**
 - Modify: `backend/src/modules/ml/ml.service.ts` — `categorize()` (L960-L1040)
@@ -601,34 +740,66 @@ const siyasetHints = {
 };
 ```
 
-#### Step 2: Per-category boost cap'ini Siyaset için artır
+#### Step 2: Per-category boost cap'ini Siyaset için **CONSERVATIVE** arttır
 
-- [ ] Keyword hints uygulandığı satırı bul (L ~1001-L ~1010). Şu anda tüm kategoriler aynı cap'e sahip (~+0.18):
+- [ ] Keyword hints uygulandığı satırı bul (`categorize()` içinde, keyword bonus calculation). Mevcut: tüm kategoriler +0.18 cap.
+
+**⚠️ KRITIK UYARI:** Keyword boost Naive Bayes olasılıklarını manuel olarak override ediyor. Siyaset'e +0.24, Genel'e +0.18 asymmetric avantaj yaratır. Bu riski minimize etmek için **+0.20 cap** (conservative) kullan:
 
 ```typescript
-// MEVCUT (tüm kategoriler eşit):
+// YENİ (Faz 2.5'te F1 < 0.62 ise ONLY):
 Object.entries(keywordBoosts).forEach(([category, hints]) => {
-    // ...
-    scores[category] = Math.min(scores[category] + boost, currentScore + 0.18);  // cap +0.18
-});
-
-// YENİ (Siyaset için +0.24):
-Object.entries(keywordBoosts).forEach(([category, hints]) => {
-    const boostCap = category === 'Siyaset' ? 0.24 : 0.18;  // Siyaset gets higher cap
+    // Conservative boost cap: Siyaset +0.20 (not +0.24)
+    // Genel +0.18 remains the same
+    // This prevents Naive Bayes calibration distortion
+    const boostCap = category === 'Siyaset' ? 0.20 : 0.18;
     scores[category] = Math.min(scores[category] + boost, currentScore + boostCap);
 });
 ```
 
-#### Step 3: Benchmark çalıştır — Recall ve F1 artışını doğrula
+**Açıklamalar:**
+- `+0.20` yerine `+0.24` kullanma → Genel F1'i -3pt'den fazla düşürebilir
+- Eğer Genel F1 -2.5pt'den fazla düşerse → boostCapı +0.18'e geri düşür
 
-- [ ] Terminal:
-```bash
-docker compose exec -e FORCE_DISK_FALLBACK=0 -e ML_DISK_SUPPLEMENT_LIMIT=0 -T backend sh -c "cd /app; npx ts-node scripts/benchmark-faz5a.ts --disk-supplement=0 --mode=unigram-bigram --manual-only"
-```
-
-- [ ] **Expected:**
-  - `[ML][Diagnostics][Siyaset] P=? R=? F1=?` — **R artmış, F1 > 0.62** (hedef)
-  - `[ML][Diagnostics][Genel] F1=?` — **max -3pt düşmüş** (acceptance threshold)
+  - Eğer Genel F1 < -3pt ise, boostCap'i +0.18'e geri düşür ve tekrar çalıştır
+@@#### Step 2.5: ⚠️ KRITIK UYARI — Keyword Boost Riski
+@@
+@@- [ ] **Keyword boost Naive Bayes olasılıklarını manuel olarak override ediyor.** 
+@@  - Risk: Siyaset'e +0.24 bonus, Genel'e +0.18 → asymmetric avantaj
+@@  - Örnek: "Hükümet duyurusu" makalesinde Siyaset +0.24 alırsa, Genel'i %16 oranında aşabilir
+@@  - Bu nedenle **+0.20 cap (CONSERVATIVE)** kullanıyoruz, +0.24 değil
+@@  - Eğer Genel F1 -3pt'den fazla düşerse → cap'i +0.18'e geri düşür
+@@
+@@#### Step 2: Per-category boost cap'ini Siyaset için (CONSERVATIVE) artır
+@@
+@@- [ ] Keyword hints uygulandığı satırı bul (`categorize()` içinde, keyword bonus calculation):
+@@
+@@```typescript
+@@// YENİ (CONSERVATIVE VERSION — Faz 2.5'te F1 < 0.62 ise):
+@@Object.entries(keywordBoosts).forEach(([category, hints]) => {
+@@    // Conservative boost cap: Siyaset +0.20 (NOT +0.24)
+@@    // Genel +0.18 remains same
+@@    // This prevents Naive Bayes calibration distortion
+@@    const boostCap = category === 'Siyaset' ? 0.20 : 0.18;
+@@    scores[category] = Math.min(scores[category] + boost, currentScore + boostCap);
+@@});
+@@```
+@@
+@@**Açıklamalar:**
+@@- `+0.20` yerine `+0.24` kullanma → Genel F1'i -3pt'den fazla düşürebilir
+@@- Eğer Genel F1 -2.5pt'den fazla düşerse → boostCap'ı +0.18'e geri düşür
+@@
+@@#### Step 3: Benchmark çalıştır — Recall ve F1 artışını doğrula
+@@
+@@- [ ] Terminal:
+@@```bash
+@@docker compose exec -e FORCE_DISK_FALLBACK=0 -e ML_DISK_SUPPLEMENT_LIMIT=0 -T backend sh -c "cd /app; npx ts-node scripts/benchmark-faz5a.ts --disk-supplement=0 --mode=unigram-bigram --manual-only"
+@@```
+@@
+@@- [ ] **Expected:**
+@@  - `[ML][Diagnostics][Siyaset] P=? R=? F1=?` — **R artmış, F1 > 0.64** (hedef)
+@@  - `[ML][Diagnostics][Genel] F1=?` — **max -2.5pt düşmüş** (acceptance threshold)
+@@  - Eğer Genel F1 < -3pt ise, boostCap'ı +0.18'e geri düşür ve tekrar çalıştır
 
 #### Step 4: Commit
 
@@ -645,7 +816,7 @@ git commit -m "feat(ml): boost Siyaset keyword hints in categorize()"
 **Files:**
 - Modify: `backend/src/modules/ml/ml.service.ts` — upsampling bölümü (L819-L874)
 
-#### Step 1: Küçük kategorileri belirle ve upsampling bonusu ekle
+#### Step 1: Küçük kategorileri belirle ve upsampling bonusu ekle (SAFE VERSION)
 
 - [ ] `loadAndTrainFromDB()` içinde upsampling bölümünü bul (~L850-L875):
 
@@ -662,18 +833,19 @@ catTrain.forEach((sample) => {
 });
 ```
 
-Yeni (per-category bonus):
+Yeni (per-category bonus — SAFE side-effect-free version):
 ```typescript
 const upsampleMultiplier = options.upsampleMultiplier ?? 3;
 const manualUpsampleMultiplier = options.manualUpsampleMultiplier ?? 5;
 
-// Dinamik medyan hesapla
+// Dinamik medyan hesapla (SAFE: .slice() creates copy, keine side-effects)
 const categorySizes = Object.values(verifiedByCategory);
-const median = categorySizes.length > 0 
-    ? categorySizes.sort((a, b) => a - b)[Math.floor(categorySizes.length / 2)]
+const sortedSizes = [...categorySizes].sort((a, b) => a - b);  // ← .slice().sort() alternative
+const median = sortedSizes.length > 0 
+    ? sortedSizes[Math.floor(sortedSizes.length / 2)]
     : 100;
-const smallCategoryThreshold = median * 0.6;
-const SMALL_CATEGORIES_BONUS = 2; // +2x ek multiplier
+const smallCategoryThreshold = median * 0.6;  // 0.6 = trigger upsampling if < 60% of median
+const SMALL_CATEGORIES_BONUS = 2; // +2x ek multiplier (keeps effective size similar to median)
 
 catTrain.forEach((sample) => {
     let repeat = sample.isManualValidated ? manualUpsampleMultiplier : upsampleMultiplier;
@@ -688,6 +860,11 @@ catTrain.forEach((sample) => {
     }
 });
 ```
+
+**Açıklama:**
+- `[...categorySizes].sort()` → shallow copy oluşturur, yan etki yok
+- `0.6 threshold` → kategori şu anda < medyan * 60% ise bonus al
+- `+2 multiplier` → küçük kategoriler medyan kategoriler kadar büyük olur (upsampling hedefi)
 
 #### Step 2: Benchmark çalıştır — Final tüm fazların birleşik etkisi
 
@@ -730,37 +907,212 @@ git commit -m "feat(ml): per-category upsampling bonus for small categories"
 ## Dependencies & Ordering
 
 ```
-┌─ Faz 0: Enhanced Logging (ön koşul — veri güdümlü karar)
-│   └─ Faz 1: Data Volume (Manuel veri Audit + Doğrulama)
-│      └─ Faz 2: Hard Negatives (Faz 0 loglarına göre ayarlanır)
-│         └─ Faz 3: Keyword Boost (Faz 2'den bağımsız, paralel olabilir)
-│            └─ Faz 4: Upsampling (Faz 1 sonrası, optimal Faz 3'den önce)
+Faz 0: Enhanced Logging (ön koşul — veri güdümlü karar)
+   ↓
+Faz 0.5: Label Consistency Audit (KRITIK — etiketleme tutarlılığı kontrol)
+   ↓
+Faz 1: Data Volume (Manuel veri Audit + Doğrulama)
+   ↓
+Faz 2: Hard Negatives (Faz 0 loglarına göre ayarlanır)
+   ↓
+Faz 2.5: Benchmark & Faz 3 Karar (DECISION GATE — F1 < 0.62 ise Faz 3'e geç)
+   ↓
+Faz 3: Keyword Boost [CONDITIONAL — sadece gerekli ise, +0.20 cap conservative]
+   ↓
+Faz 4: Upsampling [SAFE CODE — .slice().sort() side-effect free]
 ```
 
-**Sequential:** Faz 0 → Faz 1 → Faz 2 → Faz 3 (ve Faz 4 paralel)
+**Sequential & Conditional:**
+- **SEQUENTIAL:** Faz 0 → Faz 0.5 → Faz 1 → Faz 2 → Faz 2.5 (decision point)
+- **CONDITIONAL:** 
+  - Eğer F1 >= 0.62: SKIP Faz 3, direkt Faz 4'e geç
+  - Eğer F1 < 0.62: Faz 3'e geç (conservative +0.20 cap)
+- **Parallelizable:** Faz 4 Faz 3'ten bağımsız yapılabilir (sonuç farklı olabilir)
 
-**Why:** 
+**Why:**
+- Faz 0.5 MUST come first: Eğer label inconsistency varsa, tüm fuzzy logic bozuk
 - Faz 0 bilgisiz karar almamıza engel olur
 - Faz 1 veri hacmi arttırmazsa metrikler güvenilmez
-- Faz 2 injection miktarları Faz 0 loglarına bağlı (veri güdümlü)
-- Faz 3 Faz 2'den bağımsız (paralel yapılabilir ama sonra)
-- Faz 4 Faz 1'in artmış veri hacmine dayanır
+- Faz 2 injection Faz 0 loglarına bağlı (veri güdümlü)
+- Faz 2.5: GATE — Faz 3'ün riski yüksek, sadece gerekli ise yap
+- Faz 3 CONDITIONAL ve CONSERVATIVE: Naive Bayes calibration riski
+- Faz 4 SAFE CODE: Keine yan etkileri
 
 ---
 
-## Summary
 
-**Bu plan aşağıdakileri çözer:**
-
-1. ✅ Siyaset→Genel kaçışını net ve yüzdesel olarak görüyoruz (Faz 0)
-2. ✅ Test set boyutu 15 → 20+ olacak (Faz 1, veri artışı)
-3. ✅ Hard negative pool boş değil çünkü `genelSignals` 20+ terimi (Faz 2)
-4. ✅ Injection miktarları kaçış verilerine göre ayarlanıyor (Faz 2)
-5. ✅ Siyaset keyword bonus Bayesian prior'ı dengeliyor (Faz 3)
-6. ✅ Küçük kategoriler ekstra upsampling alıyor (Faz 4)
-
+@@```
+@@Faz 0: Enhanced Logging → ✅ veri güdümlü karar
+@@   ↓
+@@Faz 0.5: Label Consistency Audit → ✅ etiketleme tutarlılığı kontrol ← KRITIK
+@@   ↓
+@@Faz 1: Data Volume → ✅ veri hacmi arttır
+@@   ↓
+@@Faz 2: Hard Negatives → ✅ Faz 0 loglarına göre
+@@   ↓
+@@Faz 2.5: Decision Gate → 📊 Siyaset F1 >= 0.62? SKIP Faz 3 : RUN Faz 3
+@@   ↓↓
+@@   ├→ SKIP (F1 >= 0.62) → direkt Faz 4
+@@   └→ RUN (F1 < 0.62) → Faz 3 (+0.20 conservative)
+@@   ↓
+@@Faz 4: Upsampling → ✅ safe code, side-effect free
+@@```
+@@
+@@**Sequential & Conditional:**
+@@- **SEQUENTIAL:** Faz 0 → Faz 0.5 → Faz 1 → Faz 2 → Faz 2.5 (decision point)
+@@- **CONDITIONAL:** 
+@@  - Eğer F1 >= 0.62: SKIP Faz 3, direkt Faz 4
+@@  - Eğer F1 < 0.62: Faz 3 yap (conservative +0.20 cap)
+@@- **Parallelizable:** Faz 4 Faz 3'ten bağımsız yapılabilir
+@@
+@@**Why:**
+@@- Faz 0.5 MUST come first: Label inconsistency detected değil mi?
+@@- Faz 0 bilgisiz karar almamıza engel olur
+@@- Faz 1 veri hacmi arttırmazsa metrikler güvenilmez
+@@- Faz 2 injection Faz 0 loglarına bağlı (veri güdümlü)
+@@- Faz 2.5: GATE — Faz 3'ün riski yüksek, sadece gerekli ise yap
+@@- Faz 3 CONDITIONAL ve CONSERVATIVE: Naive Bayes calibration riski
+@@- Faz 4 SAFE CODE: Keine yan etkileri
+@@
+@@## Summary
+@@
+@@**Bu plan aşağıdakileri çözer:**
+@@
+@@1. ✅ Label inconsistency detect & fix (Faz 0.5)
+@@2. ✅ Siyaset→Genel kaçışını net ve yüzdesel olarak görüyoruz (Faz 0)
+@@3. ✅ Test set boyutu 15 → 20+ olacak (Faz 1, veri artışı)
+@@4. ✅ Hard negative pool boş değil çünkü `genelSignals` 20+ terimi (Faz 2)
+@@5. ✅ Injection miktarları kaçış verilerine göre ayarlanıyor (Faz 2)
+@@6. ✅ Keyword boost CONDITIONAL ve CONSERVATIVE (Faz 3 — sadece gerekli ise, Naive Bayes riski minimal)
+@@7. ✅ Upsampling side-effect free (Faz 4)
 **Beklenen sonuç:** Siyaset F1 ≥ 0.65, Genel Accuracy ≥ 72%, Macro-F1 ≥ 0.72
 
 ---
 
 **Next Step:** Plan review loop başlatılmalı (spec-document-reviewer subagent dispatch).
+
+@@## Chunk 1.5: Faz 0.5 — Label Consistency Audit (KRITIK)
+@@
+@@> **KRITIK:** Bu faz Faz 1'den ÖNCE yapılmalıdır. Eğer etiketleme tutarsızlığı varsa, tüm hard negative injection Faz 2'de bu hatalı veriye uygulanır. Bu, Siyaset modeline kontaminasyonlu veri öğretmek demektir.
+@@
+@@### Task 0.5: Manual Label Verification — Apr 4 Backfill Denetimi
+@@
+@@**Files:**
+@@- Query: PostgreSQL (Apr 4 backfill denetimi)
+@@
+@@#### Step 1: Düşük confidence Siyaset haberlerini listele (Apr 4 civarı)
+@@
+@@- [ ] PostgreSQL'de şu sorguyu çalıştır:
+@@
+@@```sql
+@@SELECT 
+@@  h.id, h.baslik, h.ml_confidence, h.augmented_at,
+@@  SUBSTRING(h.icerik, 1, 300) as preview
+@@FROM haberler h
+@@JOIN kategoriler k ON h.kategori_id = k.id
+@@WHERE k.ad = 'Siyaset' AND kategori_dogrulandi = true
+@@  AND ml_confidence < 0.65 AND augmented_at >= '2026-04-02'::timestamp
+@@  AND durum IN ('hazir', 'yayinda')
+@@ORDER BY ml_confidence ASC LIMIT 30;
+@@```
+@@
+@@#### Step 2: Her makaleyi manuel oku ve tutarlılığını kontrol et
+@@
+@@- [ ] 30 makalede sorulan sorular:
+@@  1. **Gerçekten siyasi haber mi?** YES/NO
+@@  2. **Eğer NO: Doğru kategori?**
+@@  3. **Yanlış etiketleme sebebi?** (örn: "bakan" kelimesi geçtiği için)
+@@
+@@#### Step 3: Hatalı kayıtları düzelt
+@@
+@@- [ ] UPDATE haberler SET kategori_dogrulandi = false ORKATÉGORI değiştir (doğru ise)
+@@
+@@#### Step 4: Karar ver
+@@
+@@- [ ] **Correct >= 27/30:** ✅ Veri tutarlı → Faz 1 devam
+@@- [ ] **20-27/30:** ⚠️ Kısmi tutarsız → Faz 1 arttırılmalı
+@@- [ ] **< 20/30:** 🔴 Yüksek kontaminasyon → HOLD
+@@
+@@#### Step 5: Commit
+@@
+@@- [ ] git commit -m "fix(data): Faz 0.5 label consistency audit — Apr 4 backfill validation"
+@@
+@@---
+@@
+@@## Chunk 2: Faz 1 — Veri Kalite ve Hacim
+@@
+@@> **CRITICAL:** Before proceeding, invoke `dataset-quality-guard` skill to validate approach.
+
+@@---
+@@
+@@## Chunk 3.5: Faz 2.5 — Benchmark & Faz 3 Decision Gate
+@@
+@@> **DECISION GATE:** Faz 3'ün CONDITIONAL yapılmasını belirler. Risk: Keyword boost Naive Bayes calibration'ını bozabilir.
+@@
+@@### Task 2.5: Benchmark & Faz 3 Karar
+@@
+@@#### Step 1: Faz 2 sonrası benchmark çalıştır
+@@
+@@- [ ] Terminal:
+@@```bash
+@@docker compose exec -e FORCE_DISK_FALLBACK=0 -e ML_DISK_SUPPLEMENT_LIMIT=0 -T backend sh -c "cd /app; npx ts-node scripts/benchmark-faz5a.ts --disk-supplement=0 --mode=unigram-bigram --manual-only"
+@@```
+@@
+@@#### Step 2: Siyaset F1 değerini not et
+@@
+@@- [ ] [ML][Diagnostics][Siyaset] F1=? satırını ara ve not al: **F1 = ?**
+@@
+@@#### Step 3: Karar ver — Faz 3 gerekli mi?
+@@
+@@| Siyaset F1 | Karar |
+@@|---|---|
+@@| **>= 0.62** | ✅ SKIP Faz 3 — Keyword boost riskli, gerek yok |
+@@| **0.58-0.62** | ⚠️ CONDITIONAL Faz 3 — Yap ama +0.20 cap (conservative) |
+@@| **< 0.58** | 🔴 HOLD — Faz 0-2'yi debug et, label audit'i kontrol et |
+@@
+@@- [ ] **Senin kararını:** Faz 3 yap\yılsın mı? YES/NO/CONDITIONAL
+@@
+@@---
+@@
+@@## Chunk 4: Faz 3 (Conditional) — Keyword Boost ve Upsampling
+@@
+@@> **CONDITIONAL FAZE:** Faz 2.5'te F1 < 0.62 ise SADECE bu faza gir. F1 >= 0.62 ise **direkt Faz 4'e atla.**
+@@
+@@### Task 3.1: Keyword Hint Boost Ayarı (CONDITIONAL)
+@@
+@@**Files:**
+@@- Modify: `backend/src/modules/ml/ml.service.ts` — `categorize()` (L960-L1040)
+
+@@**⚠️ SIDE EFFECT FIX:** `categorySizes.sort()` in-place sort yapıyor (yan etki). GÜVENLI versiyon:
+@@
+@@```typescript
+@@const upsampleMultiplier = options.upsampleMultiplier ?? 3;
+@@const manualUpsampleMultiplier = options.manualUpsampleMultiplier ?? 5;
+@@
+@@// SAFE: Create shallow copy BEFORE sorting (no side effects)
+@@const categorySizes = Object.values(verifiedByCategory);
+@@const sortedSizes = [...categorySizes].sort((a, b) => a - b);  // ← .slice().sort() alternative
+@@const median = sortedSizes.length > 0 
+@@    ? sortedSizes[Math.floor(sortedSizes.length / 2)]
+@@    : 100;
+@@const smallCategoryThreshold = median * 0.6;  // 0.6 = trigger if < 60% of median
+@@const SMALL_CATEGORIES_BONUS = 2; // +2x extra (keeps effective size ~ median)
+@@
+@@catTrain.forEach((sample) => {
+@@    let repeat = sample.isManualValidated ? manualUpsampleMultiplier : upsampleMultiplier;
+@@    
+@@    // Bonus for small categories
+@@    if (verifiedByCategory[sample.category] < smallCategoryThreshold) {
+@@        repeat += SMALL_CATEGORIES_BONUS;
+@@    }
+@@    
+@@    for (let r = 0; r < repeat; r++) {
+@@        weightedTrain.push({...sample});
+@@    }
+@@});
+@@```
+@@
+@@**Açıklamalar:**
+@@- `[...categorySizes].sort()` → shallow copy oluşturur, yan etki yok
+@@- `0.6 threshold` → kategori şu anda < medyan * 60% ise bonus al (dinamik)
+@@- `+2 multiplier` → küçük kategoriler medyan kategoriler kadar büyük olur (upsampling hedefi)
