@@ -126,6 +126,27 @@ git commit -m "feat(ml): enhance confusion matrix logging with Siyaset-specific 
 
 ---
 
+#### Step 6: Faz 0 Log Formatı Doğrulama (KRITIK — Faz 2 karar matrisinin temelini oluşturur)
+
+- [ ] **CRITICALLY IMPORTANT:** Faz 0 benchmark çıktısında şu logları doğrula:
+  - `[ML][Diagnostics][SiyasetLeakage]` log mü var? (Varsa, Faz 2 için veri alındı)
+  - `[ML][Diagnostics][TowardsSiyaset]` log mü var? (Varsa, ters yön kaçışları biliniyor)
+  - `[ML][Diagnostics][NetConfusion]` log mü var? (Varsa, net balance belirleniyor)
+  
+- [ ] **Eğer hiç biri görünmüyorsa:** ml.service.ts'deki logDiagnostics() fonksiyonunda hata var. Debug et ve Step 1-3 kodunu tekrar kontrol et.
+
+- [ ] **Log formatı doğru gözüküyorsa:** Şu değerleri **not al:**
+  - Siyaset→Genel kaçış sayısı (örn: "3" veya "5")
+  - Siyaset→Dünya kaçış sayısı (örn: "1" veya "2")
+  - Siyaset→Ekonomi kaçış sayısı (örn: "0" veya "1")
+  
+  Bu değerler Task 2.2 Step 1'de karar matrisi ikamesini belirleyecektir.
+
+- [ ] Commit:
+```bash
+
+---
+
 ## Chunk 2: Faz 1 — Veri Kalite ve Hacim
 
 > **CRITICAL:** Before proceeding, invoke `dataset-quality-guard` skill to validate approach.
@@ -211,14 +232,20 @@ git commit -m "fix(data): audit Apr 4 backfill Siyaset records, remove low-confi
 **Files:**
 - Run: `backend/scripts/manual-validate.ts`
 
+#### Step 0: Database yedek al
+
+- [ ] Manuel validasyon öncesi database backup:
+```bash
+docker compose exec -T postgres sh -c "pg_dump -U postgres news_db" > "c:/Users/dogul/Final-Project/backups/pre-manual-validation-$(date +%s).dump"
+```
+- **Amaç:** `manuel_validasyonlar` tablo yazıları geri alınabilir olmalı
+
 #### Step 1: Manuel doğrulama CLI'ını çalıştır
 
 - [ ] Terminal'i açarak:
 ```bash
 cd c:/Users/dogul/Final-Project
-docker compose exec -T backend sh -c "cd /app && npm run validate:interactive"
-# veya doğrudan ts-node:
-# docker compose exec -T backend sh -c "cd /app && npx ts-node scripts/manual-validate.ts"
+docker compose exec -T backend sh -c "cd /app && npx ts-node scripts/manual-validate.ts"
 ```
 
 - [ ] **Process:**
@@ -226,7 +253,8 @@ docker compose exec -T backend sh -c "cd /app && npm run validate:interactive"
   - Haberi oku (baslik + ilk 200 char icerik)
   - Kategoriyi doğrula: (1) Siyaset, (2) Genel, vb. tuşla seç veya düzelt
   - Script otomatik `manuel_validasyonlar` tablosuna yazacak
-  - Hedef: Minimum **20+ yeni Siyaset** doğrulaması (75 → 95+)
+  - Hedef: Minimum **15+ yeni Siyaset** doğrulaması (75 → 90+)
+  - **Fallback:** Eğer unvalidated Siyaset sayısı < 15 ise, mevcut tüm Siyaset haberleri doğrula ve Step 2'ye geç (saydı not et)
   
 - [ ] **Expected flow:**
   ```
@@ -356,16 +384,34 @@ git commit -m "feat(ml): expand genelSignals list and soften genelPool filter"
 
 #### Step 1: Faz 0 benchmark loglarından kaçış oranlarını oku ve karar matrisi uygula
 
-- [ ] Faz 0 loglarında şu satırları ara:
-  - `[ML][Diagnostics][SiyasetLeakage] ... Genel: ? (? %) ...`
-  - `[ML][Diagnostics][TowardsSiyaset] Genel -> Siyaset: ? ...`
+- [ ] **ÖNCESI:** Task 0.1 Step 6'da not ettiğin Faz 0 değerlerini bul:
+  - Siyaset→Genel: ? (örn: 3, 5, 7)
+  - Siyaset→Dünya: ? (örn: 0, 1, 2)
+  - Siyaset→Ekonomi: ? (örn: 0, 1)
 
-Karar matrisi:
-| Faz 0 Siyaset→Genel | Aksiyon | Faz 0 Siyaset→Dünya | Aksiyon |
-|---|---|---|---|
-| ≥ 4 | `genelToSiyaset` → 18 | ≥ 2 | Yeni `dünyaPool` (target 6) |
-| 3 (tahmin) | `genelToSiyaset` → 10 | ≤ 1 | `dünyaPool` isteğe bağlı |
-| ≤ 2 | `genelToSiyaset` → 6 | N/A | Atlayabilir |
+- [ ] **Karar Tablosu (veri-güdümlü):**
+  
+  | Siyaset→Genel | genelToSiyaset | Gerekçe |
+  |---|---|---|
+  | ≥ 4 | 18 (arttır) | Çok fazla kaçış → agresif injection |
+  | 3-2 | 10 (düşür) | Orta kaçış → dengeli injection |
+  | ≤ 1 | 6 (agresif düşür) | Az kaçış → overfitting riski, azalt |
+  
+  | Siyaset→Dünya | Aksiyon | Hedef |
+  |---|---|---|
+  | ≥ 2 | `siyasetDunyaPool` ekle | 6 injection |
+  | 0-1 | `siyasetDunyaPool` ekle ama **conservative injection=3** | Veri az da önemli çift |
+  
+  | Siyaset→Ekonomi | Aksiyon | Hedef |
+  |---|---|---|
+  | ≥ 2 | `siyasetEkonomiPool` ekle | 4 injection |
+  | 0-1 | `siyasetEkonomiPool` ekle ama **conservative injection=2** | Veri az da önemli çift |
+
+- [ ] **Kural:** Herhangi bir confusion pair kaçıp kaçmadığında şüphe varsa, **her zaman pool'u ekle fakat conservative injection hedefini kullan.** Fazla tarafından daha az kayıp olur.
+
+- [ ] **Misal senaryo:**
+  - Faz 0 logunda: `[SiyasetLeakage] Genel: 3 (43%) | Dünya: 1 (14%) | Teknoloji: 1 (14%) | ...`
+  - Karar: `genelToSiyaset=10`, `siyasetToDunya=3` (conservative), `siyasetToEkonomi=2` (conservative)
 
 #### Step 2: Mevcut genelToSiyaset injection satırını bul ve güncelle
 
