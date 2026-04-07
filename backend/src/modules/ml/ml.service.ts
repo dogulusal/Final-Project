@@ -424,6 +424,37 @@ export class MlCategorizationService implements INewsCategorizationService {
             const siyasetToDunya = matrix?.[siyasetIndex]?.[dunyaIndex] || 0;
             console.log(`[ML][Diagnostics][Pair] Siyaset -> Dünya: ${siyasetToDunya}`);
         }
+
+        // Siyaset-specific leakage analysis
+        if (siyasetIndex !== -1) {
+            // SiyasetLeakage: actual=Siyaset, predicted=non-Siyaset (false negatives for Siyaset)
+            const siyasetLeakage = categories.reduce((sum, cat, idx) => {
+                if (cat !== 'Siyaset') sum += (matrix?.[siyasetIndex]?.[idx] || 0);
+                return sum;
+            }, 0);
+
+            // TowardsSiyaset: actual=non-Siyaset, predicted=Siyaset (false positives for Siyaset)
+            const towardsSiyaset = categories.reduce((sum, cat, idx) => {
+                if (cat !== 'Siyaset') sum += (matrix?.[idx]?.[siyasetIndex] || 0);
+                return sum;
+            }, 0);
+
+            const netConfusion = towardsSiyaset - siyasetLeakage;
+
+            console.log(`[SiyasetLeakage] Siyaset->non-Siyaset=${siyasetLeakage} (false negatives)`);
+            console.log(`[TowardsSiyaset] non-Siyaset->Siyaset=${towardsSiyaset} (false positives)`);
+            console.log(`[NetConfusion] net=${netConfusion} (positive=over-predict, negative=under-predict Siyaset)`);
+
+            // Per-category breakdown
+            categories.forEach((cat, idx) => {
+                if (cat === 'Siyaset') return;
+                const leak = matrix?.[siyasetIndex]?.[idx] || 0;
+                const inflow = matrix?.[idx]?.[siyasetIndex] || 0;
+                if (leak > 0 || inflow > 0) {
+                    console.log(`[SiyasetLeakage][${cat}] Siyaset->${cat}=${leak} ${cat}->Siyaset=${inflow}`);
+                }
+            });
+        }
     }
     calculateRocAuc(predictions: Array<{ actual: string; scores: Record<string, number> }>, categories: string[]): { 
         per_category: Record<string, number>; 
