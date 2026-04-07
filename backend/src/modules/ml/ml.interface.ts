@@ -20,7 +20,7 @@ export interface SentimentResult {
 
 export interface INewsCategorizationService {
     categorize(title: string, contextText?: string): Promise<CategoryResult>;
-    train(dataset: TrainingData[]): Promise<void>;
+    train(dataset: TrainingData[]): Promise<boolean>;
     getAccuracy(): Promise<{ accuracy: number; testSize: number; trainSize: number }>;
     analyzeSentiment(text: string): Promise<SentimentResult>;
     extractEntities(text: string): string[];

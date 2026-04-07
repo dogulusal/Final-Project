@@ -141,7 +141,8 @@ ${input.ozet}
             return this.parseRawOutput(response.content, input);
         } catch (error) {
             console.error(`[LLM Error] İşlem hatası:`, error instanceof Error ? error.message : error);
-            return this.parseRawOutput("", input); // triggers fallback
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`LLM provider failed: ${message}`);
         }
     }
 

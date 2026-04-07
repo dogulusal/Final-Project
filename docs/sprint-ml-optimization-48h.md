@@ -1,20 +1,24 @@
-# 48 Saat ML Optimizasyon Sprint Planı
+# 48+ Saat ML Optimizasyon Sprint Planı — UPDATED 31 Mart 2026 (Faz 4b+ Roadmap)
 
-> **Başlangıç:** 29 Mart 2026 (gece)  
-> **Hedef:** ML accuracy %74 → %90+ | RSS stabilite %100 | Veri hacmi 1,265 → 2,500+  
-> **Strateji:** Veri kalitesi önce → Altyapı düzelt → Model geliştir → Doğrula
+> **Başlangıç:** 29 Mart 2026 (gece) **Status Update:** 31 Mart 17:15  
+> **Status:** Faz 4a ✅ DONE (accuracy 81.99%, 6-step validation) | Faz 4b ❌ NEXT PRIORITY  
+> **Hedefler:** ML accuracy %74 → %90+ | RSS stabilite %100 ✅ | Veri hacmi 1,265 → 2,500+ (⚠️ 1,345/54%)  
+> **Strateji:** Faz 0-4a tamamlandı → Faz 4b auth + metrics → Faz 5 LR + augmentation → Faz 6 conditional fine-tuning
 
 ---
 
-## Mevcut Durum Snapshot (29 Mart 2026, 23:00)
+## Mevcut Durum Snapshot (31 Mart 2026, 17:15 — Faz 4a Tamamlandı)
 
-| Metrik | Değer | Hedef |
-|--------|-------|-------|
-| Toplam haber | 1,265 | 2,500+ |
-| Doğrulanmış | 1,249 (%99) | %100 |
-| ML Accuracy | %74.04 | %90+ |
-| ML Sample Count | 1,890 | 3,000+ |
-| Sentiment Dağılımı | Nötr %60, Pozitif %23, Negatif %17 | Nötr <%50, Pozitif/Negatif dengeli |
+| Metrik | Değer | Hedef | Durum |
+|--------|-------|-------|-------|
+| Toplam haber | 1,345 | 2,500+ | ⚠️ %54 |
+| Doğrulanmış | 1,345 (100%) | 100% | ✅ |
+| ML Accuracy (NB Config-B) | 81.99% | 90%+ | ⚠️ +7.95 from start |
+| ML Sample Count | 1,821 train / 272 test | 3,000+ | ⚠️ |
+| Genel F1 Score | 0.651 | ≥0.80 | ⚠️ |
+| Sentiment Dağılımı | Nötr %60, Pozitif %23, Negatif %17 | Dengeli | ⚠️ |
+| Model | Naive Bayes Config-B | LR vs NB karşılaştır | ⚠️ LR denenmedi |
+| ROC-AUC / PR-AUC | Yok | ≥0.92 / ≥0.85 | ❌ Eksik |
 
 ### Kategori Dağılımı (Dengesizlik Sorunu)
 
@@ -366,14 +370,12 @@ Bu %74 accuracy'nin en büyük gizli sebebi. Model dengesizliğini değil, featu
 
 ---
 
-## Faz 4: Doğrulama & Raporlama (Saat 38-48)
+## Faz 4a: Doğrulama & Raporlama (Saat 38-48) — ✅ TAMAMLANDI
 
 **Amaç:** Tüm iyileştirmeleri end-to-end doğrula, rapor oluştur  
-**Öncelik:** 🟢 Kapanış — her şey çalıştıktan sonra  
-**Faz Başı:** `health-check` + `rss-health-monitor` workflow'lar çalıştır (son durum snapshot)  
-**Workflow Applied:** `comprehensive-review` (security + health + performance + test + lint gates + final sprint report)
+**Status:** ✅ Tamamlandı — 6-step checklist passed, accuracy 81.99% locked, model persistence verified
 
-### 4.1 — End-to-End ML Pipeline Testi
+### 4a.1 — End-to-End ML Pipeline Testi (TAMAMLANDI)
 **Workflow:** `comprehensive-review` orchestrate'i (bileşen ve entegrasyon testleri)
 1. RSS scheduler 2 döngü çalıştır (0 hata)
 2. Yeni gelen haberler otomatik kategorilendiriliyor mu?
@@ -382,7 +384,7 @@ Bu %74 accuracy'nin en büyük gizli sebebi. Model dengesizliğini değil, featu
 5. Model consistency: Aynı text iki kez tahmin ettiğinde aynı sonuç veriyor mu?
 6. Tüm kategorilerin PR curve ve ROC AUC metrikleri hesaplanıyor mu?
 
-### 4.2 — Final Metrics Snapshot
+### 4a.2 — Final Metrics Snapshot (TAMAMLANDI)
 ```sql
 -- Bu sorguları çalıştır ve sonuçları kaydet:
 SELECT accuracy, sample_count, trained_at FROM model_state ORDER BY trained_at DESC LIMIT 1;
@@ -390,7 +392,7 @@ SELECT k.ad, COUNT(*) AS total FROM haberler h JOIN kategoriler k ON h.kategori_
 SELECT sentiment, COUNT(*) FROM haberler GROUP BY sentiment;
 ```
 
-### 4.3 — Sprint Raporu (Tez-Ready Metrikleri ile)
+### 4a.3 — Sprint Raporu (kısmi, ROC/AUC pending Faz 4b'den)
 - **Başlangıç vs bitiş metrikleri tablosu:**
   | Metrik | Start | End | Gelişim |
   |--------|-------|-----|----------|
@@ -415,12 +417,12 @@ SELECT sentiment, COUNT(*) FROM haberler GROUP BY sentiment;
 - **Yapılan değişikliklerin commit listesi**
 - **Kalan sorunlar ve sonraki adımlar**
 
-### 4.4 — Dokümantasyon Güncellemesi
+### 4a.4 — Dokümantasyon (Pending post-Faz 4b)
 - `docs/ml-improvement-plan.md` güncelle (mevcut durumu yansıtsın)
 - `PERFORMANCE_AUDIT.md` ML bölümü ekle
 - `README.md` ML accuracy metriğini güncelle
 
-### Doğrulama Kriteri (Final Verification-Before-Completion)
+### Doğrulama Kriteri 4a (Final Verification-Before-Completion)
 ```
 ✅ comprehensive-review workflow passed (security + health + perf audit)
 ✅ Sprint raporu hazır (başlangıç vs bitiş metrikleri, tez-ready visualizations)
@@ -432,31 +434,276 @@ SELECT sentiment, COUNT(*) FROM haberler GROUP BY sentiment;
 
 ---
 
-## Özet: Faz Geçiş Şartları
+## Faz 4b: Auth Infrastructure & Metric Endpoints (~5-6 saat) — NEXT PRIORITY
 
-```
-Faz 0 (3h)  ──[0 RSS hatası]──►  Faz 1 (13h)  ──[her kategori >=200]──►  Faz 2 (12h)  ──[accuracy >=88%]──►  Faz 3 (10h)  ──[model seçildi]──►  Faz 4 (10h)
-```
+**Amaç:** `/api/ml/categorize` public yap (RSS scheduler + inference); ROC/PR/AUC metrikleri implement et  
+**Öncelik:** 🔴 Kritik — kategorize public olmadan frontend/RSS bloklı; metrikler tez validation için lazım  
+**Faz Başı:** health-check workflow çalıştır
 
-| Faz | Süre | Giriş Koşulu | Çıkış Koşulu |
-|-----|------|-------------|--------------|
-| 0 | ~3h | Başlangıç | RSS 0 hata, structured error logs aktif |
-| 1 | ~13h (+ saat 10 checkpoint) | RSS stabil | Her kategori ≥200, toplam ≥2,000, quota check OK |
-| 2 | ~12h | Veri hazır, Türkçe stemmer fixed | Temporal accuracy ≥%88, F1 ≥0.80, data leakage-free |
-| 3 | ~14h | Baseline güçlü | Model seçildi, Docker restart OK, production-active |
-| 4 | ~10h | Model hazır | ROC/PR curves + rapor + commit + tez-ready metrikleri |
+### 4b.1 — Auth Selective Fix (Seçenek 2) — 30 min
+**Sorun:** `/api/ml/*` tamamı authMiddleware → `/categorize` public olmalı  
+**Çözüm Yaklaşımı:** Route-level middleware  
+- Option A: `ml.controller.ts`'de override (cleanest)
+- Option B: `index.ts`'de separate mounts (explicit but duplication)  
+**Verification:** `POST /categorize (no token)` → 200 | `POST /train (no token)` → 401
+
+### 4b.2 — Docker Backend Healthcheck — 10 min
+**Action:** docker-compose.yml'de backend healthcheck ekle (GET /api/health)  
+**Verification:** `docker inspect backend --format='{{.State.Health.Status}}'` → healthy
+
+### 4b.3 — GET /api/ml/status Endpoint (Public) — 30 min
+**Returns:** accuracy, sample_count, trained_at, version, preprocessing_mode, model_type  
+**Verification:** `GET /api/ml/status (no token)` → 200, model metadata
+
+### 4b.4 — POST /api/ml/evaluate Endpoint — 90 min
+**Returns:** per-class P/R/F1, confusion matrix, overall accuracy  
+**Verification:** `POST /api/ml/evaluate (admin)` → 200, detailed metrics
+
+### 4b.5 — ROC/PR Curve Metrics (One-vs-Rest) — 120 min
+**Returns:** ROC-AUC macro, PR-AUC macro, per-category curves  
+**Verification:** AUC values >= 0.75 (baseline NB expected)  
+**Gate:** If overall macro ROC-AUC < 0.72 → fallback to baseline detailed analysis needed
+
+### 4b.6 — Confusion Matrix JSON Persistence — 30 min
+**Endpoint:** GET /api/ml/confusion-matrix → JSON heatmap-ready  
+**Verification:** Per-category rows = per-category cols, diagonal >= off-diagonal
+
+### Doğrulama Kriteri 4b (Verification-Before-Completion)
+```
+✅ Auth fix: /categorize public (no token), /train protected (401)
+✅ Docker healthcheck active and reporting healthy
+✅ GET /api/ml/status accessible, returns accuracy + model_type
+✅ POST /api/ml/evaluate returns per-class metrics + confusion matrix
+✅ ROC/AUC endpoints working, macro AUC >= 0.75
+✅ /confusion-matrix JSON valid and queryable
+```
 
 ---
 
-## Risk & Fallback
+## Faz 5: Model Expansion & Data Volume (~10-14 saat, SEQUENTIAL)
 
-| Risk | Olasılık | Etki | Fallback |
-|------|----------|------|----------|
-| Gemini quota tükenir | Yüksek | Backfill yavaşlar | Ollama-primary batch'e geç |
-| RSS kaynağı kapanır | Düşük | ~5% veri kaybı | Diğer kaynaklar kompanse eder |
-| Accuracy %90'ı bulamaz | Orta | Hedef kaçar | %85+ kabul edilebilir, raporda belirt |
-| SVM/LR fark yaratmaz | Orta | Ekstra iş boşa gider | NB ile kal, Faz 3'ü kısa tut |
-| Docker restart veri kaybı | Düşük | Model eğitimi sıfırlanır | model_state persist zaten var |
+**Amaç:** Accuracy %85%+ (LR benchmark THEN augmentation); her adımın katkısını isolation'da ölçmek  
+**Öncelik:** 🟡 Yüksek — sprint hedeflerine yakın; tez reporting için step-by-step tracking  
+**Metodoloji:** Sequential 5a → 5b (paralel değil, bağımlı) — her adımdan sonra verification gate
+**Faz Başı:** /api/ml/evaluate run ve Faz 4b metrikleri baseline al
+
+---
+
+### 5a: LR vs NB Benchmark — STEP 1 (2-3 saat)
+**Amaç:** Mevcut data ile (augmentation HENÜZ YOK) sadece model'ı LR'ye swap. LR'nin isolated delta'sını ölç.
+
+**5a.1** — LogisticRegression benchmark
+- Komut: `npx ts-node scripts/balance-training-data.ts --config=B --model=lr --seed=42`
+- Same data: mevcut 1,345/272 train/test split (temporal)
+- Output: accuracy, F1-macro, confusion matrix, per-category F1
+- **Record:** NB performance vs LR performance aynı test set'te
+
+**5a.2** — Decision & Reporting
+- LR > NB by ≥1%: Switch to LR (schema migration + factory pattern)
+- LR ≈ NB (±0.5%): Keep NB (simpler, no migration costs)
+- LR < NB: Keep NB
+- **Tez raporu:** "LR delta: X% (from 81.99% NB baseline)"
+
+**5a.3** — Schema migration (if LR wins)
+- `prisma/schema.prisma`: model_state'e `model_type` kolonu ekle
+- `ml.service.ts`: factory pattern `getClassifier(type)` → model startup'ta model_type'a göre seçim
+- Docker restart test: Model DB'den correct ML type yükleniyor mu?
+
+**Verification Gate (5a output):**
+```
+✅ LR tested: --config=B --model=lr --seed=42 çalıştırıldı
+✅ Decision logged: LR vs NB comparison table (accuracy, F1, decision)
+✅ model_type schema: migration done (if LR selected)
+✅ Model loads correct type on startup: Docker restart test passed
+✅ 5a completed metric: NB 81.99% | LR [X]% | Delta [+Y%]
+```
+
+**Timeline:** ~2-3 saat (benchmark + migration + test)
+
+---
+
+### 5b: Data Augmentation & Category Balancing — STEP 2 (5-8 saat, AFTER 5a DONE)
+**Amaç:** LR'nin (or selected model) üzerinde +374 artikel + paraphrase ekle. **Sadece augmentation'ın** katkısını ölç.
+
+**5b.1** — LLM Backfill Script Recovery
+- Git history kontrolü: backfill script 4b sırasında yazıldı mı? varsa recover et
+- Yoksa: `backend/src/scripts/llm-backfill.ts` yeniden oluştur
+  - Target: +374 artikel (toplam 1,345 + 374 = 1,719)
+  - Focus: weak categories (Sağlık, Siyaset, Ekonomi) öncelikli
+  - Method: LLM (Gemini/Ollama) ile yeni haberler generate + categorize
+- **Komut:** `npx ts-node src/scripts/llm-backfill.ts --gemini-limit=400 --target=374`
+
+**5b.2** — Dataset Augmentation (Paraphrase)
+- Zayıf kategorilerden (F1 < 0.75 from 5a) 50+ örnek LLM paraphrase et
+- Augmented örnekleri ayrı flag ile dataset'e ekle (`augmented: true`)
+- Kategoriye özgü diversity: başlık + özet yeniden ifade edilsin
+- Veri leakage guard: augmented örnekler test set'e girmemeli (temporal split maintained)
+
+**5b.3** — Category Balancing & Leakage Check
+```sql
+-- Post-augmentation check:
+SELECT k.ad, COUNT(*) as total, 
+       SUM(CASE WHEN h.augmented_at IS NULL THEN 1 ELSE 0 END) as native,
+       SUM(CASE WHEN h.augmented_at IS NOT NULL THEN 1 ELSE 0 END) as augmented
+FROM haberler h JOIN kategoriler k ON h.kategori_id=k.id 
+WHERE kategori_dogrulandi=true 
+GROUP BY k.ad ORDER BY total;
+```
+- Hedef: Her kategori ≥ 250 (native + augmented)
+- Dengesizlik: max 1.5x (best case 1.3x)
+- Leakage: Temporal split korunuyor mu? (augmented_at > train cutoff date ise skip test set)
+
+**Verification Gate (5b output):**
+```
+✅ Backfill: +374 articles added (git recover or recreate done)
+✅ Augmentation: 50+ examples paraphrased (weak categories focused)
+✅ Category balance: each ≥ 250, dengesizlik < 1.5x
+✅ Leakage guard: augmented examples not in test set
+✅ 5b completed metric: After-augmentation accuracy [Z]% | Non-augmented [X]% | Augmentation delta [+W%]
+```
+
+**Timeline:** ~5-8 saat (backfill + paraphrase + retraining + verification)
+
+---
+
+### Faz 5 Output Summary & Tez Reporting
+**Isolation Breakdown (raporlanacak):**
+
+| Aşama | Model | Data | Accuracy | F1-Macro | Delta | Rapor |
+|-------|-------|------|----------|----------|-------|-------|
+| Baseline | NB | 1,345 | 81.99% | ? | — | "Temporal split, leakage-free" |
+| 5a done | **LR** | 1,345 | **X%** | **?** | **+Y%** | "LR delta: +Y% (isolated, same data)" |
+| 5b done | **LR** | 1,719 | **Z%** | **?** | **+W%** | "Augmentation delta: +W% (isolated)" |
+| **Total gain** | LR | 1,719 | **Z%** | **?** | **+E% total** | "5a (+Y%) + 5b (+W%) = +E% from baseline" |
+
+**Doğrulama Kriteri 5 (Verification-Before-Completion):**
+```
+✅ 5a GATE PASSED: LR tested, decision taken, model_type deployed
+✅ 5b GATE PASSED: Data volume 1,719+, per-category ≥ 250, leakage 0
+✅ Accuracy progression documented:
+   - NB baseline: 81.99%
+   - After LR: X% (delta: +Y%)
+   - After augmentation: Z% (delta: +W%, LR-only data)
+✅ Target hit: Z% >= 85% (or best achieved + justified)
+✅ Faz 6 decision: if Z% >= 85% → go to Faz 6 (conditional) or finish
+                   if Z% < 85% → Faz 6 mandatory (hard-negative mining)
+✅ Tez raporlanabilir: step-by-step katkı breakdown clear
+```
+
+**Timeline:** ~10-14 saat toplam (5a: 2-3h + 5b: 5-8h + verification/doc: 2-3h)
+
+---
+
+---
+
+## Faz 6: Fine-Tuning & Tez Readiness (Conditional, 4-6 saat)
+
+**Trigger:** If Faz 5 accuracy < 85%  
+**Optional:** If accuracy >= 85%, proceed directly to Tez documentation (skip 6)
+
+**Amaç:** Confusion matrix'te top misclassification pairs'i targeted retraining ile onarım → %90+ accuracy push  
+**Tez Reporting:** Incremental gains documented (5a LR delta + 5b augmentation delta + 6 fine-tuning delta)
+
+### 6.1 — Hard-Negative Active Learning (Primary)
+**Methodology:** Confusion matrix'te en yüksek off-diagonal hücreleri target et
+
+**6.1.1** — Top Misclassification Pairs Analiz
+- Faz 5b confusion matrix'ten: hangi kategori pairs'lerinde model en çok yanıyor?
+- Örnek: "Siyaset 30→Genel 8" (8 Siyaset haberi Genel olarak yanlış tahmin)
+- Top 3 pair'i seç (8 başlığından kapat)
+
+**6.1.2** — Targeted Hard-Negative Collection
+- Top 3 pair'in her birinden 20-30 örnek manuel olarak seç/düzelt
+- Gold-label: correct category olarak işaretle
+- LLM yardımı: benzer hard examples generate et (paraphrase ile 2-3x çoğalt)
+- Dataset'e `hard_negative: true` flag ile ekle
+
+**6.1.3** — Re-train on Combined Data
+- Original 1,719 + hard negatives (~100-150) = ~1,850 toplam
+- Aynı temporal split maintained
+- Accuracy check: X% → Y% (delta rapor edilir)
+
+**Verification:** Top 3 misclassification pairs çok azalmış (off-diagonal < %5)
+
+### 6.2 — Category-Specific Tuning (Optional, if still < 88%)
+**Trigger:** 6.1 sonrası accuracy < 88% ise
+
+- **Siyaset/Ekonomi sentiment refinement:** Kategori-spesifik keyword sets
+- **Sağlık domain keywords:** Medical terms (antibiyotik, aşı, tedavi, etc.)
+- Feature engineering: kategori-aware token weighting
+
+### 6.3 — Visualizations for Thesis
+**Tez submission için raporlanacak:**
+- Confusion matrix heatmap (7×7, side-by-side: before/after 6)
+- ROC curves (all 7 classes + macro)
+- Precision-Recall curves (all 7 classes + macro)
+- Per-category F1 bar chart (before/after progression)
+- Accuracy progression: 81.99% (NB baseline) → LR → augmented → fine-tuned
+
+### Doğrulama Kriteri 6 (Verification-Before-Completion)
+```
+✅ Hard-negative mining: top 3 pairs identified + fixed
+✅ Dataset size: 1,850+ articles, balanced, leakage 0
+✅ Accuracy: >= 88% (if 6 triggered)
+✅ Confusion matrix: off-diagonal < %5 for top pairs
+✅ Tez visualizations: heatmap, ROC, PR, F1 bar charts ready
+✅ Final report: step-by-step accuracy breakdown (5a + 5b + 6 deltas)
+```
+
+**Timeline:** ~4-6 saat (analysis + collection + retraining + visualizations)
+
+---
+
+## Özet: Faz Geçiş Şartları & Accuracy Progression (UPDATED)
+
+```
+Faz 0 ✅  →  Faz 1 ⚠️  →  Faz 2 ✅  →  Faz 3 ⚠️  →  Faz 4a ✅  →  Faz 4b ✅  →  Faz 5 (sequential)  →  Faz 6 (conditional)
+```
+
+| Faz | Süre | Status | Baseline | Output | Hedef | Koşul |
+|-----|------|--------|----------|--------|-------|-------|
+| 0 | ~3h | ✅ DONE | N/A | RSS 0 hata | RSS stable | - |
+| 1 | ~13h | ⚠️ PARTIAL | N/A | 1,345 articles | 2,000+ | Every category ≥200 |
+| 2 | ~12h | ✅ DONE | %74.04 | 81.99% (temporal split) | ≥88% | 0 leakage, F1 ≥0.80 |
+| 3 | ~14h | ⚠️ PARTIAL | 81.99% | Config B ✅ | Model chosen | Docker restart OK |
+| 4a | ~10h | ✅ DONE | 81.99% | 81.99% locked | Validation done | 6-step checklist |
+| 4b | ~5-6h | ✅ DONE | N/A | Auth + metrics | Infrastructure | ROC/AUC ready |
+| **5a (STEP 1)** | **~2-3h** | ❌ NEXT | 81.99% (NB) | **X% (LR)** | LR delta ≥+1% | 5a gate passed |
+| **5b (STEP 2)** | **~5-8h** | ⏳ AFTER 5a | X% (LR only) | **Z% (LR + augment)** | Z% ≥ 85% | 5b gate passed |
+| 6 (conditional) | ~4-6h | ⏳ IF <85% | Z% | Z% ≥ 88% | Visualizations | If Z% < 85% |
+
+**Accuracy Progression (STEP-BY-STEP):**
+```
+NB (Faz 2)          81.99%
+├─ 5a: LR switch    X% (delta: +Y% from LR only)
+│  AND
+├─ 5b: Augmentation Z% (delta: +W% from augmented data)
+│  Total: 81.99% + Y% + W% = Z%
+│
+├─ If Z% >= 85%     → SKIP Faz 6, go Tez documentation
+└─ If Z% < 85%      → Faz 6 (hard-negative mining) target 88%+
+```
+
+---
+
+---
+
+### Doğrulama Kriteri 4b (Final Verification-Before-Completion)
+
+---
+
+## Risk & Fallback (UPDATED)
+
+| Risk | Olasılık | Etki | Fallback | Faz |
+|------|----------|------|---------|-----|
+| Auth fix işe yaramaz | Düşük | /categorize hâlâ protected | Route-level middleware alternatif | 4b |
+| LR NB'den kötü olur | Düşük | LR benchmarking boşa gider | NB ile kal, Faz 5 kısa tut | 5a |
+| Gemini quota tükenir | Yüksek | Backfill yavaşlar | Ollama-primary switch | 5b |
+| Accuracy %85'i bulamaz | Orta | Faz 6 push gerekebilir | 81.99% baseline + incremental gains belirt | 5→6 |
+| Data volume %54 kalırsa | Orta | Balanced training impossible | RSS kaynakları refresh, ek feed ekle | 5b |
+| Docker restart veri kaybı | Düşük | Model eğitimi sıfırlanır | model_state persist (already active) | all |
+| ROC/AUC hesapları yavaş | Düşük | Evaluation endpoint timeout | Async calculation + caching | 4b |
+| LLM backfill script kayıp | Orta | Veri hacmi hedefi elden gider | Git recover veya yeniden oluştur | 5b |
 
 ---
 
@@ -499,25 +746,26 @@ cat .agent/workflows/comprehensive-review.md # Full-stack audit + report
 
 ---
 
-## Skills & Workflow Integration
+## Skills & Workflow Integration (UPDATED — Post-Faz 4a)
 
-**Sprint sırasında aktif olacak skill/workflow'lar:**
+**Sprint sırasında aktif olacak skill/workflow'lar (Faz 4b + 5 + Conditional 6):**
 
 | Faz | Skill/Workflow | Amaç | Trigger |
-|-----|---|---|---|
-| **Faz 0** | `systematic-debugging` | Text.replace root cause analizi (4-faz debug) | Reusable RSS error analysis metodolojisi |
-| **Faz 0** | `rss-health-monitor` | Tüm RSS kaynakları audit (ping, error categorization) | Faz 0 başında + Faz 1 checkpoint'te |
-| **Faz 0-4** | `health-check` | API/DB/LLM connectivity gate | Her faz başlangıcında |
-| **Faz 1** | `dataset-quality-guard` | Class imbalance audit, noise/mislabel tespiti | Dataset backfill sonrası |
-| **Faz 1-4** | `verification-before-completion` | Fresh SQL/test çalıştırarak faz çıkış doğrulaması | Her faz kapanırken |
-| **Faz 3** | (N-gram karşılaştırması) | Feature preprocessing variant test (A/B/C) | Model seçimi öncesi |
-| **Faz 4** | `comprehensive-review` | Full-stack audit orchestrator (security+health+perf+test) | Sprint final checkpoint |
+|-----|---|---|------|
+| **Faz 4b** | (Altyapı hardening) | Auth selective, healthcheck, metrics endpoints | Security + observability gate |
+| **Faz 4b→5** | `health-check` | API/DB/LLM connectivity gate pre-Faz 5 | Faz 5 başında |
+| **Faz 5a** | (Model comparison) | LR vs NB benchmark, winner selection | Model expansion başlangıcında |
+| **Faz 5b** | (Data augmentation) | LLM backfill recovery, category balancing | Data volume optimization |
+| **Faz 5 end** | `verification-before-completion` | accuracy >= 85%, per-category coverage audit | Faz 5 çıkışı gate |
+| **Faz 6** (conditional) | `systematic-debugging` | Confusion matrix targeted analysis (top 3 pairs) | Accuracy gap analysis |
+| **Faz 6 end** | `comprehensive-review` | Full-stack audit + tez-ready report | Final checkpoint |
 
-**Yararları:**
-- ✅ Doğrulama adımları otomatize (insan hatası azalır)
-- ✅ Root cause debug metodolojiler reusable (sonraki sprint'lerde de kullanılabilir)
-- ✅ Data quality gatekeeping (model training'den önce garbage filtering)
-- ✅ Production readiness certification (docker restart, health checks)
-- ✅ Final report orchestration (tez'e dönem özeti hazırlığı)
+**Yararları (Post-Faz 4a Focus):**
+- ✅ Auth security hardening (public/protected route separation)
+- ✅ Observability infrastructure (metrics, status, evaluate endpoints)
+- ✅ Model variant tracking (model_type schema, LR vs NB auditable)
+- ✅ ROC/AUC validation certification (tez için thesis-grade metrics)
+- ✅ Data quality at scale (1,800+ articles balanced)
+- ✅ Incremental accuracy tracking (81.99% → 85%+ → 90%+ path visible)
 
 | Türkçe stopwords yetersiz | Orta | Noise filtering başarısız | Train sonrası frequency logs analizi: top 50 tokenları tespit et, <3 frekans olanları stopwords'e ekle |

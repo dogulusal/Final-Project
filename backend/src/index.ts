@@ -83,7 +83,7 @@ app.get('/api/ready', asyncHandler(async (_req, res) => {
 }));
 
 import { rssRouter } from './modules/rss';
-import { mlRouter } from './modules/ml';
+import { mlPublicRouter, mlProtectedRouter } from './modules/ml';
 import { llmRouter } from './modules/llm';
 import { renderRouter } from './modules/render';
 import { newsRouter } from './modules/news';
@@ -94,7 +94,9 @@ import { createLoginResponse } from './common/auth';
 import { loginLimiter } from './middleware/rate-limiters';
 
 app.use('/api/rss', rssRouter);
-app.use('/api/ml', authMiddleware, mlRouter);
+// ML Routes: /categorize and /status are PUBLIC; /train and /evaluate require auth
+app.use('/api/ml', mlPublicRouter);
+app.use('/api/ml', authMiddleware, mlProtectedRouter);
 app.use('/api/llm', authMiddleware, llmRouter); // LLM kotası koruma: yetkisiz çağrı = Gemini maliyeti
 app.use('/api/news', newsRouter);
 app.use('/api/render', renderRouter);

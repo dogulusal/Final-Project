@@ -14,7 +14,8 @@
         "prisma:studio": "prisma studio",
         "prisma:seed": "ts-node prisma/seed.ts",
         "migration:sanitize": "ts-node src/scripts/sanitize-existing-news.ts",
-        "training:generate": "ts-node src/scripts/generate-training-data.ts"
+        "training:generate": "ts-node src/scripts/generate-training-data.ts",
+        "ml:benchmark:faz5a": "ts-node scripts/benchmark-faz5a.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"

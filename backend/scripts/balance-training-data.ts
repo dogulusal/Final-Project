@@ -72,6 +72,12 @@ function calculateMetrics(predictions: Array<{ actual: string; predicted: string
     return { accuracy, metrics };
 }
 
+function calculateMacroF1(metrics: Record<string, { f1: number }>): number {
+    const values = Object.values(metrics).map(m => m.f1);
+    if (values.length === 0) return 0;
+    return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
 function upsample(examples: TrainingExample[], targetCount: number): TrainingExample[] {
     if (examples.length === 0) return [];
     const result: TrainingExample[] = [...examples];
@@ -81,12 +87,26 @@ function upsample(examples: TrainingExample[], targetCount: number): TrainingExa
     return result.slice(0, targetCount);
 }
 
+function seededShuffle<T>(array: T[], seed: number): T[] {
+    const arr = [...array];
+    let s = seed;
+    for (let i = arr.length - 1; i > 0; i--) {
+        s = (s * 1664525 + 1013904223) & 0xffffffff;
+        const j = Math.abs(s) % (i + 1);
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
 async function main() {
     console.log(`\n[Faz3] === N-gram + Model Karşılaştırması ===`);
     console.log(`[Faz3] Config: ${selectedConfig} | Model: ${selectedModel.toUpperCase()}\n`);
     
     const approvedNews = await prisma.haber.findMany({
-        where: { durum: { in: ['hazir', 'yayinda'] } },
+        where: {
+            durum: { in: ['hazir', 'yayinda'] },
+            kategoriDogrulandi: true,
+        },
         select: {
             baslik: true,
             metaAciklama: true,
@@ -133,11 +153,13 @@ async function main() {
         balanced.push(...sampled);
     }
 
-    const shuffled = balanced.sort(() => 0.5 - Math.random());
+    const SPLIT_SEED = 42;
+    const shuffled = seededShuffle(balanced, SPLIT_SEED);
     const splitIdx = Math.floor(shuffled.length * 0.8);
     const trainSet = shuffled.slice(0, splitIdx);
     const testSet = shuffled.slice(splitIdx);
 
+    console.log(`[Faz3] Split sabitlendi - seed: ${SPLIT_SEED}`);
     console.log(`[Faz3] Train: ${trainSet.length} | Test: ${testSet.length}`);
 
     const Classifier = selectedModel === 'lr' 
@@ -170,9 +192,239 @@ async function main() {
     });
 
     const { accuracy, metrics } = calculateMetrics(predictions, categories);
+    const macroF1 = calculateMacroF1(metrics);
+
+    // -- Confusion Matrix --------------------------------------------------
+    const confusionMatrix: Record<string, Record<string, number>> = {};
+    categories.forEach(cat => {
+        confusionMatrix[cat] = {};
+        categories.forEach(other => {
+            confusionMatrix[cat][other] = 0;
+        });
+    });
+
+    predictions.forEach(({ actual, predicted }) => {
+        if (confusionMatrix[actual] && confusionMatrix[actual][predicted] !== undefined) {
+            confusionMatrix[actual][predicted]++;
+        }
+    });
+
+    const targetCategories = ['Siyaset', 'Genel'];
+    console.log('\n[Faz3] -- Confusion Matrix (Siyaset & Genel) --');
+    targetCategories.forEach(target => {
+        const row = confusionMatrix[target];
+        if (!row) {
+            return;
+        }
+
+        const total = Object.values(row).reduce((a, b) => a + b, 0);
+        if (total === 0) {
+            console.log(`\n  Gercek: ${target} (0 ornek)`);
+            return;
+        }
+
+        console.log(`\n  Gercek: ${target} (toplam ${total} ornek)`);
+        categories
+            .filter(cat => cat !== target)
+            .sort((a, b) => row[b] - row[a])
+            .forEach(cat => {
+                if (row[cat] > 0) {
+                    const pct = ((row[cat] / total) * 100).toFixed(1);
+                    console.log(`    -> ${cat.padEnd(12)} ${row[cat]} ornek  (${pct}%)`);
+                }
+            });
+
+        const correctByTarget = row[target] || 0;
+        console.log(`    + Dogru       ${correctByTarget} ornek  (${((correctByTarget / total) * 100).toFixed(1)}%)`);
+    });
+
+    console.log('\n[Faz3] -- Hard-Negative Pairs (oncelik sirasi) --');
+    const hardNegatives: Record<string, number> = {};
+    predictions.forEach(({ actual, predicted }) => {
+        if (targetCategories.includes(actual) && actual !== predicted && categories.includes(predicted)) {
+            const key = `${actual} -> ${predicted}`;
+            hardNegatives[key] = (hardNegatives[key] || 0) + 1;
+        }
+    });
+    Object.entries(hardNegatives)
+        .sort(([, a], [, b]) => b - a)
+        .forEach(([pair, count]) => {
+            console.log(`  ${pair.padEnd(25)} ${count} ornek`);
+        });
+
+    // -- Genel->Siyaset: Otomatik Kova Ayirici ----------------------------
+    const siyasetSinyalleri = [
+        'meclis', 'bakan', 'parti', 'milletvekili', 'yasa', 'secim',
+        'muhalefet', 'iktidar', 'cumhurbaskan', 'anayasa', 'hukumet',
+        'protesto', 'gosteri', 'yargi', 'dava', 'mahkeme', 'tutuklama'
+    ];
+
+    // Leakage guard: hard-negative havuzu sadece train setinden üretilir.
+    const trainPredictions: Array<{ actual: string; predicted: string }> = [];
+    trainSet.forEach(item => {
+        const tokens = preprocessText(item.text, selectedConfig);
+        const processedText = tokens.join(' ');
+        try {
+            const predicted = classifier.classify(processedText);
+            trainPredictions.push({ actual: item.category, predicted });
+        } catch (e) {
+            trainPredictions.push({ actual: item.category, predicted: 'unknown' });
+        }
+    });
+
+    const muhtemelMislabeled: typeof trainSet = [];
+    const gercekGenel: typeof trainSet = [];
+
+    trainSet.forEach((item, idx) => {
+        const predicted = trainPredictions[idx];
+        if (!predicted) {
+            return;
+        }
+        if (predicted.actual === 'Genel' && predicted.predicted === 'Siyaset') {
+            const textLower = item.text.toLowerCase();
+            const sinyalSayisi = siyasetSinyalleri.filter(k => textLower.includes(k)).length;
+            if (sinyalSayisi >= 2) {
+                muhtemelMislabeled.push(item);
+            } else {
+                gercekGenel.push(item);
+            }
+        }
+    });
+
+    console.log('\n[Faz3] -- Kova Analizi --');
+    console.log(`  Muhtemel mislabeled (Siyaset olmali): ${muhtemelMislabeled.length}`);
+    muhtemelMislabeled.forEach((item, i) => {
+        console.log(`  [${i + 1}] ${item.text.substring(0, 100)}...`);
+    });
+
+    console.log(`\n  Gercek Genel (hard-negative adayi): ${gercekGenel.length}`);
+    gercekGenel.forEach((item, i) => {
+        console.log(`  [${i + 1}] ${item.text.substring(0, 100)}...`);
+    });
+
+    // -- Genel->Saglik: Kova Ayirici -------------------------------------
+    const saglikSinyalleri = [
+        'hastane', 'doktor', 'hasta', 'tedavi', 'ilac', 'saglik bakanligi',
+        'sağlık bakanlığı', 'klinik', 'ameliyat', 'tani', 'teşhis', 'teshis', 'asi', 'aşı',
+        'pandemi', 'salgin', 'salgın', 'hemsire', 'hemşire', 'acil', 'yogun bakim', 'yoğun bakım',
+        'kanser', 'diyabet', 'obezite'
+    ];
+
+    const muhtemelMislabeledSaglik: typeof trainSet = [];
+    const gercekGenelSaglik: typeof trainSet = [];
+
+    trainSet.forEach((item, idx) => {
+        const predicted = trainPredictions[idx];
+        if (!predicted) {
+            return;
+        }
+        if (predicted.actual === 'Genel' && predicted.predicted === 'Sağlık') {
+            const textLower = item.text.toLowerCase();
+            const sinyalSayisi = saglikSinyalleri.filter(k => textLower.includes(k)).length;
+            if (sinyalSayisi >= 2) {
+                muhtemelMislabeledSaglik.push(item);
+            } else {
+                gercekGenelSaglik.push(item);
+            }
+        }
+    });
+
+    console.log('\n[Faz3] -- Kova Analizi: Genel -> Saglik --');
+    console.log(`  Muhtemel mislabeled (Saglik olmali): ${muhtemelMislabeledSaglik.length}`);
+    muhtemelMislabeledSaglik.forEach((item, i) => {
+        console.log(`  [${i + 1}] ${item.text.substring(0, 100)}...`);
+    });
+
+    console.log(`\n  Gercek Genel (hard-negative adayi): ${gercekGenelSaglik.length}`);
+    gercekGenelSaglik.forEach((item, i) => {
+        console.log(`  [${i + 1}] ${item.text.substring(0, 100)}...`);
+    });
+
+    // -- Hard-Negative Injection ------------------------------------------
+    const hardNegativePool = [...gercekGenel, ...gercekGenelSaglik];
+
+    console.log('\n[Faz3] -- Hard-Negative Injection --');
+    console.log(`  Havuz: ${hardNegativePool.length} ornek Genel egitimine ekleniyor`);
+
+    const existingTexts = new Set(trainSet.map(i => i.text));
+    let injectedCount = 0;
+    hardNegativePool.forEach(item => {
+        if (!existingTexts.has(item.text)) {
+            trainSet.push({ ...item, category: 'Genel' });
+            existingTexts.add(item.text);
+            injectedCount++;
+        }
+    });
+    console.log(`  Eklenen (duplicate haric): ${injectedCount}`);
+
+    // Mislabeled duzeltme (manuel - kova analizinde Siyaset olmasi gerekenler)
+    let mislabeledFixed = 0;
+    muhtemelMislabeled.forEach(item => {
+        const idx = trainSet.findIndex(t => t.text === item.text);
+        if (idx !== -1) {
+            if (trainSet[idx].category !== 'Siyaset') {
+                trainSet[idx].category = 'Siyaset';
+                mislabeledFixed++;
+            }
+        } else {
+            trainSet.push({ ...item, category: 'Siyaset' });
+            existingTexts.add(item.text);
+            mislabeledFixed++;
+        }
+    });
+    console.log(`  Mislabeled duzeltme: ${mislabeledFixed} ornek Siyaset'e tasindi`);
+    console.log(`  Yeni training set boyutu: ${trainSet.length}`);
+
+    // Ikinci tur egitim: injection ve mislabeled duzeltme sonrasi
+    const classifierRound2 = new Classifier();
+    trainSet.forEach((item) => {
+        const tokens = preprocessText(item.text, selectedConfig);
+        const processedText = tokens.join(' ');
+        classifierRound2.addDocument(processedText, item.category);
+    });
+    classifierRound2.train();
+
+    const predictionsRound2: Array<{ actual: string; predicted: string }> = [];
+    testSet.forEach((item) => {
+        const tokens = preprocessText(item.text, selectedConfig);
+        const processedText = tokens.join(' ');
+        try {
+            const predicted = classifierRound2.classify(processedText);
+            predictionsRound2.push({ actual: item.category, predicted });
+        } catch (e) {
+            predictionsRound2.push({ actual: item.category, predicted: 'unknown' });
+        }
+    });
+
+    const { accuracy: accuracyRound2, metrics: metricsRound2 } = calculateMetrics(predictionsRound2, categories);
+    const genelToSiyasetRound2 = predictionsRound2.filter(p => p.actual === 'Genel' && p.predicted === 'Siyaset').length;
+    const genelF1Round2 = metricsRound2['Genel']?.f1 ?? 0;
+
+    console.log('\n[Faz3] -- Ikinci Tur Sonuclari (Injection Sonrasi) --');
+    console.log(`  Eklenen hard-negative sayisi: ${injectedCount}`);
+    console.log(`  Yeni Genel F1: ${genelF1Round2.toFixed(3)}`);
+    console.log(`  Genel->Siyaset pair sayisi: ${genelToSiyasetRound2}`);
+    console.log(`  Ikinci tur accuracy: %${(accuracyRound2 * 100).toFixed(2)}`);
+
+    // -- Hard-Negative Ornek Ciktisi (Genel -> Siyaset, train-only) ------
+    console.log('\n[Faz3] -- Hard-Negative Ornekler: Genel -> Siyaset (train-only) --');
+    let hnCount = 0;
+    trainSet.forEach((item, idx) => {
+        const predicted = trainPredictions[idx];
+        if (!predicted) {
+            return;
+        }
+        if (predicted.actual === 'Genel' && predicted.predicted === 'Siyaset') {
+            const source = (item as any).source || 'bilinmiyor';
+            console.log(`\n  [${++hnCount}] ${item.text.substring(0, 120)}...`);
+            console.log(`      Kaynak: ${source}`);
+        }
+    });
+    console.log(`\nToplam Genel->Siyaset hard-negative: ${hnCount}`);
 
     console.log(`\n[Faz3] === METRIKLERI ===`);
     console.log(`[Faz3] Accuracy: %${(accuracy * 100).toFixed(2)}`);
+    console.log(`[Faz3] Macro-F1: ${macroF1.toFixed(3)}`);
     console.log(`\n[Faz3] Per-Category F1:`);
     
     Object.entries(metrics)
