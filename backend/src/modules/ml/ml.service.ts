@@ -84,8 +84,9 @@ export class MlCategorizationService implements INewsCategorizationService {
      */
     private preprocessText(text: string, type: 'unigram' | 'bigram' = 'unigram'): string[] {
         // Normalize ve tokenize
-        const normalized = text.toLowerCase().trim();
-        const tokens = normalized.match(/\b\w+\b/g) || [];
+        const normalized = text.toLowerCase().normalize('NFC').trim();
+        // Unicode-aware tokenization: Turkish diacritics and letters are preserved.
+        const tokens = normalized.match(/[\p{L}\p{N}]+/gu) || [];
         
         if (type === 'unigram') {
             return tokens;
