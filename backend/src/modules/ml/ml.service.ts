@@ -26,6 +26,8 @@ interface HardNegativeBatchSummary {
     genelToSiyaset: number;
     siyasetToGenel: number;
     siyasetToTeknoloji: number;
+    siyasetToDunya: number;
+    siyasetToEkonomi: number;
     totalInjected: number;
 }
 
@@ -149,6 +151,8 @@ export class MlCategorizationService implements INewsCategorizationService {
             return siyasetHit >= 1 && teknolojiHit >= 1;
         });
 
+
+
         const injectFromPool = (pool: TrainingData[], target: number): number => {
             if (pool.length === 0 || target <= 0) return 0;
             // Limit duplicate amplification on tiny pools to reduce overfitting risk.
@@ -165,11 +169,15 @@ export class MlCategorizationService implements INewsCategorizationService {
         const genelToSiyaset = injectFromPool(genelPool, 14);
         const siyasetToGenel = injectFromPool(siyasetPool, 10);
         const siyasetToTeknoloji = injectFromPool(siyasetTechPool, 8);
+        const siyasetToDunya = 0;
+        const siyasetToEkonomi = 0;
 
         return {
             genelToSiyaset,
             siyasetToGenel,
             siyasetToTeknoloji,
+            siyasetToDunya,
+            siyasetToEkonomi,
             totalInjected: genelToSiyaset + siyasetToGenel + siyasetToTeknoloji
         };
     }
@@ -930,7 +938,7 @@ export class MlCategorizationService implements INewsCategorizationService {
             console.log(`[ML] Upsample weights: manual=${manualUpsampleMultiplier}x normal=${upsampleMultiplier}x | weightedManual=${manualWeightedCount} weightedRegular=${regularWeightedCount}`);
 
             const hardNegativeSummary = this.injectHardNegativeBatch(trainSet);
-            console.log(`[ML][HardNegative] Injected total=${hardNegativeSummary.totalInjected} | Genel->Siyaset=${hardNegativeSummary.genelToSiyaset}, Siyaset->Genel=${hardNegativeSummary.siyasetToGenel}, Siyaset->Teknoloji=${hardNegativeSummary.siyasetToTeknoloji}`);
+            console.log(`[ML][HardNegative] Injected total=${hardNegativeSummary.totalInjected} | Genel->Siyaset=${hardNegativeSummary.genelToSiyaset}, Siyaset->Genel=${hardNegativeSummary.siyasetToGenel}, Siyaset->Teknoloji=${hardNegativeSummary.siyasetToTeknoloji}, Siyaset->Dunya=${hardNegativeSummary.siyasetToDunya}, Siyaset->Ekonomi=${hardNegativeSummary.siyasetToEkonomi}`);
             console.log(`[ML][HardNegative] Train size after injection: ${trainSet.length}`);
 
             const trainSuccess = await this.trainWithSplit(trainSet, testSet, { persist: options.persist });
