@@ -1034,7 +1034,9 @@ export class MlCategorizationService implements INewsCategorizationService {
         for (const [category, hints] of Object.entries(keywordHints)) {
             const hitCount = hints.reduce((acc, h) => acc + (normalized.includes(h) ? 1 : 0), 0);
             if (hitCount > 0) {
-                hintBonusByCategory[category] = Math.min(0.18, hitCount * 0.06);
+                // Siyaset gets a slightly higher cap (+0.20) per Chunk 4, all others capped at 0.18
+                const cap = category === 'Siyaset' ? 0.20 : 0.18;
+                hintBonusByCategory[category] = Math.min(cap, hitCount * 0.06);
             }
         }
 
