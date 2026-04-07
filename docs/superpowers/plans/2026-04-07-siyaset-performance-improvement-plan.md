@@ -142,6 +142,8 @@ git commit -m "feat(ml): enhance confusion matrix logging with Siyaset-specific 
 - [ ] Supheli kayitlarda `kategori_dogrulandi=false` veya dogru kategoriye duzeltme uygula.
 - [ ] Correct oranina gore PASS/HOLD karari ver.
 
+> **HOLD durumunda:** Invoke `.agent/skills/systematic-debugging` — dusuk-confidence kayitlarin hangi etiketten nereye kaytigini tespit et, semptom degil kok neden duzelt.
+
 ---
 
 ## Chunk 2: Faz 1 - Veri kalite ve hacim
@@ -227,7 +229,7 @@ const sortedSizes = [...categorySizes].sort((a, b) => a - b);
 ## Dependencies & Ordering
 
 ```text
-Chunk 0 (MV-CG) -> Chunk 1 (Faz 0) -> Chunk 1.5 (Faz 0.5) -> Chunk 2 (Faz 1) -> Chunk 3 (Faz 2) -> Chunk 3.5 (Decision Gate) -> Chunk 4 (Conditional Faz 3 + Faz 4)
+Chunk 0 (MV-CG) -> Chunk 1 (Faz 0) -> Chunk 1.5 (Faz 0.5) -> Chunk 2 (Faz 1) -> Chunk 3 (Faz 2) -> Chunk 3.5 (Decision Gate) -> Chunk 4 (Conditional Faz 3 + Faz 4) -> Chunk 5 (Branch Kapanisi)
 ```
 
 **Beklenen sonuc:** Siyaset F1 >= 0.65, Genel Accuracy >= 72%, Macro-F1 >= 0.72
