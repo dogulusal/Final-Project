@@ -53,6 +53,8 @@ LIMIT 30;
 
 #### Step 2: Her ornek icin model tahmini al
 
+> **Onkosul:** Invoke `.agent/workflows/health-check.md` — backend servisi ayakta mi dogrula (`/api/ml/status` veya `/api/ml/categorize`) endpoint'e istek atmadan once.
+
 - [ ] `manual-validate.ts --predict-only` bayragi su an yok; endpoint ile tahmin al:
 
 ```bash
@@ -92,6 +94,8 @@ RMER = yanlis_tahmin_sayisi / 30
 
 #### Step 5: Etiket sorunu tespit edilirse Label Policy yaz
 
+> **HOLD durumunda:** Invoke `.agent/skills/systematic-debugging` — RMER >= 0.30 veya cok yonlu hata tespit edildiginde, duzeltme onerileri surmeden once kok neden analizi yap. Symptom fix yapma.
+
 - [ ] Faz 1'e gecmeden once su kararlar netlestirilmeli:
   - "Vali aciklamasi" -> Siyaset mi, Genel mi?
   - "Bakan katildi" (belediye etkinligi) -> Siyaset mi, Genel mi?
@@ -128,6 +132,8 @@ git add backend/src/modules/ml/ml.service.ts
 git commit -m "feat(ml): enhance confusion matrix logging with Siyaset-specific leak analysis"
 ```
 
+> **Chunk 1 tamamlanmadan once:** Invoke `.agent/skills/verification-before-completion` — benchmark ciktisinda `[SiyasetLeakage]`, `[TowardsSiyaset]`, `[NetConfusion]` satirlarinin gercekten gozuktugunu teyit et. Goruntulenmiyorsa commit yapma.
+
 ---
 
 ## Chunk 1.5: Faz 0.5 - Label Consistency Audit (Apr 4 backfill)
@@ -144,12 +150,16 @@ git commit -m "feat(ml): enhance confusion matrix logging with Siyaset-specific 
 
 - [ ] Siyaset confidence dagilimini olc.
 - [ ] DB backup al.
+
+> **DB degisikligi oncesi:** Invoke `.agent/workflows/rollback.md` — backup komutunu calistirmadan once rollback prosedurunu oku. Veri degisikligi sonrasi model istikrarsizlasirsa bu workflow ile geri don.
 - [ ] `manual-validate.ts` ile manuel dogrulama yap.
 - [ ] Dagilim ve benchmark ile etkisini dogrula.
 
 ---
 
 ## Chunk 3: Faz 2 - Hard negative duzeltmeleri
+
+> **Kod degisikligi oncesi:** Invoke `.agent/skills/test-driven-development` — ml.service.ts'i degistirmeden once benchmark scriptini "Siyaset F1 >= 0.60 olmali" assertion'i ile calistir ve su an failed oldugunu dogrula. Sonra kodu yaz.
 
 - [ ] `genelSignals` listesini genislet.
 - [ ] `genelPool` filtresini yumusat (`genelHit === 0` -> `genelHit < 2`).
@@ -161,9 +171,14 @@ git commit -m "feat(ml): enhance confusion matrix logging with Siyaset-specific 
 ## Chunk 3.5: Faz 2.5 - Decision Gate
 
 - [ ] Faz 2 benchmark sonrasi Siyaset F1'i olc.
+
+> **Tamamlanmadan once:** Invoke `.agent/skills/verification-before-completion` — F1 degerini fresh benchmark ile dogrula, log ciktisini oku, sonra asagidaki karari ver.
+
 - [ ] F1 >= 0.62 ise Faz 3 SKIP.
 - [ ] 0.58-0.62 arasi ise Faz 3 kosullu (conservative).
 - [ ] F1 < 0.58 ise HOLD.
+
+> **HOLD durumunda:** Invoke `.agent/skills/systematic-debugging` — F1 < 0.58 ise Faz 0-2'nin hangi adiminda beklenen etkiyi saglamadigi sistematik olarak bulunmali. Duzeltme olmadan Faz 3'e atlanmaz.
 
 ---
 
@@ -195,6 +210,17 @@ const sortedSizes = [...categorySizes].sort((a, b) => a - b);
 | V2 | Siyaset F1 | > 0.65 |
 | V3 | Accuracy | >= 72% |
 | V4 | Macro-F1 | >= 0.72 |
+
+---
+
+## Chunk 5: Branch Kapanisi
+
+> **Invoke:** `.agent/skills/finishing-a-development-branch` — V-0'dan V4'e kadar tum kontroller gectiginde bu skill'i calistir.
+
+- [ ] Tum validation checklist satirlarini gozden gecir (V-0 PASS, V0-V4 beklenen degerlerde).
+- [ ] `git log --oneline -10` ile commit gecmisini dogrula.
+- [ ] Branch merge veya PR sececegini belirle.
+- [ ] Temizlik: gecici benchmark loglarini ve backuplari arsivle.
 
 ---
 
