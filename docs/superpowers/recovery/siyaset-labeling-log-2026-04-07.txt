@@ -1,0 +1,1 @@
+haber_id | baslik | neden_siyaset | etiketleyen | tarih
