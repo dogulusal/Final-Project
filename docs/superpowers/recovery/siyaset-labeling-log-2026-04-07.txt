@@ -7,4 +7,8 @@ haber_id | baslik | neden_siyaset | etiketleyen | tarih
 1541 | Son dakika: MHP Istanbul Il Baskani Volkan Yilmaz oldu | parti ici atama karari, siyasi orgut haberi | dogul | 2026-04-07
 1516 | Nufusu 2 binin altina dusen belediyeler icin kritik karar! AYM acikladi | AYM iptal karari, yerel yonetim mevzuati haberi | dogul | 2026-04-07
 1562 | Disisleri Bakani Hakan Fidan ABD'li Buyukelci Barrack'i kabul etti | bakani duzeyi resmi diplomasi toplantisi haberi | dogul | 2026-04-07
+1565 | Dogum izni 24 haftaya cikiyorः İstihdam verileri ne diyorː kadınlar ne bekliyor | TBMM yasama karari, Bakanlik sosyal politika karari | dogul | 2026-04-07
+1581 | Mavi Vatan 2026 suruyor! Uc denizde es zamanli tatbikat | Devlet guvenlik strategisi, silahli kuvvetler operasyonlari, ulusal savunma haberi | dogul | 2026-04-07
+1669 | Cumhurbaskani Erdogan Pedro Sanchez ile gorustu! Dunyaya 'Iran' mesaji | Cumhurbaskani duyurusu, dis politika stratejisi, uluslararasi diplomasi karari | dogul | 2026-04-07
+1688 | 'Imaoglu cikar amacsli suc orgutu' davasinin 17'nci durusması sona erdi | Muhalefet lideri hakkinda acilan dava, yargi-siyaset iliskision, siyasi baskı haberi | dogul | 2026-04-07
 # DUNYA (Siyaset degil): 1682 | Iran'dan Trump'a yanit: Butun bolge ve Suudi Arabistan karanliga gomulur | uluslararasi askeri gerilim, siyasi karar-organ haberi degil | dogul | 2026-04-07

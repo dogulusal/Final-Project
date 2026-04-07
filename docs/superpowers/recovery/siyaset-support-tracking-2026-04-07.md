@@ -20,3 +20,4 @@
 |---|---|---|---:|---:|---:|---:|---|
 | 0 | 2026-04-07 | Baseline created | 103 | 15 | 0.456 | 0.098 | Support-first |
 | 1 | 2026-04-07 | Batch-1: 8 records verified (1574,1578,1656,1642,1678,1541,1516,1562); 1682 corrected to Dunya | 109 | - | - | - | Continue support growth, re-run 10x when benchmark support >= 25 |
+| 2 | 2026-04-07 | Batch-2: 4 records verified (1565,1581,1669,1688); TotalDB=113 (updated confirms 116 total siyaset) | 113 | - | - | - | Batch validation met, re-run 10x to measure support level |
