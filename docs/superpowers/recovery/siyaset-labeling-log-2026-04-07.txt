@@ -12,5 +12,15 @@ haber_id | baslik | neden_siyaset | etiketleyen | tarih
 1669 | Cumhurbaskani Erdogan Pedro Sanchez ile gorustu! Dunyaya 'Iran' mesaji | Cumhurbaskani duyurusu, dis politika stratejisi, uluslararasi diplomasi karari | dogul | 2026-04-07
 1688 | 'Imaoglu cikar amacsli suc orgutu' davasinin 17'nci durusması sona erdi | Muhalefet lideri hakkinda acilan dava, yargi-siyaset iliskision, siyasi baskı haberi | dogul | 2026-04-07
 403 | Sosyal medyaya ve dogum iznine yonelik duzenlemeleri de iceren kanun teklifinin komisyon gorusmeleri ertelendi | TBMM komisyon sureci ve kanun teklifi, dogrudan yasama sureci haberi | dogul | 2026-04-08
+1724 | Milli Guvenlik Kurulu toplandi | devlet guvenlik kurulu toplantisi, dogrudan yurutme/siyaset sureci haberi | dogul | 2026-04-08
+1720 | CHP'li Datca Meclis Uyesi Yuksel Temel serbest birakildi | muhalefet partisi ve yargi surecinin dogrudan siyasi etkisi var | dogul | 2026-04-08
+1692 | Cumhurbaskani Yardimcisi Cevdet Yilmaz: Turkiye olarak barisa katki vermeye haziriz | cumhurbaskani yardimcisi duzeyinde resmi siyasi/dis politika aciklamasi | dogul | 2026-04-08
 # DUNYA (Siyaset degil): 1682 | Iran'dan Trump'a yanit: Butun bolge ve Suudi Arabistan karanliga gomulur | uluslararasi askeri gerilim, siyasi karar-organ haberi degil | dogul | 2026-04-07
 # EKONOMI (Siyaset degil): 404 | Cumhurbaskani Yardimcisi Yilmaz'dan ekonomi degerlendirmesi | ana eksen ekonomi politikasi/degerlendirme, siyasi karar sureci odakli degil | dogul | 2026-04-08
+# GENEL (Siyaset degil): 1530 | Bakan Kurum Acikladi: TOKI Istanbul Kura Tarihi Belli Oldu | haber ekseni konut/kura duyurusu, genel kamu hizmeti bilgilendirmesi | dogul | 2026-04-08
+# SPOR (Siyaset degil): 1747 | Galatasaray - Goztepe maci canli izle | spor karsilasmasi yayin/fixture haberi | dogul | 2026-04-08
+# SPOR (Siyaset degil): 1746 | PSG - Liverpool maci canli izle | sampiyonlar ligi spor musabakasi haberi | dogul | 2026-04-08
+# TEKNOLOJI (Siyaset degil): 1708 | Honor 600 Pro Geekbench'te Sov Yapti | cihaz performans ve teknoloji urun haberi | dogul | 2026-04-08
+# TEKNOLOJI (Siyaset degil): 1706 | Sony, True RGB ile TV Goruntu Kalitesinde Citayi Yukseltiyor | tuketici elektronigi/teknoloji urun haberi | dogul | 2026-04-08
+# DUNYA (Siyaset degil): 1729 | Lubnan'a tarihinin en buyuk saldirisi | uluslararasi catisma haberi, yerel siyaset etiketi degil | dogul | 2026-04-08
+# EKONOMI (Siyaset degil): 1740 | VC Eclipse'ten yapay zeka girisimlerine 1,3 milyar dolarlik fon | yatirim/finans eksenli ekonomi haberi | dogul | 2026-04-08
