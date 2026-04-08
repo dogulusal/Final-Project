@@ -11,4 +11,6 @@ haber_id | baslik | neden_siyaset | etiketleyen | tarih
 1581 | Mavi Vatan 2026 suruyor! Uc denizde es zamanli tatbikat | Devlet guvenlik strategisi, silahli kuvvetler operasyonlari, ulusal savunma haberi | dogul | 2026-04-07
 1669 | Cumhurbaskani Erdogan Pedro Sanchez ile gorustu! Dunyaya 'Iran' mesaji | Cumhurbaskani duyurusu, dis politika stratejisi, uluslararasi diplomasi karari | dogul | 2026-04-07
 1688 | 'Imaoglu cikar amacsli suc orgutu' davasinin 17'nci durusması sona erdi | Muhalefet lideri hakkinda acilan dava, yargi-siyaset iliskision, siyasi baskı haberi | dogul | 2026-04-07
+403 | Sosyal medyaya ve dogum iznine yonelik duzenlemeleri de iceren kanun teklifinin komisyon gorusmeleri ertelendi | TBMM komisyon sureci ve kanun teklifi, dogrudan yasama sureci haberi | dogul | 2026-04-08
 # DUNYA (Siyaset degil): 1682 | Iran'dan Trump'a yanit: Butun bolge ve Suudi Arabistan karanliga gomulur | uluslararasi askeri gerilim, siyasi karar-organ haberi degil | dogul | 2026-04-07
+# EKONOMI (Siyaset degil): 404 | Cumhurbaskani Yardimcisi Yilmaz'dan ekonomi degerlendirmesi | ana eksen ekonomi politikasi/degerlendirme, siyasi karar sureci odakli degil | dogul | 2026-04-08
