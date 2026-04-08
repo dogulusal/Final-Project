@@ -32,3 +32,8 @@ haber_id | baslik | neden_siyaset | etiketleyen | tarih
 1441 | CHP'den ev kadinlari icin ozel calisma | muhalefet partisi (CHP) sosyal/siyasi program karari, parti etkinligi haberi | dogul | 2026-04-08
 1366 | Sam'da kritik zirve! Disisleri Bakani Hakan Fidan, Zelenskiy ve Sara ile gorustu | disisleri bakani cok tarafli diplomasi toplantisi, uluslararasi siyaset haberi | dogul | 2026-04-08
 # DUNYA (Siyaset degil): 1738 | Bulgaristan 5 yilda 8.kez secime gidiyor | yabanci ulke (Bulgaristan) ic siyaseti, Turkiye'nin direkt siyasi/dis politika karari degil | dogul | 2026-04-08
+450 | TBMM'den OECD Istanbul Merkezi'ne Onay: Isbirligi Genisliyor | TBMM Genel Kurulu onayi, dogrudan yasama sureci ve hukumetlerarasi protokol karari | dogul | 2026-04-08
+642 | Bakan Kacir: Turkiye, masada sozunun agirligini hissettiren bir ulkedir | kabine duzeyinde bakan aciklamasi, ulusal strateji/siyasi yurutme ekseni | dogul | 2026-04-08
+692 | Erdogan: Catismalar sona ermezse fatura da kabaracak | Cumhurbaskani tarafindan devlet politikasi/stratejisi kapsami aciklama | dogul | 2026-04-08
+# DUNYA (Siyaset degil): 1711 | Meksika'da kartelin 'imha ciftliginde' hayatta kalanlar anlatiyor | Meksika ic guvenlik ve kartel haberi, Turkiye ic siyaseti degil | dogul | 2026-04-08
+# DUNYA (Siyaset degil): 1686 | Pakistan arayi bulmaya calisiyor: Trump'a 'sureyi uzat', Iran'a 'Hurmuz'u ac' cagrisi | Pakistan-ABD-Iran diplomasisi, Turkiye ic siyaset karari degil | dogul | 2026-04-08
