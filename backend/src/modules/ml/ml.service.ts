@@ -123,6 +123,15 @@ export class MlCategorizationService implements INewsCategorizationService {
             'hukumet karari', 'secim kampanyasi', 'parti kongresi', 'siyasi kriz', 'kabine',
             'cumhurbaskanligi', 'bakanlik', 'muhtarlik secimi', 'oy orani'
         ];
+        
+        // Bigram signals: stronger Siyaset indicators (from coverage analysis batch-2)
+        const siyasetBigrams = [
+            'adalet_bakani',
+            'cumhurbaskani_erdogan',
+            'dem_parti',
+            'genel_baskani',
+            'belediye_baskani'
+        ];
         const genelSignals = [
             'vatandas basvurusu', 'sosyal yardim', 'belediye hizmeti',
             'kamu duyurusu', 'resmi aciklama', 'kurum haberi'
@@ -135,21 +144,24 @@ export class MlCategorizationService implements INewsCategorizationService {
         const genelPool = trainSet.filter(item => {
             if (item.category !== 'Genel') return false;
             const siyasetHit = this.countKeywordHits(item.text, siyasetSignals);
+            const siyasetBigramHit = this.countKeywordHits(item.text, siyasetBigrams);
             const genelHit = this.countKeywordHits(item.text, genelSignals);
-            return siyasetHit >= 2 && genelHit === 0;
+            return (siyasetHit >= 2 || siyasetBigramHit >= 1) && genelHit === 0;
         });
 
         const siyasetPool = trainSet.filter(item => {
             if (item.category !== 'Siyaset') return false;
             const siyasetHit = this.countKeywordHits(item.text, siyasetSignals);
-            return siyasetHit >= 2;
+            const siyasetBigramHit = this.countKeywordHits(item.text, siyasetBigrams);
+            return siyasetHit >= 2 || siyasetBigramHit >= 1;
         });
 
         const siyasetTechPool = trainSet.filter(item => {
             if (item.category !== 'Siyaset') return false;
             const siyasetHit = this.countKeywordHits(item.text, siyasetSignals);
+            const siyasetBigramHit = this.countKeywordHits(item.text, siyasetBigrams);
             const teknolojiHit = this.countKeywordHits(item.text, teknolojiSignals);
-            return siyasetHit >= 1 && teknolojiHit >= 1;
+            return (siyasetHit >= 1 || siyasetBigramHit >= 1) && teknolojiHit >= 1;
         });
 
 
