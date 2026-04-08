@@ -22,3 +22,4 @@
 | 1 | 2026-04-07 | Batch-1: 8 records verified (1574,1578,1656,1642,1678,1541,1516,1562); 1682 corrected to Dunya | 109 | - | - | - | Continue support growth, re-run 10x when benchmark support >= 25 |
 | 2 | 2026-04-07 | Batch-2: 4 records verified (1565,1581,1669,1688); TotalDB=113; 10x benchmark post-batch-2 | 113 | 15 | 0.426 | 0.034 | ✅ STD GATE PASSED! std=0.034<0.05 achieved. Bigram coverage analysis next. |
 | 3 | 2026-04-08 | Batch-3: 403 verified as Siyaset; 404 verified as Ekonomi (non-Siyaset) | 119 | - | - | - | Data growth continues; next step run 10x benchmark and check support drift |
+| 4 | 2026-04-08 | Batch-4: Backfill 31 safe records to manuel_validasyonlar; reclassify 10 excluded records (3→Dunya, 2→Genel, 3→Teknoloji, 1→Ekonomi, 1→Spor) | 150 | 22 | 0.679 | 0.067 | Support jump 15→22! F1 improved 0.426→0.679. std=0.067>0.05 gate still pending. Continue data growth. |
