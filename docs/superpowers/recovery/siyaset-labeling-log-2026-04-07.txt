@@ -24,3 +24,11 @@ haber_id | baslik | neden_siyaset | etiketleyen | tarih
 # TEKNOLOJI (Siyaset degil): 1706 | Sony, True RGB ile TV Goruntu Kalitesinde Citayi Yukseltiyor | tuketici elektronigi/teknoloji urun haberi | dogul | 2026-04-08
 # DUNYA (Siyaset degil): 1729 | Lubnan'a tarihinin en buyuk saldirisi | uluslararasi catisma haberi, yerel siyaset etiketi degil | dogul | 2026-04-08
 # EKONOMI (Siyaset degil): 1740 | VC Eclipse'ten yapay zeka girisimlerine 1,3 milyar dolarlik fon | yatirim/finans eksenli ekonomi haberi | dogul | 2026-04-08
+963 | YSK'dan 5 Beldede Secim Karari: Partiler 2026'ya Hazir | YSK secim karari, seçim yonetimi kurumu kararı, siyasi surecin ana kurumu duzeyinde haber | dogul | 2026-04-08
+1345 | Disisleri Bakani Hakan Fidan Suriye'de | disisleri bakani toplantisi, dis politika/diplomasi haberi, uluslararasi siyaset | dogul | 2026-04-08
+1327 | Bakan Gurlek, suca suruklenen cocuklarin magdur ettigi aileleriyle bir araya geldi! 12. Yargi Paketi icin yeni duzenleme yolda | Adalet Bakani, yargi paketi yasama sureci, siyasi karar haberi | dogul | 2026-04-08
+1357 | Tutuklanan Usak Belediye Baskani Ozkan Yalin'a ihrac talebi! CHP'den aciklama geldi | muhalefet partisi belediye yonetimi personeli hakkinda disiplin karari, yerel yonetim-siyaset haberi | dogul | 2026-04-08
+1749 | MHP Lideri Bahceli'den 'ateskes' mesaji: Memnuniyetle karsiliyoruz | siyasi parti lideri ozel (MHP) aciklamasi, siyasi pozisyon haberi | dogul | 2026-04-08
+1441 | CHP'den ev kadinlari icin ozel calisma | muhalefet partisi (CHP) sosyal/siyasi program karari, parti etkinligi haberi | dogul | 2026-04-08
+1366 | Sam'da kritik zirve! Disisleri Bakani Hakan Fidan, Zelenskiy ve Sara ile gorustu | disisleri bakani cok tarafli diplomasi toplantisi, uluslararasi siyaset haberi | dogul | 2026-04-08
+# DUNYA (Siyaset degil): 1738 | Bulgaristan 5 yilda 8.kez secime gidiyor | yabanci ulke (Bulgaristan) ic siyaseti, Turkiye'nin direkt siyasi/dis politika karari degil | dogul | 2026-04-08
