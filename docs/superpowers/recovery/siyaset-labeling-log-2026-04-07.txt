@@ -39,3 +39,4 @@ haber_id | baslik | neden_siyaset | etiketleyen | tarih
 # DUNYA (Siyaset degil): 1686 | Pakistan arayi bulmaya calisiyor: Trump'a 'sureyi uzat', Iran'a 'Hurmuz'u ac' cagrisi | Pakistan-ABD-Iran diplomasisi, Turkiye ic siyaset karari degil | dogul | 2026-04-08
 420 | Simsek: Dezenflasyon Sureci Kararlilikla Ilerliyor | Hazine ve Maliye Bakani tarafindan ekonomi politikasina dair resmi aciklama, hukumet yurutme ekseni | dogul | 2026-04-08
 477 | Bakan Bolat: Ocak-Subat'ta 20'li Enflasyon | Bakan duzeyinde enflasyon hedefleri/aciklamalari, kamu ekonomi yonetimi karari | dogul | 2026-04-08
+1737 | YouTube'dan 15 yas alti aciklamasi | teklifin Meclis surecine tasinmasi ve yasama etkisi nedeniyle ic siyaset sinifina alindi | dogul | 2026-04-08
