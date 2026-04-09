@@ -1033,18 +1033,39 @@ export class MlCategorizationService implements INewsCategorizationService {
             'Spor': ['maç', 'lig', 'gol', 'transfer', 'teknik direktör', 'basketbol', 'futbol', 'voleybol'],
             'Ekonomi': ['borsa', 'faiz', 'enflasyon', 'dolar', 'euro', 'merkez bankası', 'ihracat', 'altın'],
             'Teknoloji': ['yapay zeka', 'yazılım', 'siber', 'uydu', 'nasa', 'çip', 'akıllı telefon', 'teknoloji'],
-            'Siyaset': ['meclis', 'bakan', 'cumhurbaşkanı', 'parti', 'seçim', 'milletvekili', 'kanun', 'kabine'],
+            // Batch-16: Tekil tetikleyiciler (bakan, parti, seçim) phrase-level'e çekildi.
+            // Sadece bileşik siyasi bağlamlar bonus alır; idari duyurular artık Siyaset'e kaymaz.
+            'Siyaset': [
+                'meclis oturumu', 'tbmm', 'milletvekili', 'cumhurbaşkanı',
+                'kanun teklifi', 'yasa tasarısı', 'anayasa değişikliği',
+                'seçim kampanyası', 'seçim sandığı', 'muhtarlık seçimi',
+                'parti kongresi', 'parti genel başkan', 'muhalefet partisi',
+                'bakanlar kurulu', 'kabine toplantısı', 'hükümet programı',
+                'siyasi kriz', 'iktidar partisi',
+            ],
             'Dünya': ['nato', 'bm', 'ukrayna', 'israil', 'iran', 'abd', 'avrupa birliği', 'uluslararası'],
             'Sağlık': ['hastane', 'doktor', 'aşı', 'salgın', 'kanser', 'tedavi', 'sağlık', 'ameliyat'],
             'Genel': ['son dakika', 'gündem', 'olay', 'açıklama']
         };
 
+        // Asayiş Kalkanı (Batch-16): Adli/operasyon dili yoğun haberlerde Siyaset bonusunu engelle.
+        // Bu sayede savcılık/gözaltı/operasyon haberleri Siyaset'e kaymaz.
+        const asayisTerms = [
+            'savcılık', 'başsavcılık', 'adliye', 'gözaltı', 'tutuklama',
+            'zanlı', 'operasyon', 'iddianame', 'narkotik', 'suç örgütü',
+        ];
+        const asayisHits = asayisTerms.reduce((acc, t) => acc + (normalized.includes(t) ? 1 : 0), 0);
+        const siyasetPhraseHits = (keywordHints['Siyaset'] as string[])
+            .reduce((acc, h) => acc + (normalized.includes(h) ? 1 : 0), 0);
+        const asayisShield = asayisHits >= 2 && siyasetPhraseHits === 0;
+
         const hintBonusByCategory: Record<string, number> = {};
         for (const [category, hints] of Object.entries(keywordHints)) {
             const hitCount = hints.reduce((acc, h) => acc + (normalized.includes(h) ? 1 : 0), 0);
             if (hitCount > 0) {
-                // Siyaset gets a slightly higher cap (+0.20) per Chunk 4, all others capped at 0.18
-                const cap = category === 'Siyaset' ? 0.20 : 0.18;
+                // Batch-16: Siyaset cap 0.20→0.13; asayiş kalkanı devredeyse Siyaset bonusu sıfır.
+                let cap = category === 'Siyaset' ? 0.13 : 0.18;
+                if (category === 'Siyaset' && asayisShield) cap = 0;
                 hintBonusByCategory[category] = Math.min(cap, hitCount * 0.06);
             }
         }
