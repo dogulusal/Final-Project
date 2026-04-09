@@ -117,11 +117,19 @@ export class MlCategorizationService implements INewsCategorizationService {
         // Dominant pairs observed in diagnostics:
         // 1) Genel -> Siyaset, 2) Siyaset -> Genel, 3) Siyaset -> Teknoloji
         const siyasetSignals = [
-            'meclis', 'bakan', 'milletvekili', 'parti', 'secim', 'iktidar', 'muhalefet',
-            'cumhurbaskan', 'hukumet', 'anayasa', 'belediye', 'gozalti', 'tutuk', 'sorusturma',
-            'yargi', 'mahkeme', 'protesto', 'oy', 'kanun', 'yasa',
-            'hukumet karari', 'secim kampanyasi', 'parti kongresi', 'siyasi kriz', 'kabine',
-            'cumhurbaskanligi', 'bakanlik', 'muhtarlik secimi', 'oy orani'
+            // Tekil — diacritic-free, düşük false-positive riski
+            'meclis', 'milletvekili', 'iktidar', 'muhalefet',
+            'cumhurbaşkan', 'hükümet', 'anayasa',
+            // Mevcut çok-kelimeli sinyaller
+            'hükümet kararı', 'seçim kampanyası', 'parti kongresi', 'siyasi kriz', 'kabine',
+            'cumhurbaşkanlığı', 'bakanlık', 'muhtarlık seçimi',
+            // Batch-15: toksik 6 tekil kelime → phrase seviyesine yükseltildi
+            'oy oranı', 'oy pusulası', 'seçim sandığı', 'seçim bölgesi',     // oy →
+            'bakanlığı', 'bakanlar kurulu',                                   // bakan →
+            'yasa teklifi', 'yasa tasarısı', 'anayasa değişikliği', 'kanun teklifi', // yasa →
+            'belediye başkanı', 'belediye meclisi', 'büyükşehir belediyesi',  // belediye →
+            'anayasa mahkemesi', 'yargıtay', 'danıştay', 'idari mahkeme',     // mahkeme →
+            'yargı paketi', 'siyasi soruşturma'                               // tutuk →
         ];
         const genelSignals = [
             'vatandas basvurusu', 'sosyal yardim', 'belediye hizmeti',
@@ -136,7 +144,7 @@ export class MlCategorizationService implements INewsCategorizationService {
             if (item.category !== 'Genel') return false;
             const siyasetHit = this.countKeywordHits(item.text, siyasetSignals);
             const genelHit = this.countKeywordHits(item.text, genelSignals);
-            return siyasetHit >= 2 && genelHit === 0;
+            return siyasetHit >= 1 && genelHit === 0; // Batch-15: >=2 → >=1 (phrase signals are already precise)
         });
 
         const siyasetPool = trainSet.filter(item => {
@@ -167,7 +175,7 @@ export class MlCategorizationService implements INewsCategorizationService {
             return injected;
         };
 
-        const genelToSiyaset = injectFromPool(genelPool, 14);
+        const genelToSiyaset = injectFromPool(genelPool, 8); // Batch-15: 14→8 (smaller pool, reduce overfit risk)
         const siyasetToGenel = injectFromPool(siyasetPool, 10);
         const siyasetToTeknoloji = injectFromPool(siyasetTechPool, 8);
         const siyasetToDunya = 0;
