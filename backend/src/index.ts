@@ -85,6 +85,7 @@ app.get('/api/ready', asyncHandler(async (_req, res) => {
 import { rssRouter } from './modules/rss';
 import { mlPublicRouter, mlProtectedRouter } from './modules/ml';
 import { llmRouter } from './modules/llm';
+import { consensusRouter } from './modules/llm/llm.controller';
 import { renderRouter } from './modules/render';
 import { newsRouter } from './modules/news';
 import { socialRouter } from './modules/social';
@@ -98,6 +99,7 @@ app.use('/api/rss', rssRouter);
 app.use('/api/ml', mlPublicRouter);
 app.use('/api/ml', authMiddleware, mlProtectedRouter);
 app.use('/api/llm', authMiddleware, llmRouter); // LLM kotası koruma: yetkisiz çağrı = Gemini maliyeti
+app.use('/api/llm/consensus', authMiddleware, consensusRouter); // Consensus pipeline admin API
 app.use('/api/news', newsRouter);
 app.use('/api/render', renderRouter);
 app.use('/api/social', socialRouter);
@@ -139,20 +141,24 @@ app.use('/api/admin', authMiddleware, adminRouter);
 // --- Background Tasks ---
 import { rssScheduler } from './modules/rss/rss-scheduler';
 import { backupScheduler } from './scripts/backup-scheduler';
+import { llmConsensusWorker } from './modules/llm/llm-consensus-worker.singleton';
 rssScheduler.start(); // RSS periyodik toplayıcısını başlat
 backupScheduler.start(); // Günlük veritabanı yedeklemesini başlat
+llmConsensusWorker.start(); // LLM konsensüs pipeline worker'ını başlat
 
 // Graceful Shutdown
 process.on('SIGTERM', () => {
     console.log('[Server] Kapatılıyor...');
     rssScheduler.stop();
     backupScheduler.stop();
+    llmConsensusWorker.stop();
     disconnectDB().finally(() => process.exit(0));
 });
 process.on('SIGINT', () => {
     console.log('[Server] Kapatılıyor (Ctrl+C)...');
     rssScheduler.stop();
     backupScheduler.stop();
+    llmConsensusWorker.stop();
     disconnectDB().finally(() => process.exit(0));
 });
 
