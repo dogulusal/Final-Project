@@ -58,6 +58,8 @@ interface PendingArticle {
     llmRetryCount: number;
 }
 
+type KategoriMap = Map<string, number>;
+
 export class LlmConsensusWorker {
     private isProcessing = false;
     private timer: NodeJS.Timeout | null = null;
@@ -112,31 +114,38 @@ export class LlmConsensusWorker {
             },
         });
 
+        const allKategoriler = await prisma.kategori.findMany({
+            select: { id: true, ad: true },
+        });
+        const kategoriMap: KategoriMap = new Map(
+            allKategoriler.map((kategori) => [kategori.ad.toLowerCase(), kategori.id]),
+        );
+
         for (const article of articles) {
-            await this._processArticle(article);
+            await this._processArticle(article, kategoriMap);
         }
     }
 
-    protected async _processArticle(article: PendingArticle): Promise<void> {
+    protected async _processArticle(article: PendingArticle, kategoriMap: KategoriMap): Promise<void> {
         try {
             const { category, provider } = await this._callLLM(
                 article.baslik,
                 article.metaAciklama ?? article.baslik,
             );
 
-            const llmKategori = await prisma.kategori.findFirst({ where: { ad: category } });
-            if (!llmKategori) throw new Error(`Bilinmeyen LLM kategorisi: "${category}"`);
+            const llmKategoriId = kategoriMap.get(category.toLowerCase());
+            if (!llmKategoriId) throw new Error(`Bilinmeyen LLM kategorisi: "${category}"`);
 
-            const isConsensus = article.nbKategoriId === llmKategori.id;
+            const isConsensus = article.nbKategoriId === llmKategoriId;
 
             await prisma.haber.update({
                 where: { id: article.id },
                 data: {
-                    llmKategoriId: llmKategori.id,
+                    llmKategoriId,
                     llmProvider: provider,
                     ...(isConsensus
                         ? {
-                              kategoriId: llmKategori.id,
+                              kategoriId: llmKategoriId,
                               durum: 'hazir',
                               kategoriDogrulandi: true,
                           }

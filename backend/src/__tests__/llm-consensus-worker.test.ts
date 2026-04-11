@@ -10,7 +10,15 @@ jest.mock('../config/database', () => ({
             update: jest.fn().mockResolvedValue({}),
         },
         kategori: {
-            findFirst: jest.fn(),
+            findMany: jest.fn().mockResolvedValue([
+                { id: 1, ad: 'Spor' },
+                { id: 2, ad: 'Ekonomi' },
+                { id: 3, ad: 'Teknoloji' },
+                { id: 4, ad: 'Siyaset' },
+                { id: 5, ad: 'Dünya' },
+                { id: 6, ad: 'Sağlık' },
+                { id: 7, ad: 'Genel' },
+            ]),
         },
     },
 }));
@@ -63,6 +71,15 @@ const mockHaber = (overrides: Partial<{
 describe('LlmConsensusWorker', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        (prisma.kategori.findMany as jest.Mock).mockResolvedValue([
+            { id: 1, ad: 'Spor' },
+            { id: 2, ad: 'Ekonomi' },
+            { id: 3, ad: 'Teknoloji' },
+            { id: 4, ad: 'Siyaset' },
+            { id: 5, ad: 'Dünya' },
+            { id: 6, ad: 'Sağlık' },
+            { id: 7, ad: 'Genel' },
+        ]);
     });
 
     // ─── _parseCategory ────────────────────────────────────────────────────────
@@ -135,7 +152,6 @@ describe('LlmConsensusWorker', () => {
         (prisma.haber.findMany as jest.Mock).mockResolvedValue([
             mockHaber({ nbKategoriId: KATEGORI_ID }),
         ]);
-        (prisma.kategori.findFirst as jest.Mock).mockResolvedValue({ id: KATEGORI_ID, ad: 'Teknoloji' });
 
         const worker = new TestableWorker(makeMockProvider('Teknoloji'), makeMockProvider('Genel'));
         await worker.processNextBatch();
@@ -157,11 +173,10 @@ describe('LlmConsensusWorker', () => {
 
     it('çakışma durumunda durum değişmez ve kategoriDogrulandi=false kalır', async () => {
         const NB_ID = 2;
-        const LLM_ID = 5;
+        const LLM_ID = 4;
         (prisma.haber.findMany as jest.Mock).mockResolvedValue([
             mockHaber({ nbKategoriId: NB_ID }),
         ]);
-        (prisma.kategori.findFirst as jest.Mock).mockResolvedValue({ id: LLM_ID, ad: 'Siyaset' });
 
         const worker = new TestableWorker(makeMockProvider('Siyaset'), makeMockProvider('Genel'));
         await worker.processNextBatch();
