@@ -48,6 +48,16 @@ coverage/
 # Debug / one-off scripts (not part of app)
 backend/category-stats.js
 backend/catstats.js
+
+# Backups and snapshots (large, one-off)
+backups/benchmark_state/
+backups/code_snapshots/
+backups/db_snapshots/
+
+# SQL temp/audit files
+query_*.sql
+batch*.sql
+*_audit.sql
 backend/check-categories.js
 backend/check-siyaset.js
 backend/check-siyaset2.js

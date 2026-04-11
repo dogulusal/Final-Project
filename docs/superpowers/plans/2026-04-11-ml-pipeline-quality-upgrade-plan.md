@@ -1,7 +1,7 @@
 # ML Pipeline Kalitesi Yükseltme - Uygulama Planı
 
 **Tarih:** 2026-04-11  
-**Durum:** READY FOR EXECUTION  
+**Durum:** EXECUTED - Path B closed (pass rate %30, systematic-debugging completed, Sağlık kategorisi temiz)  
 **Toplam Süresi:** ~2-3 saat hızlı path + 1-2 hafta background spot-check  
 **Branch:** feature/tokenizer-unicode-aware
 
