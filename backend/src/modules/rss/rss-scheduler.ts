@@ -1,10 +1,8 @@
-import { RSS_SOURCES, LLM_PIPELINE_ENABLED, LLM_DAILY_QUOTA, ML_CONFIDENCE_THRESHOLD } from '../../config/constants';
+import { RSS_SOURCES, LLM_PIPELINE_ENABLED, LLM_DAILY_QUOTA, ML_CONFIDENCE_THRESHOLD, LLM_CONSENSUS_ENABLED } from '../../config/constants';
 import { ContentQualityFilter } from '../news/content-quality-filter';
 import { NewsService } from '../news/news.service';
 import { mlService } from '../ml/ml.controller';
 import { prisma } from '../../config/database';
-import { ContentGenerationService } from '../llm/llm.service';
-import { RawNewsInput } from '../llm/llm.interface';
 import { RssParserService } from './rss.service';
 
 export interface SchedulerStatus {
@@ -23,11 +21,12 @@ export class RssScheduler {
     private todayCount: number = 0;
     
     // LLM Pipeline: günlük kota takibi ve işlenen URL seti (duplicate LLM çağrısını önler)
+    // Not: Consensus worker aktifken bu alanlar kullanılmaz; LLM_PIPELINE_ENABLED eski inline mod için korunur.
     private llmDailyCount: number = 0;
     private llmLastResetDate: string = '';
     private llmProcessedUrls: Set<string> = new Set();
     private llmQuotaLoggedThisCycle: boolean = false;
-    private llmService = new ContentGenerationService();
+    // llmService kaldırıldı — inline LLM devreden çıkarıldı; consensus worker tarafından yönetilir
 
     // Sağlık takibi
     private sourceFailures: Record<string, number> = {};
@@ -193,24 +192,6 @@ export class RssScheduler {
         console.log(`[Scheduler] RSS toplayıcı durduruldu.`);
     }
 
-    /** Gemini 429 hataları için üstel geri çekilme (exponential backoff) ile LLM çağrısı */
-    private async callLLMWithRetry(input: RawNewsInput): Promise<import('../llm/llm.interface').GeneratedNewsContent> {
-        const delays = [0, 2000, 6000];
-        let lastErr: any;
-        for (let attempt = 0; attempt < delays.length; attempt++) {
-            if (delays[attempt] > 0) await new Promise(r => setTimeout(r, delays[attempt]));
-            try {
-                return await this.llmService.generate(input);
-            } catch (err: any) {
-                lastErr = err;
-                const is429 = err?.message?.includes('429') || err?.status === 429;
-                if (!is429 || attempt === delays.length - 1) throw err;
-                console.warn(`[Scheduler LLM] ⏳ 429 rate limit, ${delays[attempt + 1]}ms bekleniyor... (deneme ${attempt + 1}/${delays.length})`);
-            }
-        }
-        throw lastErr;
-    }
-
     private async runCycle() {
         console.log(`[Scheduler] Yeni döngü başladı. Toplam Kaynak: ${RSS_SOURCES.length}`);
 
@@ -300,88 +281,27 @@ export class RssScheduler {
                             finalCatId = mlCatId;
                         }
 
-                        // 4. LLM Zenginleştirme (LLM_PIPELINE_ENABLED=true ile etkinleştirilir)
-                        let llmBaslik = safeTitle;
-                        let llmIcerik = contentFallback;
-                        let llmMetaAciklama = contentFallback.substring(0, 150) + "...";
-                        let llmSentiment = sentRes ? sentRes.label : "Nötr";
-                        let newsdurum: 'ham' | 'hazir' = 'ham';
-                        let llmProviderName = 'none';
-                        let llmSucceeded = false;
-                        let kategoriDogrulandi = false;
+                        // 4. Consensus Pipeline: LLM'i arka plan worker'a bırak
+                        // LLM_CONSENSUS_ENABLED=true  → llmProvider='pending' (worker işleyecek)
+                        // LLM_CONSENSUS_ENABLED=false → llmProvider='none'    (NB kategorisi final)
+                        const llmProviderValue = LLM_CONSENSUS_ENABLED ? 'pending' : 'none';
 
-                        const articleUrl = safeLink || '';
-                        const quotaAvailable = LLM_PIPELINE_ENABLED &&
-                            this.llmDailyCount < LLM_DAILY_QUOTA &&
-                            !this.llmProcessedUrls.has(articleUrl);
-
-                        if (quotaAvailable) {
-                            try {
-                                const llmInput: RawNewsInput = {
-                                    baslik: safeTitle,
-                                    ozet: contentFallback,
-                                    kategori: catRes?.kategori || source.category || 'Genel',
-                                    kaynak_url: articleUrl
-                                };
-                                const llmResult = await this.callLLMWithRetry(llmInput);
-                                llmBaslik = this.normalizeText(llmResult.baslik) || safeTitle;
-                                llmIcerik = this.normalizeText(llmResult.icerik) || contentFallback;
-                                llmMetaAciklama = this.normalizeText(llmResult.meta_aciklama) || llmMetaAciklama;
-
-                                const normalizedSentiment = this.normalizeText(llmResult.sentiment);
-                                if (normalizedSentiment === 'Pozitif' || normalizedSentiment === 'Negatif' || normalizedSentiment === 'Nötr') {
-                                    llmSentiment = normalizedSentiment;
-                                }
-
-                                const normalizedKategori = this.normalizeText(llmResult.kategori);
-                                if (normalizedKategori) {
-                                    const llmCatId = this.resolveCategoryId(normalizedKategori, kategoriMap);
-                                    if (llmCatId) {
-                                        finalCatId = llmCatId;
-                                    } else {
-                                        console.warn(`[Scheduler LLM] Geçersiz kategori (${normalizedKategori}) source=${source.id}. Kaynak kategorisi korunuyor.`);
-                                    }
-                                }
-                                llmSucceeded = true;
-                                llmProviderName = 'gemini';
-                                this.llmDailyCount++;
-                                if (articleUrl) this.llmProcessedUrls.add(articleUrl);
-                                console.log(`[Scheduler LLM] ✅ "${llmBaslik.substring(0, 50)}..." zenginleştirildi (kota: ${this.llmDailyCount}/${LLM_DAILY_QUOTA})`);
-                            } catch (llmErr: any) {
-                                console.warn(`[Scheduler LLM] ⚠️ LLM başarısız, ham kaydediliyor: ${llmErr.message}`);
-                            }
-                        } else if (LLM_PIPELINE_ENABLED && this.llmDailyCount >= LLM_DAILY_QUOTA && !this.llmQuotaLoggedThisCycle) {
-                            this.llmQuotaLoggedThisCycle = true;
-                            console.warn(`[Scheduler LLM] ⛔ Günlük kota doldu (${LLM_DAILY_QUOTA}). Bu döngüdeki kalan haberler ham kaydedilecek.`);
-                        }
-
-                        // LLM başarılıysa hazır kabul et. LLM yoksa sadece güçlü ML tahmini olanları hazıra al.
-                        if (llmSucceeded || mlStrong) {
-                            newsdurum = 'hazir';
-                        }
-
-                        // Kategori doğrulaması: LLM geçerli kategori üretmişse veya güçlü ML + kaynak uyumu varsa true.
-                        if (
-                            (llmSucceeded && finalCatId !== sourceCatId) ||
-                            (mlStrong && mlCatId && mlCatId === finalCatId && mlCatId === sourceCatId)
-                        ) {
-                            kategoriDogrulandi = true;
-                        }
-
-                        // 5. DB Kayıt
+                        // 5. DB Kayıt (Haber her zaman 'ham' başlar; worker consensus'u tamamlayınca 'hazir' olur)
                         await this.newsService.createNews({
-                            baslik: llmBaslik,
-                            icerik: llmIcerik,
-                            metaAciklama: llmMetaAciklama,
-                            kategoriId: finalCatId,
-                            sentiment: llmSentiment,
+                            baslik: safeTitle,
+                            icerik: contentFallback,
+                            metaAciklama: contentFallback.substring(0, 150) + "...",
+                            kategoriId: finalCatId,          // NB tahmini (provisional)
+                            nbKategoriId: finalCatId,        // NB tahmini (frozen, asla değişmez)
+                            llmKategoriId: null,             // Worker dolduracak
+                            sentiment: sentRes ? sentRes.label : 'Nötr',
                             mlConfidence: catRes ? catRes.confidence : undefined,
                             gorselUrl: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167",
                             kaynakUrl: safeLink,
-                            durum: newsdurum,
-                            llmProvider: llmProviderName,
-                            kategoriDogrulandi,
-                            augmentedAt: llmSucceeded ? new Date() : undefined
+                            durum: 'ham',
+                            llmProvider: llmProviderValue,
+                            kategoriDogrulandi: false,
+                            augmentedAt: undefined
                         });
 
                         cycleAdded++;

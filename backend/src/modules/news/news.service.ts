@@ -57,6 +57,9 @@ export class NewsService implements INewsService {
                 llmProvider: data.llmProvider || null,
                 kategoriDogrulandi: data.kategoriDogrulandi || false,
                 augmentedAt: data.augmentedAt || null,
+                nbKategoriId: data.nbKategoriId ?? null,
+                llmKategoriId: data.llmKategoriId ?? null,
+                llmRetryCount: data.llmRetryCount ?? 0,
                 okumaSuresiDakika: data.icerik ? Math.ceil(data.icerik.split(' ').length / 200) : null,
             } as any,
             include: {
