@@ -76,6 +76,7 @@ protectedRouter.put('/validate-batch', async (req: Request, res: Response) => {
                     data: {
                         kategoriId: d.yeniKategoriId,
                         kategoriDogrulandi: true,
+                        durum: 'hazir',
                     },
                 })
             ).concat(
@@ -165,7 +166,8 @@ protectedRouter.put('/validate-correction', async (req: Request, res: Response) 
                 where: { id: haberId },
                 data: {
                     kategoriId: yeniKategoriId,
-                    kategoriDogrulandi: true
+                    kategoriDogrulandi: true,
+                    durum: 'hazir',
                 }
             }),
             (prisma as any).manuelValidasyon.create({
