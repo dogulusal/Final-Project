@@ -59,7 +59,7 @@ protectedRouter.put('/validate-batch', async (req: Request, res: Response) => {
                 haberId: number;
                 eskiKategoriId: number;
                 yeniKategoriId: number;
-                kararTuru: 'confirm' | 'correct';
+                kararTuru: 'confirm' | 'correct' | 'skip';
             }>;
             validatedBy: string;
         };
@@ -68,9 +68,11 @@ protectedRouter.put('/validate-batch', async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: 'Geçersiz payload: batchId ve decisions zorunlu.' });
         }
 
+        const actionableDecisions = decisions.filter(d => d.kararTuru !== 'skip');
+
         // Tüm update'leri tek atomik transaction içinde çalıştır
         await prisma.$transaction(
-            decisions.map(d =>
+            actionableDecisions.map(d =>
                 prisma.haber.update({
                     where: { id: d.haberId },
                     data: {
@@ -89,7 +91,11 @@ protectedRouter.put('/validate-batch', async (req: Request, res: Response) => {
                             dogrulayanEmail: validatedBy ?? 'cli',
                             kararTuru: d.kararTuru,
                             batchId,
-                            notlar: d.kararTuru === 'correct' ? 'Kategori düzeltildi' : 'Onaylandı',
+                            notlar: d.kararTuru === 'correct'
+                                ? 'Kategori düzeltildi'
+                                : d.kararTuru === 'skip'
+                                    ? 'Atlandı'
+                                    : 'Onaylandı',
                         },
                     })
                 )

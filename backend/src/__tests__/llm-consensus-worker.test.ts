@@ -226,6 +226,36 @@ describe('LlmConsensusWorker', () => {
         );
     });
 
+    it('geçersiz LLM çıktısında retry/dead yerine NB final korunur', async () => {
+        const NB_ID = 2;
+        (prisma.haber.findMany as jest.Mock).mockResolvedValue([
+            mockHaber({ nbKategoriId: NB_ID, llmRetryCount: 1 }),
+        ]);
+
+        const invalidGemini = makeMockProvider('Hayvanlar');
+        const invalidOllama = makeMockProvider('Kategori: Bilinmiyor');
+        const worker = new TestableWorker(invalidGemini, invalidOllama);
+
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+        await worker.processNextBatch();
+        warnSpy.mockRestore();
+
+        expect(prisma.haber.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    llmKategoriId: null,
+                    kategoriId: NB_ID,
+                    durum: 'hazir',
+                    kategoriDogrulandi: true,
+                    llmProvider: 'none',
+                }),
+            }),
+        );
+
+        const updateArgs = (prisma.haber.update as jest.Mock).mock.calls[0][0];
+        expect(updateArgs.data.llmRetryCount).toBeUndefined();
+    });
+
     // ─── re-entrancy guard ─────────────────────────────────────────────────────
 
     it('aynı anda iki processNextBatch çağrısı olduğunda ikincisi atlanır', async () => {

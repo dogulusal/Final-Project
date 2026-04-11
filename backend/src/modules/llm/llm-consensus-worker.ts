@@ -43,6 +43,13 @@ export interface WorkerStats {
     failedCount: number;
 }
 
+class InvalidLLMCategoryError extends Error {
+    constructor(rawCategory: string) {
+        super(`Geçersiz LLM kategori yanıtı: "${rawCategory}"`);
+        this.name = 'InvalidLLMCategoryError';
+    }
+}
+
 interface PendingArticle {
     id: number;
     baslik: string;
@@ -145,6 +152,22 @@ export class LlmConsensusWorker {
 
             console.log(`[LLM Consensus] id=${article.id} → ${category} (${isConsensus ? 'konsensüs ✓' : 'çakışma ↔'})`);
         } catch (err) {
+            if (err instanceof InvalidLLMCategoryError) {
+                await prisma.haber.update({
+                    where: { id: article.id },
+                    data: {
+                        llmKategoriId: null,
+                        kategoriId: article.nbKategoriId ?? undefined,
+                        durum: 'hazir',
+                        kategoriDogrulandi: true,
+                        llmProvider: 'none',
+                    },
+                });
+                this.processedCount++;
+                console.warn(`[LLM Consensus] Geçersiz kategori çıktısı id=${article.id}; NB final korundu: ${err.message}`);
+                return;
+            }
+
             const newRetryCount = article.llmRetryCount + 1;
             const isDead = newRetryCount >= LLM_CONSENSUS_MAX_RETRIES;
             await prisma.haber.update({
@@ -175,7 +198,7 @@ export class LlmConsensusWorker {
         const found = (VALID_LLM_CATEGORIES as readonly string[]).find(
             cat => cat.localeCompare(trimmed, 'tr', { sensitivity: 'base' }) === 0,
         );
-        if (!found) throw new Error(`Geçersiz LLM kategori yanıtı: "${trimmed}"`);
+        if (!found) throw new InvalidLLMCategoryError(trimmed);
         return found;
     }
 
