@@ -4,23 +4,23 @@ import { prisma } from '../../config/database';
 
 const mlService = new MlCategorizationService('naive-bayes', 'unigram-bigram');
 
-// Sisteme başladığında önce DB'den kayıtlı modeli yüklemeyi dener, yoksa sıfırdan eğitir.
-// PRODUCTION: Use dataset.json pure (v51 baseline, 72.13% accuracy)
-// SPRINT 3: When manual validation complete, switch back to loadAndTrainFromDB()
+// Sisteme başladığında DB'den manual-only Records ile eğitir (Batch-21d: quality upgrade)
+// PRODUCTION: Use manual-only validated records (71.56% benchmark)
+// Auto-training trigger every 20 validated news with manualOnlyVerified: true
 void (async () => {
-    const loaded = await mlService.loadModelFromDb();
+    const trained = await mlService.loadAndTrainFromDB({ manualOnlyVerified: true });
 
-    if (loaded) {
-        console.log('[ML Controller] Kayıtlı model yüklendi ve gelen isteklere açık.');
+    if (trained) {
+        console.log('[ML Controller] Model manual-only records ile eğitildi ve gelen isteklere açık. (🎯 71.56% beklenen)');
         return;
     }
 
-    // PRODUCTION DEFAULT: Use dataset.json pure fallback (no DB batch verify)
-    const trained = await mlService.loadAndTrainFromDiskFallback();
-    if (trained) {
-        console.log('[ML Controller] Model dataset.json saf veri ile eğitildi ve gelen isteklere açık.');
+    // FALLBACK: Use dataset.json if DB training fails
+    const fallback = await mlService.loadAndTrainFromDiskFallback();
+    if (fallback) {
+        console.log('[ML Controller] ⚠️  Manual-only training başarısız, fallback dataset.json kullanılıyor.');
     } else {
-        console.warn('[ML Controller] Model başlatılırken sorun yaşandı veya JSON yedeği de bulunamadı.');
+        console.warn('[ML Controller] ❌ Model başlatılırken sorun yaşandı veya JSON yedeği de bulunamadı.');
     }
 })();
 
@@ -33,7 +33,7 @@ protectedRouter.post('/train', async (_req: Request, res: Response) => {
         // To enable DB batch verify: set ?useDb=true OR wait for Sprint 3 manual validation
         const useDb = _req.query.useDb === 'true';
         const success = useDb 
-            ? await mlService.loadAndTrainFromDB()
+            ? await mlService.loadAndTrainFromDB({ manualOnlyVerified: true })
             : await mlService.loadAndTrainFromDiskFallback();
         if (success) {
             res.json({ success: true, message: useDb ? 'Model DB batch ile eğitildi.' : 'Model dataset.json ile eğitildi.' });

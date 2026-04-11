@@ -237,7 +237,7 @@ export class MlCategorizationService implements INewsCategorizationService {
                     this.newsSinceLastTrain = 0;
                     setImmediate(async () => {
                         console.log('[ML Pipeline] Toplu eğitim tetiklendi...');
-                        await this.loadAndTrainFromDB();
+                        await this.loadAndTrainFromDB({ manualOnlyVerified: true });
                     });
                 }
             }
