@@ -13,6 +13,7 @@ type RunResult = {
   trainSize: number;
   testSize: number;
   durationSec: number;
+  categorySupports: Record<string, number>;
 };
 
 function parseMode(): ModeArg {
@@ -55,6 +56,14 @@ function parseManualOnly(): boolean {
   return process.argv.includes('--manual-only');
 }
 
+function parseMaxDbSamples(): number | undefined {
+  const arg = process.argv.find((a) => a.startsWith('--max-db-samples='));
+  if (!arg) return undefined;
+  const value = Number(arg.split('=')[1]);
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return Math.floor(value);
+}
+
 function safeNum(value: unknown): number {
   if (typeof value !== 'number' || Number.isNaN(value)) return 0;
   return value;
@@ -85,6 +94,7 @@ async function runSingleBenchmark(
   forceDiskFallback: boolean,
   diskSupplementLimit: number,
   manualOnly: boolean,
+  maxDbSamples?: number,
 ): Promise<RunResult> {
   const mlService = new MlCategorizationService(model, mode);
 
@@ -102,11 +112,19 @@ async function runSingleBenchmark(
       diskSupplementLimit,
       persist: false,
       manualOnlyVerified: manualOnly,
+      maxDbSamples,
     });
   }
 
   const diagnostics = (mlService as any).lastDiagnostics;
   const siyasetMetrics = diagnostics?.metrics?.Siyaset;
+
+  const categorySupports: Record<string, number> = {};
+  if (diagnostics?.metrics) {
+    for (const [cat, m] of Object.entries(diagnostics.metrics)) {
+      categorySupports[cat] = safeNum((m as any)?.support);
+    }
+  }
 
   return {
     run,
@@ -118,6 +136,7 @@ async function runSingleBenchmark(
     trainSize: safeNum(mlService.trainSize),
     testSize: safeNum(mlService.testSize),
     durationSec: (Date.now() - start) / 1000,
+    categorySupports,
   };
 }
 
@@ -129,6 +148,7 @@ async function main() {
     const mode = parseMode();
     const model = parseModel();
     const manualOnly = parseManualOnly();
+    const maxDbSamples = parseMaxDbSamples();
 
     console.log('');
     console.log('=== BENCHMARK 10X TOKENIZER STABILITY ===');
@@ -138,12 +158,15 @@ async function main() {
     console.log(`diskSupplementLimit=${diskSupplementLimit}`);
     console.log(`FORCE_DISK_FALLBACK=${forceDiskFallback ? 'true' : 'false'}`);
     console.log(`manualOnly=${manualOnly}`);
+    if (typeof maxDbSamples === 'number') {
+      console.log(`maxDbSamples=${maxDbSamples}`);
+    }
     console.log('');
 
     const results: RunResult[] = [];
 
     for (let i = 1; i <= runs; i++) {
-      const r = await runSingleBenchmark(i, model, mode, forceDiskFallback, diskSupplementLimit, manualOnly);
+      const r = await runSingleBenchmark(i, model, mode, forceDiskFallback, diskSupplementLimit, manualOnly, maxDbSamples);
       results.push(r);
 
       console.log(
@@ -157,6 +180,11 @@ async function main() {
           `test=${r.testSize} ` +
           `dur=${r.durationSec.toFixed(1)}s`,
       );
+
+      const lowSupport = Object.entries(r.categorySupports).filter(([, s]) => s < 10);
+      if (lowSupport.length > 0) {
+        console.log(`[Run ${r.run.toString().padStart(2, '0')}][WARN] Low test support: ${lowSupport.map(([c, s]) => `${c}=${s}`).join(', ')}`);
+      }
     }
 
     const accStats = stats(results.map((r) => r.accuracy));
@@ -184,6 +212,19 @@ async function main() {
       console.log('Decision: std > 0.05 -> Önce support/veri sorunu çözülmeli, hard negative aşamasına geçmeyin.');
     } else {
       console.log('Decision: std <= 0.05 -> Bigram listesi/coverage üzerinden iyileştirmeye devam edin.');
+    }
+
+    // Per-category support table (min/mean/max across runs)
+    const allCats = Array.from(new Set(results.flatMap((r) => Object.keys(r.categorySupports)))).sort();
+    if (allCats.length > 0) {
+      console.log('');
+      console.log('=== CATEGORY TEST SUPPORT (min / mean / max across runs) ===');
+      for (const cat of allCats) {
+        const vals = results.map((r) => r.categorySupports[cat] ?? 0);
+        const catStats = stats(vals);
+        const flag = catStats.min < 10 ? ' ⚠ LOW' : '';
+        console.log(`  ${cat.padEnd(12)} min=${catStats.min.toFixed(0).padStart(3)} mean=${catStats.mean.toFixed(1).padStart(5)} max=${catStats.max.toFixed(0).padStart(3)}${flag}`);
+      }
     }
 
     process.exit(0);
