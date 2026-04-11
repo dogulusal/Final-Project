@@ -1,10 +1,8 @@
-import { RSS_SOURCES, LLM_PIPELINE_ENABLED, LLM_DAILY_QUOTA, ML_CONFIDENCE_THRESHOLD } from '../../config/constants';
+import { RSS_SOURCES, LLM_PIPELINE_ENABLED, LLM_DAILY_QUOTA, ML_CONFIDENCE_THRESHOLD, LLM_CONSENSUS_ENABLED } from '../../config/constants';
 import { ContentQualityFilter } from '../news/content-quality-filter';
 import { NewsService } from '../news/news.service';
 import { mlService } from '../ml/ml.controller';
 import { prisma } from '../../config/database';
-import { ContentGenerationService } from '../llm/llm.service';
-import { RawNewsInput } from '../llm/llm.interface';
 import { RssParserService } from './rss.service';
 
 export interface SchedulerStatus {
@@ -23,11 +21,12 @@ export class RssScheduler {
     private todayCount: number = 0;
     
     // LLM Pipeline: günlük kota takibi ve işlenen URL seti (duplicate LLM çağrısını önler)
+    // Not: Consensus worker aktifken bu alanlar kullanılmaz; LLM_PIPELINE_ENABLED eski inline mod için korunur.
     private llmDailyCount: number = 0;
     private llmLastResetDate: string = '';
     private llmProcessedUrls: Set<string> = new Set();
     private llmQuotaLoggedThisCycle: boolean = false;
-    private llmService = new ContentGenerationService();
+    // llmService kaldırıldı — inline LLM devreden çıkarıldı; consensus worker tarafından yönetilir
 
     // Sağlık takibi
     private sourceFailures: Record<string, number> = {};
@@ -37,6 +36,80 @@ export class RssScheduler {
     private rssParserService = new RssParserService();
     private qualityFilter = new ContentQualityFilter();
     private newsService = new NewsService();
+
+    private getValueType(value: unknown): string {
+        if (Array.isArray(value)) return 'array';
+        if (value === null) return 'null';
+        return typeof value;
+    }
+
+    private getValueSample(value: unknown): string {
+        if (typeof value === 'string') {
+            return value.substring(0, 50);
+        }
+
+        try {
+            return JSON.stringify(value).substring(0, 50);
+        } catch {
+            return String(value).substring(0, 50);
+        }
+    }
+
+    private logParserFieldType(sourceId: string, fieldName: string, value: unknown): void {
+        if (typeof value === 'string') return;
+
+        console.error(
+            `[Parser Error] source: ${sourceId} | field: ${fieldName} | actual_type: ${this.getValueType(value)} | value_sample: ${this.getValueSample(value)}`
+        );
+    }
+
+    private normalizeCategoryKey(value: string): string {
+        return value
+            .toLowerCase()
+            .trim()
+            .replace(/ğ/g, 'g')
+            .replace(/ü/g, 'u')
+            .replace(/ş/g, 's')
+            .replace(/ı/g, 'i')
+            .replace(/ö/g, 'o')
+            .replace(/ç/g, 'c');
+    }
+
+    private resolveCategoryId(categoryText: string, kategoriMap: Map<string, number>): number | null {
+        const normalizedInput = this.normalizeCategoryKey(categoryText);
+        if (!normalizedInput) return null;
+
+        const aliases: Record<string, string> = {
+            gundem: 'genel',
+            yasam: 'genel',
+            magazin: 'genel',
+            politika: 'siyaset',
+            dunya: 'dunya',
+            spor: 'spor',
+            ekonomi: 'ekonomi',
+            saglik: 'saglik',
+            teknoloji: 'teknoloji',
+            genel: 'genel'
+        };
+
+        for (const [name, id] of kategoriMap.entries()) {
+            const normalizedName = this.normalizeCategoryKey(name);
+            if (normalizedName === normalizedInput) {
+                return id;
+            }
+        }
+
+        const aliasTarget = aliases[normalizedInput];
+        if (!aliasTarget) return null;
+
+        for (const [name, id] of kategoriMap.entries()) {
+            if (this.normalizeCategoryKey(name) === aliasTarget) {
+                return id;
+            }
+        }
+
+        return null;
+    }
 
     private normalizeText(value: unknown): string {
         if (typeof value === 'string') {
@@ -119,24 +192,6 @@ export class RssScheduler {
         console.log(`[Scheduler] RSS toplayıcı durduruldu.`);
     }
 
-    /** Gemini 429 hataları için üstel geri çekilme (exponential backoff) ile LLM çağrısı */
-    private async callLLMWithRetry(input: RawNewsInput): Promise<import('../llm/llm.interface').GeneratedNewsContent> {
-        const delays = [0, 2000, 6000];
-        let lastErr: any;
-        for (let attempt = 0; attempt < delays.length; attempt++) {
-            if (delays[attempt] > 0) await new Promise(r => setTimeout(r, delays[attempt]));
-            try {
-                return await this.llmService.generate(input);
-            } catch (err: any) {
-                lastErr = err;
-                const is429 = err?.message?.includes('429') || err?.status === 429;
-                if (!is429 || attempt === delays.length - 1) throw err;
-                console.warn(`[Scheduler LLM] ⏳ 429 rate limit, ${delays[attempt + 1]}ms bekleniyor... (deneme ${attempt + 1}/${delays.length})`);
-            }
-        }
-        throw lastErr;
-    }
-
     private async runCycle() {
         console.log(`[Scheduler] Yeni döngü başladı. Toplam Kaynak: ${RSS_SOURCES.length}`);
 
@@ -186,6 +241,10 @@ export class RssScheduler {
                 for (let i = 0; i < Math.min(feedItems.length, 15); i++) {
                     try {
                         const item = feedItems[i];
+                        this.logParserFieldType(source.id, 'title', item.title);
+                        this.logParserFieldType(source.id, 'link', item.link);
+                        this.logParserFieldType(source.id, 'contentSnippet', item.contentSnippet);
+
                         const safeTitle = this.normalizeText(item.title);
                         if (!safeTitle) continue;
 
@@ -210,88 +269,39 @@ export class RssScheduler {
                         ]);
 
                         const genelCatId = kategoriMap.get('genel') ?? 1;
+                        const sourceCatId = this.resolveCategoryId(source.category, kategoriMap) ?? genelCatId;
                         const mlStrong = !!(catRes && catRes.confidence >= ML_CONFIDENCE_THRESHOLD);
                         const mlCatId = mlStrong
-                            ? (kategoriMap.get(catRes!.kategori.toLowerCase()) ?? genelCatId)
+                            ? (this.resolveCategoryId(catRes!.kategori, kategoriMap) ?? null)
                             : null;
-                        let finalCatId = mlStrong
-                            ? mlCatId!
-                            : genelCatId;
+                        let finalCatId = sourceCatId;
 
-                        // 4. LLM Zenginleştirme (LLM_PIPELINE_ENABLED=true ile etkinleştirilir)
-                        let llmBaslik = safeTitle;
-                        let llmIcerik = contentFallback;
-                        let llmMetaAciklama = contentFallback.substring(0, 150) + "...";
-                        let llmSentiment = sentRes ? sentRes.label : "Nötr";
-                        let newsdurum: 'ham' | 'hazir' = 'ham';
-                        let llmProviderName = 'none';
-                        let llmSucceeded = false;
-                        let kategoriDogrulandi = false;
-
-                        const articleUrl = safeLink || '';
-                        const quotaAvailable = LLM_PIPELINE_ENABLED &&
-                            this.llmDailyCount < LLM_DAILY_QUOTA &&
-                            !this.llmProcessedUrls.has(articleUrl);
-
-                        if (quotaAvailable) {
-                            try {
-                                const llmInput: RawNewsInput = {
-                                    baslik: safeTitle,
-                                    ozet: contentFallback,
-                                    kategori: catRes?.kategori || source.category || 'Genel',
-                                    kaynak_url: articleUrl
-                                };
-                                const llmResult = await this.callLLMWithRetry(llmInput);
-                                llmBaslik = this.normalizeText(llmResult.baslik) || safeTitle;
-                                llmIcerik = this.normalizeText(llmResult.icerik) || contentFallback;
-                                llmMetaAciklama = this.normalizeText(llmResult.meta_aciklama) || llmMetaAciklama;
-
-                                const normalizedSentiment = this.normalizeText(llmResult.sentiment);
-                                if (normalizedSentiment === 'Pozitif' || normalizedSentiment === 'Negatif' || normalizedSentiment === 'Nötr') {
-                                    llmSentiment = normalizedSentiment;
-                                }
-
-                                const normalizedKategori = this.normalizeText(llmResult.kategori).toLowerCase();
-                                if (normalizedKategori) {
-                                    const llmCatId = kategoriMap.get(normalizedKategori);
-                                    if (llmCatId) finalCatId = llmCatId;
-                                }
-                                llmSucceeded = true;
-                                llmProviderName = 'gemini';
-                                this.llmDailyCount++;
-                                if (articleUrl) this.llmProcessedUrls.add(articleUrl);
-                                console.log(`[Scheduler LLM] ✅ "${llmBaslik.substring(0, 50)}..." zenginleştirildi (kota: ${this.llmDailyCount}/${LLM_DAILY_QUOTA})`);
-                            } catch (llmErr: any) {
-                                console.warn(`[Scheduler LLM] ⚠️ LLM başarısız, ham kaydediliyor: ${llmErr.message}`);
-                            }
-                        } else if (LLM_PIPELINE_ENABLED && this.llmDailyCount >= LLM_DAILY_QUOTA && !this.llmQuotaLoggedThisCycle) {
-                            this.llmQuotaLoggedThisCycle = true;
-                            console.warn(`[Scheduler LLM] ⛔ Günlük kota doldu (${LLM_DAILY_QUOTA}). Bu döngüdeki kalan haberler ham kaydedilecek.`);
+                        // ML sadece çok güvenli olduğunda ya da kaynak kategorisiyle aynıysa override etsin.
+                        if (mlStrong && mlCatId && (mlCatId === sourceCatId || catRes!.confidence >= 0.93)) {
+                            finalCatId = mlCatId;
                         }
 
-                        // LLM başarılıysa hazır kabul et. LLM yoksa sadece güçlü ML tahmini olanları hazıra al.
-                        if (llmSucceeded || mlStrong) {
-                            newsdurum = 'hazir';
-                        }
+                        // 4. Consensus Pipeline: LLM'i arka plan worker'a bırak
+                        // LLM_CONSENSUS_ENABLED=true  → llmProvider='pending' (worker işleyecek)
+                        // LLM_CONSENSUS_ENABLED=false → llmProvider='none'    (NB kategorisi final)
+                        const llmProviderValue = LLM_CONSENSUS_ENABLED ? 'pending' : 'none';
 
-                        // ML ve nihai kategori uyumu varsa doğrulanmış kabul et.
-                        if (mlStrong && mlCatId && mlCatId === finalCatId) {
-                            kategoriDogrulandi = true;
-                        }
-
-                        // 5. DB Kayıt
+                        // 5. DB Kayıt (Haber her zaman 'ham' başlar; worker consensus'u tamamlayınca 'hazir' olur)
                         await this.newsService.createNews({
-                            baslik: llmBaslik,
-                            icerik: llmIcerik,
-                            metaAciklama: llmMetaAciklama,
-                            kategoriId: finalCatId,
-                            sentiment: llmSentiment,
+                            baslik: safeTitle,
+                            icerik: contentFallback,
+                            metaAciklama: contentFallback.substring(0, 150) + "...",
+                            kategoriId: finalCatId,          // NB tahmini (provisional)
+                            nbKategoriId: finalCatId,        // NB tahmini (frozen, asla değişmez)
+                            llmKategoriId: null,             // Worker dolduracak
+                            sentiment: sentRes ? sentRes.label : 'Nötr',
                             mlConfidence: catRes ? catRes.confidence : undefined,
                             gorselUrl: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167",
                             kaynakUrl: safeLink,
-                            durum: newsdurum,
-                            llmProvider: llmProviderName,
-                            kategoriDogrulandi
+                            durum: 'ham',
+                            llmProvider: llmProviderValue,
+                            kategoriDogrulandi: false,
+                            augmentedAt: undefined
                         });
 
                         cycleAdded++;

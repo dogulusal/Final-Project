@@ -1,0 +1,869 @@
+{
+  "exportedAt": "2026-04-11T15:19:38.771Z",
+  "confidenceThreshold": 0.85,
+  "rule": "3/3 correct â†’ batch accepted; any wrong â†’ full batch rejected",
+  "totalCandidates": 200,
+  "batchCount": 20,
+  "batches": [
+    {
+      "batchId": 1,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        2012,
+        1655,
+        1700,
+        1318,
+        1736,
+        1503,
+        1709,
+        1356,
+        1821,
+        1527
+      ],
+      "sampledRecords": [
+        {
+          "id": 1356,
+          "title": "Galaxy S26 Ultra Oyun Testi! GTA 5â€™i AÃ§abiliyor mu?",
+          "currentCategory": "Ekonomi",
+          "confidence": 0.9992696949654571,
+          "decision": "wrong",
+          "note": "Teknoloji olmali"
+        },
+        {
+          "id": 2012,
+          "title": "Ä°stanbul BarajlarÄ± %70 Dolulukla Nefes AldÄ±: 15 GÃ¼nde BÃ¼yÃ¼k ArtÄ±ÅŸ",
+          "currentCategory": "Genel",
+          "confidence": 0.999999082692904,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1503,
+          "title": "ÅanlÄ±urfa'da Feci Kaza: Baba ve OÄŸul HayatÄ±nÄ± Kaybetti",
+          "currentCategory": "Genel",
+          "confidence": 0.9996798463668957,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 2,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1425,
+        2044,
+        1811,
+        1448,
+        1988,
+        1989,
+        2033,
+        1629,
+        1418,
+        1891
+      ],
+      "sampledRecords": [
+        {
+          "id": 1988,
+          "title": "YouTube TV UygulamasÄ±ndaki Kritik Hata DÃ¼zeltiliyor",
+          "currentCategory": "SaÄŸlÄ±k",
+          "confidence": 0.9967745079682971,
+          "decision": "wrong",
+          "note": "Teknoloji olmali"
+        },
+        {
+          "id": 1448,
+          "title": "DJI Osmo Pocket 4 SÄ±zdÄ±: Kamera PazarÄ±nda Yeni DÃ¶nem BaÅŸlÄ±yor",
+          "currentCategory": "Teknoloji",
+          "confidence": 0.9972190355842044,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1811,
+          "title": "Android 17 Oyunculara MÃ¼jde: Oyun KollarÄ±na Tam Ã–zelleÅŸtirme Geliyor",
+          "currentCategory": "Teknoloji",
+          "confidence": 0.9980596106664855,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 3,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1889,
+        1934,
+        1628,
+        1770,
+        1886,
+        1763,
+        1970,
+        1725,
+        1699,
+        1881
+      ],
+      "sampledRecords": [
+        {
+          "id": 1699,
+          "title": "Bu AkÄ±llÄ± Saati MÃ¼hendisler DeÄŸil, Efsane Sporcu TasarladÄ±! Huawei Watch GT Runner 2",
+          "currentCategory": "SaÄŸlÄ±k",
+          "confidence": 0.9497467352873492,
+          "decision": "wrong",
+          "note": "Teknoloji olmali"
+        },
+        {
+          "id": 1763,
+          "title": "Ä°zmirâ€™de â€˜Meslek FabrikasÄ±â€™ direniÅŸi sÃ¼rÃ¼yorâ€¦ Cemil Tugayâ€™dan sert Ã§Ä±kÄ±ÅŸ: â€˜Sizin gibi zalimlerden korkmuyorum, o binaya gireceÄŸim!â€™",
+          "currentCategory": "SaÄŸlÄ±k",
+          "confidence": 0.9677613511424891,
+          "decision": "wrong",
+          "note": "Siyaset olmali"
+        },
+        {
+          "id": 1934,
+          "title": "TurkNet Ä°nternet HÄ±zÄ±nda TÃ¼rkiye LiderliÄŸini SÃ¼rdÃ¼rÃ¼yor",
+          "currentCategory": "Teknoloji",
+          "confidence": 0.9799813476878667,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 4,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1982,
+        1911,
+        1358,
+        1349,
+        1896,
+        1860,
+        1867,
+        2099,
+        2096,
+        1276
+      ],
+      "sampledRecords": [
+        {
+          "id": 1867,
+          "title": "2 Ã§ocuk annesi direksiyon baÅŸÄ±nda! Rizeâ€™de kadÄ±n taksici azmiyle takdir topluyor",
+          "currentCategory": "SaÄŸlÄ±k",
+          "confidence": 0.9464280883615277,
+          "decision": "wrong",
+          "note": "Genel olmali"
+        },
+        {
+          "id": 1896,
+          "title": "Ä°srail'den LÃ¼bnan'da Hizbullah'a saldÄ±rÄ±! 'Naim KasÄ±m'Ä±n yeÄŸeni Ã¶ldÃ¼rÃ¼ldÃ¼'",
+          "currentCategory": "DÃ¼nya",
+          "confidence": 0.9464285414204423,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1349,
+          "title": "Ä°stanbul'da Cuma'dan Ä°tibaren Hava 6Â°C SoÄŸuyacak: YaÄŸmur Geliyor",
+          "currentCategory": "Genel",
+          "confidence": 0.9464285714268321,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 5,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1698,
+        1816,
+        1396,
+        1394,
+        1469,
+        1465,
+        1453,
+        2076,
+        1673,
+        1487
+      ],
+      "sampledRecords": [
+        {
+          "id": 1487,
+          "title": "Ä°STANBULâ€™DA 8 SAATLÄ°K ELEKTRÄ°K KESÄ°NTÄ°SÄ°! 6 Nisan Hangi Ä°lÃ§elerde Elektrik Yok? BEDAÅ ve AYEDAÅ Duyurdu",
+          "currentCategory": "SaÄŸlÄ±k",
+          "confidence": 0.9442678009811564,
+          "decision": "wrong",
+          "note": "Genel olmali"
+        },
+        {
+          "id": 1465,
+          "title": "KÄ±zÄ±nÄ±n MezarÄ±nÄ± YaÄŸmalayanlar Kamerada: Anne Ä°syan Etti",
+          "currentCategory": "Genel",
+          "confidence": 0.9458784780177152,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1453,
+          "title": "Mezar HÄ±rsÄ±zlarÄ± Kamerada: BayraÄŸa BasÄ±p EÅŸya Ã‡aldÄ±lar",
+          "currentCategory": "Genel",
+          "confidence": 0.9457300024255593,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 6,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1343,
+        1440,
+        1447,
+        1426,
+        1517,
+        1460,
+        1390,
+        1822,
+        1400,
+        1456
+      ],
+      "sampledRecords": [
+        {
+          "id": 1456,
+          "title": "FETÃ–'ye 13 Ä°lde EÅŸ ZamanlÄ± Operasyon: 19 GÃ¶zaltÄ±",
+          "currentCategory": "Genel",
+          "confidence": 0.9431968798686337,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1440,
+          "title": "Sahte Ä°kamet Ä°zni Åebekesine Operasyon: 51 GÃ¶zaltÄ±, 441 Ä°zin Ä°ptali",
+          "currentCategory": "Genel",
+          "confidence": 0.9433946582722126,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1400,
+          "title": "KayÄ±p GenÃ§ KadÄ±n Barajda Ã–lÃ¼ Bulundu: 8 Yerinden BÄ±Ã§aklanmÄ±ÅŸ",
+          "currentCategory": "Genel",
+          "confidence": 0.9432820742278252,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "ACCEPTED"
+    },
+    {
+      "batchId": 7,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1454,
+        1701,
+        2020,
+        1410,
+        1285,
+        1625,
+        1661,
+        1567,
+        1937,
+        1712
+      ],
+      "sampledRecords": [
+        {
+          "id": 1937,
+          "title": "TÃ¶re cinayetinde 4 Ã§ocuk da kocadan Ã§Ä±kmadÄ±!",
+          "currentCategory": "Siyaset",
+          "confidence": 0.9420280003051339,
+          "decision": "wrong",
+          "note": "Genel olmali"
+        },
+        {
+          "id": 1712,
+          "title": "TÃ¼rkiye Down Sendromu DerneÄŸi'nden Ã–zel EÄŸitim KurumlarÄ± YÃ¶netmeliÄŸi'nde yapÄ±lan deÄŸiÅŸikliklere iptal davasÄ±",
+          "currentCategory": "SaÄŸlÄ±k",
+          "confidence": 0.9419125353165553,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1454,
+          "title": "13 Ä°lde FETÃ– Operasyonu: TSK YapÄ±lanmasÄ±ndan 19 GÃ¶zaltÄ±",
+          "currentCategory": "Genel",
+          "confidence": 0.9431968798686337,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 8,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1903,
+        1815,
+        1412,
+        1660,
+        2032,
+        1705,
+        1359,
+        1693,
+        1311,
+        1765
+      ],
+      "sampledRecords": [
+        {
+          "id": 1705,
+          "title": "Steam Ä°ndirimleri BaÅŸladÄ±: Oyunlarda %90'a Varan FÄ±rsatlar",
+          "currentCategory": "Teknoloji",
+          "confidence": 0.9394814381831842,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 2032,
+          "title": "GaspÃ§Ä± Konum AttÄ±, Polise YakayÄ± Ele Verdi: Dijital Ä°z PeÅŸinde!",
+          "currentCategory": "Genel",
+          "confidence": 0.9399191065811926,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1359,
+          "title": "Åans Topu 5 Nisan SonuÃ§larÄ±: BÃ¼yÃ¼k Ä°kramiye Kime Ã‡Ä±ktÄ±?",
+          "currentCategory": "Genel",
+          "confidence": 0.939249640365362,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "ACCEPTED"
+    },
+    {
+      "batchId": 9,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        2007,
+        1407,
+        2034,
+        1844,
+        1995,
+        1730,
+        1910,
+        1814,
+        1733,
+        1723
+      ],
+      "sampledRecords": [
+        {
+          "id": 2007,
+          "title": "Meclis'te Ara SeÃ§im ve Tutuklu Vekil TartÄ±ÅŸmalarÄ± Yeniden Alevlendi",
+          "currentCategory": "Siyaset",
+          "confidence": 0.9365586794656603,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1730,
+          "title": "Huawei Watch GT Runner 2 Ä°nceleme â€“ Spor ve SaÄŸlÄ±k iÃ§in En Ä°yisi mi?",
+          "currentCategory": "SaÄŸlÄ±k",
+          "confidence": 0.9318472067684338,
+          "decision": "wrong",
+          "note": "Teknoloji olmali"
+        },
+        {
+          "id": 1844,
+          "title": "DÃ¼nya bunu bekliyordu! AteÅŸ kesildi masa kurulacak",
+          "currentCategory": "SaÄŸlÄ±k",
+          "confidence": 0.9325330065562322,
+          "decision": "wrong",
+          "note": "Dunya olmali"
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 10,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1363,
+        1696,
+        1841,
+        1694,
+        1665,
+        1522,
+        1820,
+        1761,
+        1439,
+        1476
+      ],
+      "sampledRecords": [
+        {
+          "id": 1363,
+          "title": "KullanÄ±cÄ±lardan Samsungâ€™a BÃ¼yÃ¼k EleÅŸtiri!",
+          "currentCategory": "Teknoloji",
+          "confidence": 0.9252068202121149,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1439,
+          "title": "NASA YayÄ±nÄ± Kesti: Astronot Glover Uzayda DuÅŸ AlÄ±rken YakalandÄ±",
+          "currentCategory": "Genel",
+          "confidence": 0.9129557250735201,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1820,
+          "title": "ÅiÅŸli Belediyesi'nde Kayyum YÃ¶netimine 'Ãœcret GaspÄ±' Protestosu",
+          "currentCategory": "Siyaset",
+          "confidence": 0.9158852658743492,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "ACCEPTED"
+    },
+    {
+      "batchId": 11,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1354,
+        1479,
+        1437,
+        1899,
+        1945,
+        1966,
+        2018,
+        2082,
+        1742,
+        1859
+      ],
+      "sampledRecords": [
+        {
+          "id": 1899,
+          "title": "KurtulmuÅŸ'tan ara seÃ§im aÃ§Ä±klamasÄ±",
+          "currentCategory": "Genel",
+          "confidence": 0.9032258046750755,
+          "decision": "wrong",
+          "note": "Siyaset olmali"
+        },
+        {
+          "id": 1479,
+          "title": "Bursaâ€™da surlara Ã§Ä±kan adam, 'Ezgi gelmezse atlarÄ±m' dedi! Jiletlerle intihar tehdidi savurdu",
+          "currentCategory": "Genel",
+          "confidence": 0.9076918189931419,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1966,
+          "title": "â€œTrump Amerikan imparatorluÄŸunu yok ettiâ€ Pirus zaferi benzetmesi: Ä°ngiliz dergisinden Ã§arpÄ±cÄ± kapak!",
+          "currentCategory": "Genel",
+          "confidence": 0.9032123396439218,
+          "decision": "wrong",
+          "note": "Kategori yanlis"
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 12,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1897,
+        1348,
+        1346,
+        2048,
+        1389,
+        1634,
+        1840,
+        1500,
+        1679,
+        1666
+      ],
+      "sampledRecords": [
+        {
+          "id": 1666,
+          "title": "ABD ile Ä°srail'den Ä°ran'da hayati bÃ¶lgelere saldÄ±rÄ±! 10 nokta vuruldu",
+          "currentCategory": "Genel",
+          "confidence": 0.8982820075257292,
+          "decision": "wrong",
+          "note": "Dunya olmali"
+        },
+        {
+          "id": 2048,
+          "title": "HÃ¼kÃ¼met dÃ¼ÄŸmeye bastÄ±! Ãœlkedeki tÃ¼m vatandaÅŸlara Ã¼cretsiz internet verilecek: 'LÃ¼ks deÄŸil temel ihtiyaÃ§'",
+          "currentCategory": "Genel",
+          "confidence": 0.8983050550014411,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1348,
+          "title": "Park yeri kavgasÄ± ortalÄ±ÄŸÄ± karÄ±ÅŸtÄ±rdÄ±! Tekme tokat birbirlerine girdiler",
+          "currentCategory": "Genel",
+          "confidence": 0.8983050833063198,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 13,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1837,
+        1893,
+        2052,
+        2049,
+        1998,
+        1879,
+        1622,
+        1468,
+        1301,
+        1300
+      ],
+      "sampledRecords": [
+        {
+          "id": 1837,
+          "title": "Hollanda DÄ±ÅŸiÅŸleri BakanÄ± Berendsen, bugÃ¼n TÃ¼rkiyeâ€™de",
+          "currentCategory": "Genel",
+          "confidence": 0.8982621154342724,
+          "decision": "wrong",
+          "note": "Dunya olmali"
+        },
+        {
+          "id": 1998,
+          "title": "Galaxy Z Flip 8 SÄ±zdÄ±: Yeni Katlanabilir Telefonun TasarÄ±mÄ± Belli Oldu",
+          "currentCategory": "Teknoloji",
+          "confidence": 0.8967350534951508,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1468,
+          "title": "TÃ¼rkiye Dijitale GÃ¼mrÃ¼k Getirdi! Zamlar KapÄ±da!",
+          "currentCategory": "Teknoloji",
+          "confidence": 0.8945804083356057,
+          "decision": "wrong",
+          "note": "Ekonomi olmali"
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 14,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1316,
+        1315,
+        1313,
+        1584,
+        1324,
+        1632,
+        1499,
+        1963,
+        2025,
+        1283
+      ],
+      "sampledRecords": [
+        {
+          "id": 1316,
+          "title": "16 YaÅŸÄ±ndaki EsnafÄ±n Telefon DÃ¼kkanÄ± Soyuldu: 150 Bin TL Zarar",
+          "currentCategory": "Genel",
+          "confidence": 0.8928571426526395,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1963,
+          "title": "Cemil Tugay: Meslek FabrikasÄ± iÃ§in mÃ¼cadele sÃ¼recek",
+          "currentCategory": "Genel",
+          "confidence": 0.89271667125315,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1584,
+          "title": "NevÅŸehir'de SilahlÄ± SaldÄ±rÄ±: KurÅŸunlara BardaklÄ± YanÄ±t",
+          "currentCategory": "Genel",
+          "confidence": 0.8928571148925897,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "ACCEPTED"
+    },
+    {
+      "batchId": 15,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1695,
+        1631,
+        1495,
+        1490,
+        1369,
+        2067,
+        2035,
+        1444,
+        1420,
+        1434
+      ],
+      "sampledRecords": [
+        {
+          "id": 1695,
+          "title": "E-ticarete gireceklere Ã¶zel destek",
+          "currentCategory": "Ekonomi",
+          "confidence": 0.8926011652653576,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1490,
+          "title": "SÃ¼per Lig'de Åampiyonluk YarÄ±ÅŸÄ± KÄ±zÄ±ÅŸtÄ±: Liderlik El DeÄŸiÅŸtirebilir",
+          "currentCategory": "Spor",
+          "confidence": 0.8894350888814206,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1631,
+          "title": "Poco X8 Pro Max TÃ¼rkiye'de: FiyatÄ± ve Ã–ne Ã‡Ä±kan Ã–zellikleri",
+          "currentCategory": "Teknoloji",
+          "confidence": 0.89246389781236,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "ACCEPTED"
+    },
+    {
+      "batchId": 16,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1367,
+        1620,
+        1633,
+        1535,
+        1431,
+        1728,
+        1965,
+        1443,
+        1751,
+        1912
+      ],
+      "sampledRecords": [
+        {
+          "id": 1965,
+          "title": "BurÃ§lara gÃ¶re erkeklerin ilk randevu karnesi",
+          "currentCategory": "SaÄŸlÄ±k",
+          "confidence": 0.875747646122957,
+          "decision": "wrong",
+          "note": "Genel olmali"
+        },
+        {
+          "id": 1633,
+          "title": "X, Grok Yapay Zeka Destekli Ã‡eviri Ã–zelliÄŸini DÃ¼nya Genelinde BaÅŸlattÄ±",
+          "currentCategory": "Teknoloji",
+          "confidence": 0.8804759916928048,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1367,
+          "title": "Dev derbide ilk 11'ler belli oldu!",
+          "currentCategory": "Spor",
+          "confidence": 0.886023878883942,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 17,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1914,
+        1941,
+        1521,
+        1512,
+        1501,
+        1488,
+        1413,
+        2094,
+        1913,
+        1556
+      ],
+      "sampledRecords": [
+        {
+          "id": 1521,
+          "title": "7 Ãœniversite Mezunu Akademisyenden 521 Milyon TL'lik Ä°ntikam DolandÄ±rÄ±cÄ±lÄ±ÄŸÄ±",
+          "currentCategory": "Genel",
+          "confidence": 0.8676470588235293,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1488,
+          "title": "DiÅŸ AÄŸrÄ±sÄ± Ä°Ã§in TarÄ±m Ä°lacÄ± ve Mazot Ä°Ã§ti: Hayati Tehlike!",
+          "currentCategory": "Genel",
+          "confidence": 0.8676468900389559,
+          "decision": "wrong",
+          "note": "Saglik olmali"
+        },
+        {
+          "id": 1914,
+          "title": "Bursa BÃ¼yÃ¼kÅŸehir Belediyesi'nde baÅŸkan vekili seÃ§imi Ã¶ncesi ortalÄ±k karÄ±ÅŸtÄ±, CHP'liler binaya zorla girmek istedi",
+          "currentCategory": "Genel",
+          "confidence": 0.8695652173913042,
+          "decision": "wrong",
+          "note": "Siyaset olmali"
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 18,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1342,
+        2083,
+        2066,
+        1455,
+        1405,
+        1284,
+        1887,
+        1997,
+        1326,
+        1323
+      ],
+      "sampledRecords": [
+        {
+          "id": 2083,
+          "title": "Fatma Nur Ã‡elik cinayeti! 17 yaÅŸÄ±ndaki katil iÃ§in 126 yÄ±l hapis talebi",
+          "currentCategory": "Genel",
+          "confidence": 0.861413304366716,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1284,
+          "title": "Galaxy Z Wide Fold Geliyor: iPhone Foldâ€™a Rakip!",
+          "currentCategory": "Teknoloji",
+          "confidence": 0.8579391165063849,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1455,
+          "title": "TÃ¼rkÅŸeker'den 525 GeÃ§ici Ä°ÅŸÃ§i AlÄ±mÄ± BaÅŸlÄ±yor",
+          "currentCategory": "Genel",
+          "confidence": 0.8614049653352036,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "ACCEPTED"
+    },
+    {
+      "batchId": 19,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1364,
+        1538,
+        1478,
+        1520,
+        2101,
+        1715,
+        1471,
+        1717,
+        1321,
+        1303
+      ],
+      "sampledRecords": [
+        {
+          "id": 1520,
+          "title": "Kentte bÃ¼yÃ¼k panik! Siren Ã§aldÄ±, herkes uykudan fÄ±rladÄ±: Sebep ise ÅŸaÅŸÄ±rttÄ±",
+          "currentCategory": "Genel",
+          "confidence": 0.8548386158761918,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1471,
+          "title": "Ä°BB 'Yolsuzluk' davasÄ± 16â€™ncÄ± gÃ¼nÃ¼nde",
+          "currentCategory": "Genel",
+          "confidence": 0.8548380750190371,
+          "decision": "wrong",
+          "note": "Siyaset olmali"
+        },
+        {
+          "id": 1303,
+          "title": "Yer: Ä°stanbul! Market Ã§alÄ±ÅŸanÄ±na yumruk ÅŸoku",
+          "currentCategory": "Genel",
+          "confidence": 0.8547398468205522,
+          "decision": "correct",
+          "note": ""
+        }
+      ],
+      "batchDecision": "REJECTED"
+    },
+    {
+      "batchId": 20,
+      "totalInBatch": 10,
+      "allRecordIds": [
+        1830,
+        1760,
+        1713,
+        1888,
+        1401,
+        2086,
+        2090,
+        2081,
+        1668,
+        1704
+      ],
+      "sampledRecords": [
+        {
+          "id": 1704,
+          "title": "Redmi K Pad 2 OyuncularÄ±n Yeni GÃ¶zdesi Olacak",
+          "currentCategory": "Teknoloji",
+          "confidence": 0.8504390098729425,
+          "decision": "correct",
+          "note": ""
+        },
+        {
+          "id": 1401,
+          "title": "Demir kubbe bir kez daha delindi! Ä°ran fÃ¼zesi Ä°srailâ€™i vurduâ€¦ YaralÄ±lar var",
+          "currentCategory": "Genel",
+          "confidence": 0.8536709068200661,
+          "decision": "wrong",
+          "note": "Dunya olmali"
+        },
+        {
+          "id": 1830,
+          "title": "Metaâ€™ya aÄŸÄ±r darbe: Facebook ve Instagram'a tarihi ceza",
+          "currentCategory": "Genel",
+          "confidence": 0.8545959818152573,
+          "decision": "wrong",
+          "note": "Ekonomi olmali"
+        }
+      ],
+      "batchDecision": "REJECTED"
+    }
+  ]
+}

@@ -1,0 +1,125 @@
+﻿=== TOKENIZER COVERAGE ANALYSIS (SIYASET) ===
+rows_total=1206
+rows_siyaset=102
+
+-- Signal Document Hit Comparison --
+secim              legacy=  0 unicode=  0 delta=  0
+se├ğim              legacy=  0 unicode=  7 delta=  7 example="Belde stat├╝s├╝ kazanan 5 yerle┼şim yerinde se├ğim yap─▒lmas─▒ karar─▒ Resmi Gazete'de"
+cumhurbaskani      legacy=  0 unicode=  0 delta=  0
+cumhurba┼şkan─▒      legacy=  0 unicode=  8 delta=  8 example="AKP'li Cumhurba┼şkan─▒ Erdo─şan, BlackRock Ba┼şkan─▒ Laurence Fink ile g├Âr├╝┼şt├╝"
+meclis             legacy=  6 unicode=  6 delta=  0
+milletvekili       legacy=  5 unicode=  5 delta=  0
+bakan              legacy= 23 unicode= 15 delta= -8
+kabine             legacy=  0 unicode=  0 delta=  0
+parti              legacy= 14 unicode= 14 delta=  0
+hukumet            legacy=  0 unicode=  0 delta=  0
+h├╝k├╝met            legacy=  0 unicode=  0 delta=  0
+anayasa            legacy=  5 unicode=  5 delta=  0
+
+-- Top 25 Unicode Unigrams (Siyaset docs) --
+ve                       168
+i                        124
+bir                      77
+bu                       57
+ba┼şkan─▒                  49
+nin                      42
+chp                      40
+t├╝rkiye                  37
+de                       35
+genel                    29
+in                       27
+parti                    26
+den                      25
+da                       25
+belediye                 25
+yeni                     24
+belirtti                 23
+olarak                   23
+─▒n                       22
+bakan─▒                   21
+bakan                    19
+adalet                   18
+sosyal                   17
+├Âzel                     17
+u┼şak                     16
+
+-- Top 25 Unicode Bigrams (Siyaset docs) --
+belediye_ba┼şkan─▒                 18
+t├╝rkiye_nin                      14
+i_zmir                           13
+adalet_bakan─▒                    10
+u┼şak_belediye                    10
+i_stanbul                        10
+i_srail                          9
+dem_parti                        9
+genel_ba┼şkan─▒                    9
+bakan─▒_ak─▒n                      8
+ak─▒n_g├╝rlek                      8
+├Âzkan_yal─▒m                      8
+chp_nin                          7
+ba┼şkan_yard─▒mc─▒s─▒                7
+chp_den                          7
+ba┼şkan─▒_├Âzkan                    7
+cumhurba┼şkan─▒_erdo─şan            7
+y├Ânter_in                        7
+i_mamo─şlu                        7
+sert_tepki                       7
+ak_parti                         6
+i_ran                            6
+genel_ba┼şkan                     6
+bir_araya                        6
+ve_sosyal                        6
+
+-- Top 25 Legacy Unigrams (Siyaset docs) --
+n                        320
+i                        253
+ve                       168
+g                        152
+r                        121
+k                        117
+t                        114
+d                        107
+ba                       106
+s                        95
+y                        85
+bir                      78
+a                        78
+m                        74
+kan                      73
+de                       66
+na                       60
+l                        60
+bu                       57
+in                       52
+nda                      49
+b                        45
+bakan                    43
+nin                      42
+chp                      40
+
+-- Top 25 Legacy Bigrams (Siyaset docs) --
+ba_kan                           58
+n_n                              40
+t_rkiye                          37
+g_r                              21
+belediye_ba                      21
+i_in                             20
+genel_ba                         17
+u_ak                             16
+g_zalt                           16
+n_g                              15
+erdo_an                          15
+rkiye_nin                        14
+b_y                              14
+d_n                              14
+y_nelik                          13
+k_resel                          13
+y_k                              13
+i_zmir                           13
+n_belirtti                       12
+de_i                             12
+g_rlek                           12
+ili_kin                          12
+cumhurba_kan                     12
+oldu_unu                         11
+de_il                            11

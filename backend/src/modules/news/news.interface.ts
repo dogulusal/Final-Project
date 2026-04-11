@@ -10,6 +10,11 @@ export interface CreateNewsDto {
     mlConfidence?: number;
     llmProvider?: string;
     kategoriDogrulandi?: boolean;
+    augmentedAt?: Date;
+    // Consensus Pipeline alanları
+    nbKategoriId?: number | null;    // NB orijinal tahmini (frozen)
+    llmKategoriId?: number | null;   // LLM kategorisi (worker tarafından doldurulur)
+    llmRetryCount?: number;          // LLM retry sayacı
 }
 
 export interface INewsService {

@@ -48,7 +48,7 @@ function KategorilerContent() {
 
     const fetchNews = async () => {
         try {
-            const res = await fetch(`${API_BASE}/api/news?limit=500&status=hazir`);
+            const res = await fetch(`${API_BASE}/api/news?limit=1500&status=hazir`);
             const data = await res.json();
             if (data.success) setNews(dedupe(data.data));
         } catch {

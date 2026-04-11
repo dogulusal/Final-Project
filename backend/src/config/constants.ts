@@ -76,6 +76,13 @@ export const LLM_PIPELINE_ENABLED = process.env.LLM_PIPELINE_ENABLED === 'true';
 // Günlük LLM'e gönderilebilecek maksimum haber sayısı (maliyet kontrolü)
 export const LLM_DAILY_QUOTA = parseInt(process.env.LLM_DAILY_QUOTA || '100', 10);
 
+// --- LLM Consensus Worker ---
+// Arka planda NB tahminlerini LLM ile doğrulayan async worker ayarları
+export const LLM_CONSENSUS_ENABLED = process.env.LLM_CONSENSUS_ENABLED !== 'false'; // default: true
+export const LLM_CONSENSUS_BATCH_SIZE = parseInt(process.env.LLM_CONSENSUS_BATCH_SIZE || '10', 10);
+export const LLM_CONSENSUS_INTERVAL_MS = parseInt(process.env.LLM_CONSENSUS_INTERVAL_MS || '30000', 10);
+export const LLM_CONSENSUS_MAX_RETRIES = parseInt(process.env.LLM_CONSENSUS_MAX_RETRIES || '3', 10);
+
 // --- Retry ---
 export const MAX_RETRY_ATTEMPTS = 3;
 export const RETRY_DELAY_MS = 15 * 60 * 1000; // 15 dakika
@@ -99,6 +106,8 @@ export const RSS_SOURCES: IRssSource[] = [
     { id: 'donanimhaber', name: 'DonanımHaber', url: 'https://www.donanimhaber.com/rss/tum/', category: 'Teknoloji' },
     { id: 'aa-gundem', name: 'Anadolu Ajansı Gündem', url: 'https://www.aa.com.tr/tr/rss/default?cat=gundem', category: 'Siyaset' },
     { id: 'trthaber-gundem', name: 'TRT Haber Gündem', url: 'https://www.trthaber.com/gundem_articles.rss', category: 'Siyaset' },
+    { id: 'odatv', name: 'OdaTV', url: 'https://www.odatv.com/rss', category: 'Siyaset' },
+    { id: 'diken', name: 'Diken', url: 'https://www.diken.com.tr/feed/', category: 'Siyaset' },
     { id: 'hurriyet-teknoloji', name: 'Hürriyet Teknoloji', url: 'https://www.hurriyet.com.tr/rss/teknoloji', category: 'Teknoloji' },
     { id: 'haberturk-gundem', name: 'Habertürk Gündem', url: 'https://www.haberturk.com/rss/manset.xml', category: 'Genel' },
     { id: 'bloomberght', name: 'BloombergHT', url: 'https://www.bloomberght.com/rss', category: 'Ekonomi' },
@@ -108,7 +117,14 @@ export const RSS_SOURCES: IRssSource[] = [
     { id: 'trthaber-saglik', name: 'TRT Haber Sağlık', url: 'https://www.trthaber.com/saglik_articles.rss', category: 'Sağlık' },
     { id: 'dw-turkce', name: 'DW Türkçe', url: 'https://rss.dw.com/xml/rss-tur-all', category: 'Dünya' },
     { id: 'cumhuriyet-siyaset', name: 'Cumhuriyet Siyaset', url: 'https://www.cumhuriyet.com.tr/rss/3', category: 'Siyaset' },
+    { id: 'gazeteduvar', name: 'Gazete Duvar', url: 'https://gazeteduvar.com.tr/feed', category: 'Siyaset' },
     { id: 'aa-saglik', name: 'Anadolu Ajansı Sağlık', url: 'https://www.aa.com.tr/tr/rss/default?cat=saglik', category: 'Sağlık' },
+    { id: 'sabah-saglik', name: 'Sabah Sağlık', url: 'https://www.sabah.com.tr/rss/saglik.xml', category: 'Sağlık' },
+    { id: 'ntv-saglik', name: 'NTV Sağlık', url: 'https://www.ntv.com.tr/saglik.rss', category: 'Sağlık' },
+    { id: 'cnnturk-saglik', name: 'CNN Türk Sağlık', url: 'https://www.cnnturk.com/feed/rss/saglik/news', category: 'Sağlık' },
+    { id: 'ensonhaber-saglik', name: 'Ensonhaber Sağlık', url: 'https://www.ensonhaber.com/rss/saglik.xml', category: 'Sağlık' },
+    { id: 'aksam-saglik', name: 'Akşam Sağlık', url: 'https://www.aksam.com.tr/rss/rss.asp?cat=saglik', category: 'Sağlık' },
+    { id: 'takvim-saglik', name: 'Takvim Sağlık', url: 'https://www.takvim.com.tr/rss/saglik.xml', category: 'Sağlık' },
     { id: 'cnnturk-anasayfa', name: 'CNN Türk', url: 'https://www.cnnturk.com/feed/rss/all/news', category: 'Genel' },
     { id: 'milliyet-anasayfa', name: 'Milliyet Sondakika', url: 'https://www.milliyet.com.tr/rss/rssnew/sondakikarss.xml', category: 'Genel' },
     { id: 'haberturk-saglik', name: 'Habertürk Sağlık', url: 'https://www.haberturk.com/rss/saglik.xml', category: 'Sağlık' },

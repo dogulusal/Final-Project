@@ -56,6 +56,10 @@ export class NewsService implements INewsService {
                 mlConfidence: data.mlConfidence || null,
                 llmProvider: data.llmProvider || null,
                 kategoriDogrulandi: data.kategoriDogrulandi || false,
+                augmentedAt: data.augmentedAt || null,
+                nbKategoriId: data.nbKategoriId ?? null,
+                llmKategoriId: data.llmKategoriId ?? null,
+                llmRetryCount: data.llmRetryCount ?? 0,
                 okumaSuresiDakika: data.icerik ? Math.ceil(data.icerik.split(' ').length / 200) : null,
             } as any,
             include: {
@@ -213,8 +217,10 @@ export class NewsService implements INewsService {
         return news;
     }
 
-    private generateSlug(title: string): string {
-        return title.toLowerCase()
+    private generateSlug(title: unknown): string {
+        const safeTitle = typeof title === 'string' ? title : String(title ?? '');
+
+        const slug = safeTitle.toLowerCase()
             .trim()
             .replace(/[ğ]/g, 'g')
             .replace(/[ü]/g, 'u')
@@ -225,5 +231,7 @@ export class NewsService implements INewsService {
             .replace(/[^a-z0-9 -]/g, '') // Özel karakterleri sil
             .replace(/\s+/g, '-')       // Boşlukları tireye çevir
             .replace(/-+/g, '-');       // Tekrarlayan tireleri tek tire yap
+
+        return slug || `haber-${Date.now()}`;
     }
 }

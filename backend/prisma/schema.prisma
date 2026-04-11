@@ -33,7 +33,8 @@ model Kategori {
   renkKodu  String  @map("renk_kodu")
   ikon      String?
 
-  haberler  Haber[]
+  haberler            Haber[]
+  manuelValidasyonlar ManuelValidasyon[]
 
   @@map("kategoriler")
 }
@@ -54,11 +55,18 @@ model Haber {
   goruntulemeSayisi   Int       @default(0) @map("goruntulenme_sayisi")
   durum               String    @default("ham") // ham | hazir | yayinda
   mlConfidence        Float?    @map("ml_confidence")
-  llmProvider         String?   @map("llm_provider")
+  llmProvider         String?   @map("llm_provider") // 'pending' | 'gemini' | 'ollama' | 'failed' | 'dead' | 'none'
   kategoriDogrulandi  Boolean   @default(false) @map("kategori_dogrulandi")
+  augmentedAt         DateTime? @map("augmented_at")
 
-  kategori            Kategori  @relation(fields: [kategoriId], references: [id])
+  // --- Consensus Pipeline alanları ---
+  nbKategoriId        Int?      @map("nb_kategori_id")   // NB orijinal tahmini (frozen)
+  llmKategoriId       Int?      @map("llm_kategori_id")  // LLM kategorisi
+  llmRetryCount       Int       @default(0) @map("llm_retry_count") // LLM retry sayacı (max 3)
+
+  kategori            Kategori          @relation(fields: [kategoriId], references: [id])
   okumaGecmisi        OkumaGecmisi[]
+  manuelValidasyonlar ManuelValidasyon[]
 
   @@index([durum])                          // En sık filtre: status=hazir
   @@index([yayinlanmaTarihi(sort: Desc)])   // Sıralama: en yeni önce
@@ -66,6 +74,7 @@ model Haber {
   @@index([durum, yayinlanmaTarihi(sort: Desc)])  // Kombine: hazir haberler tarih sırası
   @@index([kategoriId, durum, yayinlanmaTarihi(sort: Desc)]) // Kategori + durum + tarih sıralama
   @@index([durum, sentiment, yayinlanmaTarihi(sort: Desc)]) // Sentiment admin istatistikleri/trend
+  @@index([augmentedAt])
   @@map("haberler")
 }
 
@@ -125,6 +134,26 @@ model LlmKullanim {
   @@index([tarih(sort: Desc)])
   @@index([saglayici, tarih(sort: Desc)])
   @@map("llm_kullanm")
+}
+
+// --- Manuel Validasyon Audit Trail (Sprint 3) ---
+model ManuelValidasyon {
+  id                  Int       @id @default(autoincrement())
+  haberId             Int       @map("haber_id")
+  haber               Haber     @relation(fields: [haberId], references: [id], onDelete: Cascade)
+  eskiKategoriId      Int?      @map("eski_kategori_id")
+  yeniKategoriId      Int       @map("yeni_kategori_id")
+  yeniKategori        Kategori  @relation(fields: [yeniKategoriId], references: [id])
+  dogrulayanEmail     String?   @map("dogrulayan_email")  // "cli" veya kullanici email
+  kararTuru           String    @map("karar_turu")        // "confirm" | "correct" | "skip"
+  batchId             String    @map("batch_id")          // Batch UUID tracking
+  olusturulmaTarihi   DateTime  @default(now()) @map("olusturulma_tarihi")
+  notlar              String?
+
+  @@index([batchId])
+  @@index([olusturulmaTarihi(sort: Desc)])
+  @@index([haberId])
+  @@map("manuel_validasyonlar")
 }
 
 // --- ML Model Durumu ---
