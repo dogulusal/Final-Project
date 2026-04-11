@@ -76,6 +76,13 @@ export const LLM_PIPELINE_ENABLED = process.env.LLM_PIPELINE_ENABLED === 'true';
 // Günlük LLM'e gönderilebilecek maksimum haber sayısı (maliyet kontrolü)
 export const LLM_DAILY_QUOTA = parseInt(process.env.LLM_DAILY_QUOTA || '100', 10);
 
+// --- LLM Consensus Worker ---
+// Arka planda NB tahminlerini LLM ile doğrulayan async worker ayarları
+export const LLM_CONSENSUS_ENABLED = process.env.LLM_CONSENSUS_ENABLED !== 'false'; // default: true
+export const LLM_CONSENSUS_BATCH_SIZE = parseInt(process.env.LLM_CONSENSUS_BATCH_SIZE || '10', 10);
+export const LLM_CONSENSUS_INTERVAL_MS = parseInt(process.env.LLM_CONSENSUS_INTERVAL_MS || '30000', 10);
+export const LLM_CONSENSUS_MAX_RETRIES = parseInt(process.env.LLM_CONSENSUS_MAX_RETRIES || '3', 10);
+
 // --- Retry ---
 export const MAX_RETRY_ATTEMPTS = 3;
 export const RETRY_DELAY_MS = 15 * 60 * 1000; // 15 dakika
