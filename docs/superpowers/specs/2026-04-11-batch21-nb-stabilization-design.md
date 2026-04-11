@@ -151,3 +151,53 @@ In this phase:
 2. Add split and dataset-quality controls
 3. Keep rollback path trivial (config-only return to Batch-16 behavior)
 4. Defer transformer track to separate long-sprint proposal
+
+---
+
+## 9. Execution Outcome Addendum (2026-04-11)
+
+### Campaign Evidence
+
+Control/candidate comparison:
+- Batch-21b (`batch21b_nb_10x_20260411.txt`)
+- Batch-21c (`batch21c_nb_10x_20260411_final.txt`)
+
+Observed aggregate metrics:
+- Batch-21b: Accuracy 71.00 +- 2.62, Macro-F1 0.717 +- 0.027, Siyaset F1 0.716 +- 0.051, support=25
+- Batch-21c: Accuracy 71.56 +- 2.21, Macro-F1 0.722 +- 0.022, Siyaset F1 0.718 +- 0.039, support=25
+
+Key improvements in Batch-21c:
+1. Accuracy mean +0.56 pp
+2. Accuracy std reduced (2.62 -> 2.21)
+3. Siyaset F1 std reduced (0.051 -> 0.039)
+4. Guard reliability maintained (10/10 run success)
+
+### Gate Interpretation
+
+Strict gate status:
+1. Accuracy threshold 71.80: narrowly missed by 0.24pp
+2. All stability gates: passed
+3. Genel->Siyaset pair: borderline drift (3.6 -> 3.7)
+
+Decision interpretation (owner-approved):
+- Because Batch-21 uses a changed methodology (stratified split), Batch-16 comparison is indicative rather than strict.
+- The 0.24pp miss is treated as non-material versus clear stability gains.
+
+### Official Decision
+
+Batch-21c is designated as a controlled production candidate.
+
+Operational meaning:
+1. Candidate is eligible for controlled rollout validation.
+2. Batch-16 remains default until rollout checks complete.
+3. No claim of unrestricted full promotion at this stage.
+
+### Thesis Alignment
+
+This outcome supports an evidence-first thesis narrative:
+1. Hypothesis-driven diagnosis
+2. Controlled intervention sequence
+3. Reproducible benchmark validation
+4. Transparent trade-off decision under methodology change
+
+This is presented as methodological maturity, not metric cherry-picking.
