@@ -304,8 +304,8 @@ Post-wave check (batch_audit_log phase='post')
 **New:** 
 - Initial load: 20 articles
 - On scroll-to-bottom: auto-fetch next 20
-- Uses `IntersectionObserver` (supported in all modern browsers; polyfill for IE11 if needed)
-- Fallback for older browsers: show "Load more" button instead of auto-scroll
+- Uses `IntersectionObserver` (modern browser standard)
+- Graceful degradation: show "Load more" button for older browsers
 - Displays total pages remaining: "Showing 20-40 of 2,021"
 
 #### Change 2: Category Page (`frontend/src/app/kategoriler/[slug]/page.tsx`)
@@ -451,6 +451,82 @@ If `pg_restore` fails mid-operation (disk full, corruption, etc.):
 - ML model reweighting per category (only if accuracy plateaus)
 - A/B test: LLM1 (Gemini) vs LLM2 (new provider) consensus
 - Sentiment analysis verification (similar dual-verify pipeline)
+
+---
+
+## 11. Skill & Workflow Integration
+
+This spec integrates Agency superpowers skills to ensure quality, safety, and auditability.
+
+### 11.1 Mandatory Skills per Phase
+
+#### During Wave Orchestration
+**Skill:** `superpowers:executing-plans`
+- **Usage:** Master script `run-consensus-waves.ts` follows bite-sized step execution
+- **Why:** Ensures wave sequence is deterministic, verifiable at each checkpoint
+- **Triggers:** Once per wave (before consensus-backfill invocation)
+- **Checkpoint:** Wave N results logged to batch_audit_log before proceeding
+
+#### After Each Wave (Accuracy Verification)
+**Skill:** `superpowers:verification-before-completion`
+- **Usage:** Before claiming "Wave N succeeded"
+- **Verification command:**
+  ```bash
+  curl -s http://localhost:3002/api/ml/evaluate \
+    -H "Authorization: Bearer $JWT" | jq '.data.overall_accuracy'
+  ```
+- **Evidence required:** Fresh accuracy value, not cached
+- **Rule:** If accuracy drop >3pp from previous wave → mark as verification FAILED, trigger rollback
+- **Zero tolerance:** No success claim without running this check
+
+#### Before Each Wave (Data Quality Guard)
+**Skill:** `superpowers:dataset-quality-guard`
+- **Usage:** Pre-wave category distribution audit
+- **Checks:**
+  1. Category dominance: any >50% → HARD STOP (Guard2 active)
+  2. Imbalance ratio: max/min >2.5 → WARNING (log, but continue)
+  3. Sample audit: random 20 articles from to-be-processed batch → verify NB+LLM labels plausible
+- **Source:** batch_audit_log(wave_n, phase='pre')
+- **Authority:** If data quality check fails → escalate to human, don't auto-retry
+
+### 11.2 Optional Skills (For Crisis Management)
+
+#### Rollback Triggered (Accuracy Guard 3pp)
+**Resource:** `.agent/workflows/rollback.md` (to be created post-spec)
+- **Invocation:** If Wave N post-accuracy >3pp below Wave N-1
+- **Actions:**
+  1. Automated: DB restore + model_state rollback + dispute cleanup (Section 6.1)
+  2. Manual: Human reviews batch_audit_log to understand why accuracy fell
+  3. Decision: Retry wave N vs. investigate & adjust LLM settings vs. full restart
+
+#### Unexpected Rollback (>1 wave in series fails)
+**Resource:** `.agent/workflows/systematic-debugging.md` (to be created post-spec)
+- **Invocation:** If waves 1-3 all fail accuracy guard (>1 rollback)
+- **Purpose:** Root cause analysis — is it:
+  - LLM provider inconsistency? (Gemini API changed?)
+  - Category drift in unverified articles? (cluster of mislabeled old articles?)
+  - Model initialization issue? (model_state corruption?)
+- **Output:** Recommendations for plan adjustment or reset
+
+#### Health Check (Every 4 Hours)
+**Resource:** `.agent/workflows/health-check.md` (to be created post-spec)
+- **Automated:** Background verification of:
+  - DB connectivity: `SELECT 1;` (latency must be <100ms)
+  - Redis cache: `PING` (must respond <50ms)
+  - LLM API: Test Gemini + Ollama connectivity (curl with timeout=2s)
+  - Model state: Check model_state version matches expected (prevents stale model loads)
+- **Alert:** Any check fails → pause wave orchestration, notify operator
+
+### 11.3 Integration Checklist (Pre-Backfill)
+
+- [ ] Skills folder `.agent/skills/` contains `executing-plans/`, `verification-before-completion/`, `dataset-quality-guard/` (verified in spec review)
+- [ ] Post-spec creation: `.agent/workflows/rollback.md`, `systematic-debugging.md`, `health-check.md`
+- [ ] Master script `run-consensus-waves.ts` invokes:
+  - executing-plans skill check (step-by-step verification)
+  - verification-before-completion before marking wave complete
+  - dataset-quality-guard for pre-wave audit
+- [ ] Error logging: All wave_n transitions logged to batch_audit_log for audit trail
+- [ ] Rollback documentation: operator runbook links to workflow scripts
 
 ---
 
