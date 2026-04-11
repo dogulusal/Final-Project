@@ -55,9 +55,14 @@ model Haber {
   goruntulemeSayisi   Int       @default(0) @map("goruntulenme_sayisi")
   durum               String    @default("ham") // ham | hazir | yayinda
   mlConfidence        Float?    @map("ml_confidence")
-  llmProvider         String?   @map("llm_provider")
+  llmProvider         String?   @map("llm_provider") // 'pending' | 'gemini' | 'ollama' | 'failed' | 'dead' | 'none'
   kategoriDogrulandi  Boolean   @default(false) @map("kategori_dogrulandi")
   augmentedAt         DateTime? @map("augmented_at")
+
+  // --- Consensus Pipeline alanları ---
+  nbKategoriId        Int?      @map("nb_kategori_id")   // NB orijinal tahmini (frozen)
+  llmKategoriId       Int?      @map("llm_kategori_id")  // LLM kategorisi
+  llmRetryCount       Int       @default(0) @map("llm_retry_count") // LLM retry sayacı (max 3)
 
   kategori            Kategori          @relation(fields: [kategoriId], references: [id])
   okumaGecmisi        OkumaGecmisi[]
