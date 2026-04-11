@@ -1,7 +1,7 @@
 # Consensus Backfill & Full Coverage — Design Spec
 
 **Date:** 2026-04-11  
-**Status:** DRAFT  
+**Status:** FINAL  
 **Branch:** feature/tokenizer-unicode-aware  
 **Author:** brainstorming session  
 **Scope:** Complete news verification + ML accuracy boost + frontend unlimited scroll
@@ -69,8 +69,8 @@ CREATE TABLE dispute_queue (
   batch_number    INT,
   durum           VARCHAR(20) DEFAULT 'bekliyor',  -- bekliyor | cozuldu | atildi
   admin_karar_kategori_id INT REFERENCES kategori(id),
-  created_at      TIMESTAMP DEFAULT NOW(),
-  resolved_at     TIMESTAMP,
+  created_at      TIMESTAMP DEFAULT NOW() AT TIME ZONE 'UTC',
+  resolved_at     TIMESTAMP AT TIME ZONE 'UTC',
   resolved_by     VARCHAR(100)
 );
 ```
@@ -113,16 +113,34 @@ npx ts-node src/scripts/consensus-backfill.ts \
   --ollama-limit=25
 ```
 
+**Transaction Model:**
+- Entire batch runs in a single Prisma transaction
+- If any article fails consensus (NB crashes, LLM times out): entire batch rolls back (no partial commits)
+- Failure: operator retries wave with `--start-from=OFFSET` to skip already-processed articles
+- On success: all updates (consensus + disputes) committed atomically
+
+**LLM Fallback Criteria:**
+- Gemini called first with 5-second timeout
+- If timeout OR Gemini error (rate limit 429, server 500, overloaded): try Ollama with 10-second timeout
+- If both fail: mark article `llmProvider='failed'`, will retry on next script invocation
+- Max 3 retries per article; after that: `llmProvider='dead'` (skip in future runs)
+
+**Dry-Run Mode (`--dry-run`):**
+- Actualy calls both NB and LLM APIs (tests infrastructure)
+- Writes results to database (same as live run)
+- No change: commit to git required to actually effect schema changes
+- Purpose: validate quota, API connectivity, rate limits before full run
+
 **Flow:**
-1. Select 200 unverified articles (oldest first, ordered by created_at)
-2. For each article:
+1. Select 200 unverified articles (oldest first, `ORDER BY created_at ASC, id ASC` for deterministic tie-breaking)
+2. For each article (inside transaction):
    - Call NB classifier (in-memory, instant)
-   - Call LLM (Gemini primary, Ollama fallback, 1.5s delay between calls)
+   - Call LLM (Gemini primary with 5s timeout, Ollama fallback with 10s timeout, 1.5s delay between Gemini calls)
    - Compare results:
-     - **CONSENSUS:** NB == LLM category → insert into haber with `kategoriDogrulandi=true`
+     - **CONSENSUS:** NB == LLM category → update haber with `kategoriDogrulandi=true`
      - **DISPUTE:** NB ≠ LLM category → insert into dispute_queue with both scores
-3. Log counts: consensus n, dispute m
-4. Return: { processed: 200, consensus: ~140, dispute: ~60 }
+3. On completion: commit transaction and log counts
+4. Return: { processed: 200, consensus: ~140, dispute: ~60, failed: 0 }
 
 #### Script 2: `backend/src/scripts/run-consensus-waves.ts`
 **Purpose:** Orchestrate all 6 waves with retry logic and rollback.
@@ -151,7 +169,10 @@ Process
 
 Train & Evaluate
 ├─ POST /api/ml/train?useDb=true
-  └─ Model retrains on all verified articles (now ~915 + ~140 consensus)
+  └─ **Retrain input filter:** Only articles where `kategoriDogrulandi=true` AND `durum IN ('hazir','yayinda')`
+  └─ **Excludes:** disputes (still durum='ham') until manually resolved
+  └─ Model size: ~915 (starting) + ~140 (new consensus) = ~1,055 verified articles
+  └─ **Transaction isolation:** All wave consensus updates committed atomically BEFORE retrain (all-or-nothing)
 ├─ POST /api/ml/evaluate → get new accuracy
 ├─ Compare to previous wave's accuracy:
    └─ If accuracy drop > 3pp → ROLLBACK (see Section 3.5)
@@ -187,15 +208,22 @@ Wave 3 post-accuracy: 73.1% (drop: 3.1pp > 3pp threshold)
 
 ### 3.4 Dispute Resolution
 
-**Manual workflow (for ~300-400 disputed articles):**
+**Primary method: CLI tool (recommended) + API endpoint (for automation)**
 
-1. **CLI tool:** `backend/src/scripts/resolve-disputes-cli.ts`
+Two methods exist but with **no concurrency conflicts** because:
+- CLI tool writes lock file: `.locks/dispute_resolution_in_progress`
+- API endpoint checks lock before processing; returns error if CLI is active
+- Prevents simultaneous resolution of same dispute
+
+1. **CLI tool:** `backend/src/scripts/resolve-disputes-cli.ts` (interactive workflow)
    ```bash
    npx ts-node src/scripts/resolve-disputes-cli.ts --batch=1
    ```
-   Shows batches of 10 disputes, operator chooses correct category, updates haber + dispute_queue
+   - Shows batches of 10 disputes, operator chooses correct category
+   - Updates haber + dispute_queue atomically
+   - Single-threaded by design (natural mutex)
 
-2. **API endpoint:** `PUT /api/ml/resolve-disputes-batch` (admin-protected)
+2. **API endpoint:** `PUT /api/ml/resolve-disputes-batch` (for bulk/programmatic resolution)
    ```json
    {
      "decisions": [
@@ -204,11 +232,11 @@ Wave 3 post-accuracy: 73.1% (drop: 3.1pp > 3pp threshold)
      ]
    }
    ```
+   - Checks lock file; errors if CLI active: `{"error": "Dispute resolution in progress via CLI"}`
+   - Updates atomically on success
 
-3. **Admin panel:** `GET /api/admin/disputes` + `GET /api/admin/disputes/:id`
-   - Lists pending disputes with NB vs LLM side-by-side
-   - Operator picks correct category on UI
-   - Auto-updates haber + updates dispute_queue
+3. **Admin panel:** Out of scope for backfill sprint (defer to UI improvements phase)
+   - Can display disputes read-only; uses API endpoint for resolution
 
 ---
 
@@ -216,15 +244,21 @@ Wave 3 post-accuracy: 73.1% (drop: 3.1pp > 3pp threshold)
 
 ### Wave Execution Plan
 
-| Wave | Articles | Start offset | Expected consensus | Expected disputes | Cumulative verified |
+| Wave | Articles | Start offset | Expected consensus (70%)* | Expected disputes (30%)* | Cumulative verified |
 |---|---|---|---|---|---|
-| 1 | 200 | 0 | ~140 (70%) | ~60 (30%) | ~1,055 (52%) |
-| 2 | 200 | 200 | ~140 | ~60 | ~1,195 (59%) |
-| 3 | 200 | 400 | ~140 | ~60 | ~1,335 (66%) |
-| 4 | 200 | 600 | ~140 | ~60 | ~1,475 (73%) |
-| 5 | 200 | 800 | ~140 | ~60 | ~1,615 (80%) |
-| 6 | 106 | 1000 | ~74 | ~32 | ~1,689 (84%) |
-| **Manual** | ~330 disputes | — | ~330 | 0 | **~2,019 (≥99%)** |
+| 1 | 200 | 0 (id ASC) | 140 | 60 | ~1,055 (52%) |
+| 2 | 200 | +200 articles | 140 | 60 | ~1,195 (59%) |
+| 3 | 200 | +200 articles | 140 | 60 | ~1,335 (66%) |
+| 4 | 200 | +200 articles | 140 | 60 | ~1,475 (73%) |
+| 5 | 200 | +200 articles | 140 | 60 | ~1,615 (80%) |
+| 6 | 106 | +106 articles (final) | 74 | 32 | ~1,689 (84%) |
+| **Manual** | ~332 disputes | — | ~332 | 0 | **~2,021 (≥99%)** |
+
+**\* 70% consensus rate methodology:** Conservative estimate based on:
+- NB accuracy on training set: ~75%
+- LLM accuracy on similar articles: ~82% (Gemini observed on pilot)
+- Overlap (both correct): ~70% expected
+- Empirical validation: run consensus-backfill on sample of 50 unverified articles before committing to plan
 
 ### Timeline Estimate
 
@@ -270,7 +304,8 @@ Post-wave check (batch_audit_log phase='post')
 **New:** 
 - Initial load: 20 articles
 - On scroll-to-bottom: auto-fetch next 20
-- Uses `IntersectionObserver` (not scroll listener → better performance)
+- Uses `IntersectionObserver` (supported in all modern browsers; polyfill for IE11 if needed)
+- Fallback for older browsers: show "Load more" button instead of auto-scroll
 - Displays total pages remaining: "Showing 20-40 of 2,021"
 
 #### Change 2: Category Page (`frontend/src/app/kategoriler/[slug]/page.tsx`)
@@ -327,9 +362,21 @@ If waves 1-3 cause unrecoverable distribution skew:
 **Decision point:** If wave 3 fails and manual investigation reveals systemic issue (e.g., LLM API behavior changed), restart entire consensus process with adjustments.
 **Time to reset:** ~10 minutes
 
-### 6.3 Backups Kept
+### 6.3 Restore Failure Mitigation
+If `pg_restore` fails mid-operation (disk full, corruption, etc.):
+```
+1. Archive failed dump: mv backups/pre_batch_N.dump.gz backups/pre_batch_N.FAILED.dump.gz
+2. Try restore from N-1: pg_restore backups/pre_batch_{N-1}.dump.gz
+3. If N-1 also fails: restore from pre_consensus_2026-04-11.dump.gz (master snapshot)
+4. Manual investigation: check docker logs for corruption signals
+5. Contact DB provider if persistent (cloud provider issue)
+```
+**Prevention:** All dumps gzipped and tested with `pg_restore --no-data` during creation
+
+### 6.4 Backups Kept
 - Pre-backfill master snapshot: `backups/pre_consensus_2026-04-11.dump.gz`
-- Per-wave snapshots: `backups/pre_batch_1_20260411_HHMM.dump.gz` through `pre_batch_6_*.dump.gz`
+- Per-wave snapshots: `backups/pre_batch_1_20260411_HHMMSS_UTC.dump.gz` through `pre_batch_6_*.dump.gz`
+- All timestamps in UTC to avoid regional ambiguity
 - Retention: 14 days (delete older)
 
 ---
