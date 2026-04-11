@@ -58,9 +58,28 @@ export class MlCategorizationService implements INewsCategorizationService {
     public lastConfusionMatrix: any = null;
     public lastDiagnostics: TrainDiagnostics | null = null;
     private readonly BATCH_TRAIN_THRESHOLD = 20;
+    private readonly MIN_TEST_SUPPORT = 10;     // stratified split: minimum test examples per category
+    private readonly MIN_TRAIN_RATIO = 0.60;    // stratified split: train set floor (60% of category total)
 
-    constructor(classifierType: ClassifierType = 'naive-bayes', preprocessingMode: PreprocessingMode = 'unigram-bigram') {
-        this.classifierType = classifierType;
+    private resolveClassifierType(classifierType?: ClassifierType): ClassifierType {
+        if (classifierType === 'naive-bayes' || classifierType === 'logistic-regression') {
+            return classifierType;
+        }
+
+        const envModel = process.env.ML_MODEL_TYPE;
+        if (envModel === 'naive-bayes' || envModel === 'logistic-regression') {
+            return envModel;
+        }
+
+        if (envModel) {
+            console.warn(`[ML Warn] Invalid ML_MODEL_TYPE="${envModel}", fallback to naive-bayes.`);
+        }
+
+        return 'naive-bayes';
+    }
+
+    constructor(classifierType?: ClassifierType, preprocessingMode: PreprocessingMode = 'unigram-bigram') {
+        this.classifierType = this.resolveClassifierType(classifierType);
         this.preprocessingMode = preprocessingMode;
         this.initializeClassifier();
 
@@ -889,7 +908,7 @@ export class MlCategorizationService implements INewsCategorizationService {
                 })
             );
 
-            for (const [, examples] of Object.entries(byCategory)) {
+            for (const [catName, examples] of Object.entries(byCategory)) {
                 if (examples.length < 3) continue; // Kategori guard
 
                 const fromDisk = examples.filter((e: any) => e.source === 'disk');
@@ -899,9 +918,31 @@ export class MlCategorizationService implements INewsCategorizationService {
                     return a.publishedAt.getTime() - b.publishedAt.getTime();
                 });
 
-                const splitIndex = Math.max(1, Math.floor(temporal.length * 0.8));
+                // Stratified-temporal split: enforce minimum test support per category.
+                // Base: 80/20 split. If test support < MIN_TEST_SUPPORT, try to grow test
+                // slice without dropping train below MIN_TRAIN_RATIO * total.
+                const totalN = temporal.length;
+                const baseTestN = totalN - Math.max(1, Math.floor(totalN * 0.8));
+                const minAllowedTrainN = Math.ceil(totalN * this.MIN_TRAIN_RATIO);
+                const maxAllowedTestN = totalN - minAllowedTrainN;
+
+                let testN: number;
+                let splitNote = '';
+                if (baseTestN >= this.MIN_TEST_SUPPORT) {
+                    testN = baseTestN;
+                } else if (maxAllowedTestN >= this.MIN_TEST_SUPPORT) {
+                    testN = this.MIN_TEST_SUPPORT;
+                    splitNote = `expanded ${baseTestN}→${testN} to meet support target`;
+                } else {
+                    testN = Math.max(1, maxAllowedTestN);
+                    splitNote = `FALLBACK: support=${testN}<${this.MIN_TEST_SUPPORT}, 60%-floor limits growth`;
+                }
+
+                const splitIndex = totalN - testN;
                 const catTrainBase = temporal.slice(0, splitIndex);
                 const catTestBase = temporal.slice(splitIndex);
+                console.log(`[ML][StratifiedSplit][${catName}] total=${totalN} train=${splitIndex} test=${testN}${splitNote ? ` | ${splitNote}` : ''}`);
+
 
                 const leakedFromTest = backfillStartTime
                     ? catTestBase.filter((e: any) => !!e.augmentedAt && e.augmentedAt >= backfillStartTime)
