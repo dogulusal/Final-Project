@@ -911,7 +911,7 @@ export class MlCategorizationService implements INewsCategorizationService {
                 })
                 .map(news => ({
                     id: news.id,
-                    text: (news.baslik + ' ' + (news.metaAciklama || '') + ' ' + (news.icerik ? news.icerik.slice(0, 800) : '')).trim(),
+                    text: (news.baslik + ' ' + (news.metaAciklama || '') + ' ' + (news.icerik ? news.icerik.slice(0, 300) : '')).trim(),
                     category: news.kategori.ad,
                     publishedAt: news.yayinlanmaTarihi,
                     augmentedAt: (news as any).augmentedAt ?? null,
