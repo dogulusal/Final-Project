@@ -237,7 +237,7 @@ export class MlCategorizationService implements INewsCategorizationService {
                     this.newsSinceLastTrain = 0;
                     setImmediate(async () => {
                         console.log('[ML Pipeline] Toplu eğitim tetiklendi...');
-                        await this.loadAndTrainFromDB({ manualOnlyVerified: true });
+                        await this.loadAndTrainFromDB();
                     });
                 }
             }
@@ -723,8 +723,8 @@ export class MlCategorizationService implements INewsCategorizationService {
             const maxDbSamples = Math.max(0, options.maxDbSamples ?? 0);
             const manualOnlyVerified = options.manualOnlyVerified === true;
             
-            // HIGH RISK: Categories with low avg confidence (e.g., Spor 0.394)
-            const HIGH_RISK_CATEGORIES = new Set(['Spor']); // Excluded from batch verify
+            // HIGH RISK: Categories with low avg confidence — cleared after full consensus backfill (2346/2347 verified, Spor has 226 verified)
+            const HIGH_RISK_CATEGORIES = new Set<string>([]); // Spor removed: sufficient verified articles now
             
             // Öncelik: güçlü güvene sahip onaylı haberlerden eğitim havuzu oluştur.
             const trustedNewsRaw = await prisma.haber.findMany({
@@ -800,12 +800,10 @@ export class MlCategorizationService implements INewsCategorizationService {
                         // Manual doğrulama benchmark'ında confidence/high-risk filtreleri uygulanmaz.
                         return true;
                     }
-                    // Always exclude HIGH_RISK (Spor)
+                    // Always exclude HIGH_RISK categories (currently empty after full backfill)
                     if (HIGH_RISK_CATEGORIES.has(news.kategori.ad)) return false;
-                    // For non-Sağlık categories: require mlConfidence >= 0.70
-                    // For Sağlık: accept all (avg confidence 0.619 is acceptable)
-                    const confidence = (news as any).mlConfidence ?? 0;
-                    if (news.kategori.ad !== 'Sağlık' && confidence < 0.70) return false;
+                    // kategoriDogrulandi=true olan haberler consensus veya manuel doğrulamayla onaylanmış
+                    // mlConfidence filtresi uygulanmaz — doğrulanmış veri kalitesi garantilidir
                     return true;
                 })
                 .map(news => ({
@@ -1071,8 +1069,21 @@ export class MlCategorizationService implements INewsCategorizationService {
         // Kelime ipuçları: model kararsız kaldığında kategori drift'ini azaltır.
         const normalized = inferenceText.toLowerCase();
         const keywordHints: Record<string, string[]> = {
-            'Spor': ['maç', 'lig', 'gol', 'transfer', 'teknik direktör', 'basketbol', 'futbol', 'voleybol'],
-            'Ekonomi': ['borsa', 'faiz', 'enflasyon', 'dolar', 'euro', 'merkez bankası', 'ihracat', 'altın'],
+            'Spor': ['maç', 'lig', 'gol', 'transfer', 'teknik direktör', 'basketbol', 'futbol', 'voleybol', 'hakem', 'şampiyon', 'kupa', 'derbi', 'golcü', 'defans', 'forvet'],
+            'Ekonomi': [
+                // Finans / döviz
+                'borsa', 'faiz', 'enflasyon', 'dolar', 'euro', 'merkez bankası', 'ihracat', 'altın',
+                // Şirket / sektör haberleri
+                'şirket', 'sektör', 'piyasa', 'banka', 'bankacılık', 'kredi', 'yatırım', 'ihale',
+                'bütçe', 'vergi', 'kâr', 'zarar', 'ciro', 'gelir', 'gider', 'büyüme', 'küçülme',
+                // Tüketici / fiyat haberleri
+                'fiyat', 'zam', 'tüketici', 'ürün fiyatı', 'zamlandı', 'ucuzladı', 'pahalandı',
+                'merdiven altı', 'kayıt dışı', 'gümrük', 'ithalat', 'dış ticaret',
+                // Bankacılık / mobil
+                'mobil bankacılık', 'internet bankacılık', 'kredi kartı', 'atm', 'iban',
+                // İstihdam / ekonomik gösterge
+                'işsizlik', 'istihdam', 'ücret', 'asgari ücret', 'enflasyon oranı', 'büyüme oranı',
+            ],
             'Teknoloji': ['yapay zeka', 'yazılım', 'siber', 'uydu', 'nasa', 'çip', 'akıllı telefon', 'teknoloji'],
             // Batch-16: Tekil tetikleyiciler (bakan, parti, seçim) phrase-level'e çekildi.
             // Sadece bileşik siyasi bağlamlar bonus alır; idari duyurular artık Siyaset'e kaymaz.
@@ -1086,7 +1097,17 @@ export class MlCategorizationService implements INewsCategorizationService {
             ],
             'Dünya': ['nato', 'bm', 'ukrayna', 'israil', 'iran', 'abd', 'avrupa birliği', 'uluslararası'],
             'Sağlık': ['hastane', 'doktor', 'aşı', 'salgın', 'kanser', 'tedavi', 'sağlık', 'ameliyat'],
-            'Genel': ['son dakika', 'gündem', 'olay', 'açıklama']
+            'Genel': [
+                'son dakika', 'gündem', 'olay', 'açıklama',
+                // Kültür / sanat / eğlence
+                'sinema', 'film', 'dizi', 'müzik', 'konser', 'sergi', 'tiyatro',
+                'yönetmen', 'oyuncu', 'sanatçı', 'müzisyen',
+                // İnsan haberleri
+                'kurucusu', 'girişimci', 'hayatını kaybetti', 'vefat', 'geri döndü',
+                'ödül', 'başarı', 'rekor',
+                // Kamu / duyuru
+                'vatandaş', 'başvuru', 'hizmet', 'kampanya fırsatı', 'indirim kampanyası',
+            ]
         };
 
         // Asayiş Kalkanı (Batch-16): Adli/operasyon dili yoğun haberlerde Siyaset bonusunu engelle.
