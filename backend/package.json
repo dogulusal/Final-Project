@@ -13,6 +13,7 @@
         "prisma:migrate": "prisma migrate dev",
         "prisma:studio": "prisma studio",
         "prisma:seed": "ts-node prisma/seed.ts",
+        "status:db": "ts-node check-db-state.ts",
         "migration:sanitize": "ts-node src/scripts/sanitize-existing-news.ts",
         "training:generate": "ts-node src/scripts/generate-training-data.ts",
         "ml:benchmark:faz5a": "ts-node scripts/benchmark-faz5a.ts"
@@ -37,6 +38,8 @@
         "helmet": "^8.1.0",
         "ioredis": "^5.10.0",
         "jsonwebtoken": "^9.0.3",
+        "ml-logistic-regression": "^2.0.0",
+        "ml-matrix": "^6.12.2",
         "natural": "^6.10.0",
         "node-cron": "^4.2.1",
         "rss-parser": "^3.13.0",
