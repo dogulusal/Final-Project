@@ -317,6 +317,7 @@ export class MlCategorizationService implements INewsCategorizationService {
         }
 
         // Prepare LR state if combined model is active
+        // LR Serialization OUTSIDE transaction to avoid timeout
         let lrModelData: Prisma.InputJsonValue | null = null;
         if (this.useCombinedModel && this.tfidfService && this.lrClassifier) {
             try {
@@ -330,27 +331,42 @@ export class MlCategorizationService implements INewsCategorizationService {
             }
         }
 
-        // Atomic save: NB + LR in same upsert transaction
-        await (prisma as any).$transaction(async (tx: any) => {
-            await tx.modelState.upsert({
-                where: { id: 1 },
-                update: {
-                    modelData,
-                    ...(lrModelData !== null ? { lrModelData } : {}),
-                    accuracy,
-                    sampleCount,
-                    trainedAt: new Date(),
-                    version: { increment: 1 }
+        const savePayload = {
+            where: { id: 1 },
+            update: {
+                modelData,
+                ...(lrModelData !== null ? { lrModelData } : {}),
+                accuracy,
+                sampleCount,
+                trainedAt: new Date(),
+                version: { increment: 1 }
+            },
+            create: {
+                id: 1,
+                modelData,
+                ...(lrModelData !== null ? { lrModelData } : {}),
+                accuracy,
+                sampleCount
+            }
+        };
+
+        // Atomic save first; if interactive tx expires, fallback to direct upsert.
+        try {
+            await (prisma as any).$transaction(
+                async (tx: any) => {
+                    await tx.modelState.upsert(savePayload);
                 },
-                create: {
-                    id: 1,
-                    modelData,
-                    ...(lrModelData !== null ? { lrModelData } : {}),
-                    accuracy,
-                    sampleCount
-                }
-            });
-        });
+                { maxWait: 30000, timeout: 30000 }
+            );
+        } catch (e: any) {
+            const msg = String(e?.message || '');
+            if (e?.code === 'P2028' || msg.includes('Transaction already closed')) {
+                console.warn('[ML Warn] Interactive tx timeout; retrying with direct upsert.');
+                await modelStateRepo.upsert(savePayload);
+            } else {
+                throw e;
+            }
+        }
 
         console.log(`[ML] Model DB'ye kaydedildi. Accuracy=%${(accuracy * 100).toFixed(1)} Sample=${sampleCount} combined=${this.useCombinedModel}`);
     }

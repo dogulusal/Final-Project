@@ -1,3 +1,4 @@
+/// <reference path="../../types/ml-logistic-regression.d.ts" />
 /**
  * TF-IDF Vectorizer + Logistic Regression Classifier
  *
@@ -205,6 +206,8 @@ export class TfidfLrClassifier {
             throw new Error('documents and labels must have the same length');
         }
 
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore: no type declarations for ml-logistic-regression
         const LrModule = await import('ml-logistic-regression');
         const LR = LrModule.default;
         const { Matrix } = await import('ml-matrix');
@@ -291,6 +294,8 @@ export class TfidfLrClassifier {
      * Deserialize is async because ml-logistic-regression is ESM-only.
      */
     async deserialize(state: Record<string, unknown>): Promise<void> {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore: no type declarations for ml-logistic-regression
         const LrModule = await import('ml-logistic-regression');
         const LR = LrModule.default;
         this.model = LR.load(state.model as Record<string, unknown>);

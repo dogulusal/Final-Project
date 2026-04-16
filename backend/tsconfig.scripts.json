@@ -1,0 +1,13 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "strict": false,
+        "noImplicitAny": false
+    },
+    "files": [
+        "src/types/ml-logistic-regression.d.ts"
+    ],
+    "include": [
+        "src/**/*"
+    ]
+}
