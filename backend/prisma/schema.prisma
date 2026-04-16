@@ -35,6 +35,9 @@ model Kategori {
 
   haberler            Haber[]
   manuelValidasyonlar ManuelValidasyon[]
+  nbDisputes          DisputeQueue[] @relation("nb")
+  llmDisputes         DisputeQueue[] @relation("llm")
+  adminKararDisputes  DisputeQueue[] @relation("admin_karar")
 
   @@map("kategoriler")
 }
@@ -67,6 +70,7 @@ model Haber {
   kategori            Kategori          @relation(fields: [kategoriId], references: [id])
   okumaGecmisi        OkumaGecmisi[]
   manuelValidasyonlar ManuelValidasyon[]
+  disputeQueue        DisputeQueue?
 
   @@index([durum])                          // En sık filtre: status=hazir
   @@index([yayinlanmaTarihi(sort: Desc)])   // Sıralama: en yeni önce
@@ -76,6 +80,46 @@ model Haber {
   @@index([durum, sentiment, yayinlanmaTarihi(sort: Desc)]) // Sentiment admin istatistikleri/trend
   @@index([augmentedAt])
   @@map("haberler")
+}
+
+model DisputeQueue {
+  id                   Int       @id @default(autoincrement())
+  haberId              Int       @unique @map("haber_id")
+  haber                Haber     @relation(fields: [haberId], references: [id], onDelete: Cascade)
+  nbKategoriId         Int?      @map("nb_kategori_id")
+  nbKategori           Kategori? @relation("nb", fields: [nbKategoriId], references: [id])
+  llmKategoriId        Int?      @map("llm_kategori_id")
+  llmKategori          Kategori? @relation("llm", fields: [llmKategoriId], references: [id])
+  nbGuvenSkoru         Float?    @map("nb_guven_skoru")
+  llmGuvenSkoru        Float?    @map("llm_guven_skoru")
+  batchNumber          Int       @map("batch_number")
+  durum                String    @default("bekliyor") // bekliyor | cozuldu | atildi
+  adminKararKategoriId Int?      @map("admin_karar_kategori_id")
+  adminKararKategori   Kategori? @relation("admin_karar", fields: [adminKararKategoriId], references: [id])
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  resolvedAt           DateTime? @map("resolved_at") @db.Timestamptz
+  resolvedBy           String?   @map("resolved_by")
+
+  @@map("dispute_queue")
+}
+
+model BatchAuditLog {
+  id                   Int      @id @default(autoincrement())
+  batchNumber          Int      @map("batch_number")
+  phase                String   // 'pre' or 'post'
+  timestamp            DateTime @default(now()) @db.Timestamptz
+  haberCount           Int?     @map("haber_count")
+  kategoriDistribution Json?    @map("kategori_distribution") // {"Gündem": 45, "Spor": 120, ...}
+  categoryDominancePct Float?   @map("category_dominance_pct")
+  imbalanceRatio       Float?   @map("imbalance_ratio")
+  mlAccuracy           Float?   @map("ml_accuracy")
+  trainSize            Int?     @map("train_size")
+  testSize             Int?     @map("test_size")
+  status               String   // 'in_progress' | 'success' | 'rolled_back'
+  notes                String?
+
+  @@unique([batchNumber, phase])
+  @@map("batch_audit_log")
 }
 
 // --- Çerez Tercihleri ---
@@ -161,6 +205,7 @@ model ModelState {
   id          Int      @id
   version     Int      @default(1)
   modelData   Json     @map("model_data")
+  lrModelData Json?    @map("lr_model_data")
   accuracy    Float?
   trainedAt   DateTime @default(now()) @map("trained_at")
   sampleCount Int      @default(0) @map("sample_count")

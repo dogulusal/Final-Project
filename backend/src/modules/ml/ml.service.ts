@@ -6,6 +6,7 @@ import { INewsCategorizationService, CategoryResult, TrainingData, SentimentResu
 import { ML_CONFIDENCE_THRESHOLD } from '../../config/constants';
 import { prisma } from '../../config/database';
 import { newsEventEmitter } from '../news/news.service';
+import { TfidfLrService, TfidfLrClassifier } from './tfidf-lr.service';
 
 type ClassifierType = 'naive-bayes' | 'logistic-regression';
 type PreprocessingMode = 'unigram' | 'unigram-bigram' | 'unigram-bigram-filtered';
@@ -60,6 +61,13 @@ export class MlCategorizationService implements INewsCategorizationService {
     private readonly BATCH_TRAIN_THRESHOLD = 20;
     private readonly MIN_TEST_SUPPORT = 10;     // stratified split: minimum test examples per category
     private readonly MIN_TRAIN_RATIO = 0.60;    // stratified split: train set floor (60% of category total)
+
+    // Task 2.3-2.4: Combined NB+LR soft voting
+    private tfidfService: TfidfLrService | null = null;
+    private lrClassifier: TfidfLrClassifier | null = null;
+    public useCombinedModel: boolean = false;
+    private readonly NB_WEIGHT = 0.30;
+    private readonly LR_WEIGHT = 0.70;
 
     private resolveClassifierType(classifierType?: ClassifierType): ClassifierType {
         if (classifierType === 'naive-bayes' || classifierType === 'logistic-regression') {
@@ -308,24 +316,43 @@ export class MlCategorizationService implements INewsCategorizationService {
             console.warn('[ML Guard1] Could not check accuracy, proceeding:', e);
         }
 
-        await modelStateRepo.upsert({
-            where: { id: 1 },
-            update: {
-                modelData,
-                accuracy,
-                sampleCount,
-                trainedAt: new Date(),
-                version: { increment: 1 }
-            },
-            create: {
-                id: 1,
-                modelData,
-                accuracy,
-                sampleCount
+        // Prepare LR state if combined model is active
+        let lrModelData: Prisma.InputJsonValue | null = null;
+        if (this.useCombinedModel && this.tfidfService && this.lrClassifier) {
+            try {
+                lrModelData = {
+                    vectorizer: this.tfidfService.serialize(),
+                    classifier: this.lrClassifier.serialize(),
+                } as Prisma.InputJsonValue;
+            } catch (e) {
+                console.warn('[ML Warn] LR serialization failed, saving NB-only state:', e);
+                lrModelData = null;
             }
+        }
+
+        // Atomic save: NB + LR in same upsert transaction
+        await (prisma as any).$transaction(async (tx: any) => {
+            await tx.modelState.upsert({
+                where: { id: 1 },
+                update: {
+                    modelData,
+                    ...(lrModelData !== null ? { lrModelData } : {}),
+                    accuracy,
+                    sampleCount,
+                    trainedAt: new Date(),
+                    version: { increment: 1 }
+                },
+                create: {
+                    id: 1,
+                    modelData,
+                    ...(lrModelData !== null ? { lrModelData } : {}),
+                    accuracy,
+                    sampleCount
+                }
+            });
         });
 
-        console.log(`[ML] Model DB'ye kaydedildi. Accuracy=%${(accuracy * 100).toFixed(1)} Sample=${sampleCount}`);
+        console.log(`[ML] Model DB'ye kaydedildi. Accuracy=%${(accuracy * 100).toFixed(1)} Sample=${sampleCount} combined=${this.useCombinedModel}`);
     }
 
     async loadModelFromDb(): Promise<boolean> {
@@ -350,6 +377,27 @@ export class MlCategorizationService implements INewsCategorizationService {
             this.lastAccuracy = savedModel.accuracy ?? this.lastAccuracy;
             this.trainSize = savedModel.sampleCount;
             this.testSize = 0;
+
+            // Load LR model if available (NB-only fallback if absent)
+            if (savedModel.lrModelData) {
+                try {
+                    const lrState = typeof savedModel.lrModelData === 'string'
+                        ? JSON.parse(savedModel.lrModelData)
+                        : savedModel.lrModelData;
+                    this.tfidfService = new TfidfLrService();
+                    this.tfidfService.deserialize(lrState.vectorizer);
+                    this.lrClassifier = new TfidfLrClassifier();
+                    await this.lrClassifier.deserialize(lrState.classifier);
+                    this.useCombinedModel = true;
+                    console.log('[ML] Combined NB+LR model loaded from DB');
+                } catch (lrErr) {
+                    console.warn('[ML Warn] LR model load failed — falling back to NB-only mode:', lrErr);
+                    this.useCombinedModel = false;
+                }
+            } else {
+                this.useCombinedModel = false;
+                console.warn('[ML] LR model data missing in DB — NB-only mode active');
+            }
 
             console.log(`[ML] Model DB'den yüklendi. Accuracy=%${(this.lastAccuracy * 100).toFixed(1)} Sample=${this.trainSize}`);
             return true;
@@ -1029,11 +1077,125 @@ export class MlCategorizationService implements INewsCategorizationService {
             console.log(`[ML][HardNegative] Train size after injection: ${trainSet.length}`);
 
             const trainSuccess = await this.trainWithSplit(trainSet, testSet, { persist: options.persist });
+
+            // Task 2.4: Train LR alongside NB (after NB training completes)
+            if (trainSuccess) {
+                try {
+                    console.log('[ML][LR] TF-IDF+LR eğitimi başlıyor...');
+                    const lrTexts = trainSet.map((a: TrainingData) => a.text);
+                    const lrLabels = trainSet.map((a: TrainingData) => a.category);
+                    const tfidf = new TfidfLrService();
+                    tfidf.fitVectorizer(lrTexts, { maxFeatures: 5000, ngramRange: [1, 2] });
+                    const lr = new TfidfLrClassifier();
+                    await lr.fit(lrTexts, lrLabels, tfidf, { numSteps: 300, learningRate: 5e-3 });
+                    this.tfidfService = tfidf;
+                    this.lrClassifier = lr;
+                    this.useCombinedModel = true;
+                    console.log(`[ML][LR] LR eğitimi tamamlandı. Vocab=${tfidf.vocabularySize} features`);
+                } catch (lrErr) {
+                    console.warn('[ML Warn] LR eğitimi başarısız, NB-only modda devam:', lrErr);
+                    this.useCombinedModel = false;
+                }
+            }
+
             return trainSuccess;
         } catch (error) {
             console.error('[ML Error] DB üzerinden veri seti oluşturulurken hata:', error);
             return false;
         }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Task 2.3: Soft Voting + Public Inference Methods
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Get NB probability distribution for a text (all categories, normalized).
+     * Uses getClassifications() which returns [{label, value}] sorted by probability.
+     */
+    private getNbProbabilities(text: string): number[] {
+        const tokens = this.preprocess(text, this.preprocessingMode);
+        const processed = tokens.join(' ');
+        const classifications: Array<{ label: string; value: number }> =
+            this.classifier.getClassifications(processed) || [];
+        const total = classifications.reduce((s: number, c: any) => s + c.value, 0);
+        // Return in sorted-label order for alignment with LR probs
+        return this.indexCategory().map(cat => {
+            const entry = classifications.find((c: any) => c.label === cat);
+            const raw = entry ? entry.value : 0;
+            return total > 0 ? raw / total : 1 / Math.max(1, classifications.length);
+        });
+    }
+
+    /**
+     * Get LR probability distribution. Falls back to NB if LR not loaded.
+     */
+    private async getLrProbabilities(text: string): Promise<number[]> {
+        if (!this.lrClassifier || !this.tfidfService) {
+            return this.getNbProbabilities(text);
+        }
+        const probs = await this.lrClassifier.predictProba(text, this.tfidfService);
+        // LR probs are indexed by LR's own indexCategory; align to NB's category order
+        const lrCats = this.lrClassifier.getIndexCategory();
+        return this.indexCategory().map(cat => {
+            const idx = lrCats.indexOf(cat);
+            return idx >= 0 ? probs[idx] : 0;
+        });
+    }
+
+    /**
+     * Returns sorted list of all known category names (from trained NB classifier).
+     */
+    private indexCategory(): string[] {
+        try {
+            const classifications: Array<{ label: string }> =
+                this.classifier.getClassifications('test') || [];
+            return classifications.map((c: any) => c.label).sort();
+        } catch {
+            return [];
+        }
+    }
+
+    /**
+     * Soft vote combination: P_combined(k) = NB_W × P_NB(k) + LR_W × P_LR(k)
+     */
+    private softVoteCombine(nbProbs: number[], lrProbs: number[]): number[] {
+        if (nbProbs.length !== lrProbs.length) return nbProbs;
+        const combined = nbProbs.map((nb, i) => this.NB_WEIGHT * nb + this.LR_WEIGHT * lrProbs[i]);
+        const sum = combined.reduce((a, b) => a + b, 0);
+        return sum > 0 ? combined.map(p => p / sum) : combined;
+    }
+
+    /** NB-only category prediction (public, for evaluation scripts) */
+    predictNbCategory(text: string): string {
+        const tokens = this.preprocess(text, this.preprocessingMode);
+        return this.classifier.classify(tokens.join(' '));
+    }
+
+    /** LR-only category prediction (falls back to NB if LR not loaded) */
+    async predictLrCategory(text: string): Promise<string> {
+        if (!this.lrClassifier || !this.tfidfService) return this.predictNbCategory(text);
+        return this.lrClassifier.predict(text, this.tfidfService);
+    }
+
+    /** Combined soft-vote category prediction */
+    async predictCombinedCategory(text: string): Promise<string> {
+        if (!this.useCombinedModel) return this.predictNbCategory(text);
+        const nbProbs = this.getNbProbabilities(text);
+        const lrProbs = await this.getLrProbabilities(text);
+        const combined = this.softVoteCombine(nbProbs, lrProbs);
+        const cats = this.indexCategory();
+        let maxIdx = 0;
+        for (let i = 1; i < combined.length; i++) {
+            if (combined[i] > combined[maxIdx]) maxIdx = i;
+        }
+        return cats[maxIdx] ?? 'Bilinmeyen';
+    }
+
+    /** Maps index → category name in LR model (required by CV script) */
+    categoryByIndex(index: number): string {
+        if (!this.lrClassifier) throw new Error('LR model not loaded');
+        return this.lrClassifier.getIndexCategory()[index];
     }
 
     async benchmarkFromDb(upsampleMultiplier: number = 1, diskSupplementLimit: number = 0, maxDbSamples: number = 0): Promise<{ accuracy: number; trainSize: number; testSize: number; classifierType: string; preprocessingMode: string; }> {
