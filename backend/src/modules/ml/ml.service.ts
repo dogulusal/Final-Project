@@ -158,6 +158,16 @@ export class MlCategorizationService implements INewsCategorizationService {
             'yapay zeka', 'akilli', 'telefon', 'uygulama', 'yazilim', 'donanim', 'chip',
             'kamera', 'batarya', 'platform', 'sosyal medya', 'instagram', 'xiaomi', 'iphone', 'android'
         ];
+        const dunyaSignals = [
+            'yabancı', 'uluslararası', 'dışişleri', 'konsolos', 'büyükelçi',
+            'nato', 'bm ', 'ab ', 'avrupa birliği', 'birleşmiş milletler',
+            'savaş', 'çatışma', 'mülteci', 'sınır operasyon', 'kuzey kore',
+            'rusya', 'çin', 'abd ', 'iran', 'ukrayna', 'suriye', 'filistin', 'gazze'
+        ];
+        const ekonomiSignals = [
+            'borsa', 'enflasyon', 'faiz', 'merkez bankası', 'döviz', 'ihracat',
+            'ithalat', 'gdp', 'büyüme oranı', 'işsizlik', 'vergi', 'bütçe', 'gelir vergisi'
+        ];
 
         const genelPool = trainSet.filter(item => {
             if (item.category !== 'Genel') return false;
@@ -179,6 +189,27 @@ export class MlCategorizationService implements INewsCategorizationService {
             return siyasetHit >= 1 && teknolojiHit >= 1;
         });
 
+        const dunyaSiyasetPool = trainSet.filter(item => {
+            if (item.category !== 'Dünya') return false;
+            const siyasetHit = this.countKeywordHits(item.text, siyasetSignals);
+            const dunyaHit = this.countKeywordHits(item.text, dunyaSignals);
+            return siyasetHit >= 1 && dunyaHit >= 1;
+        });
+
+        const siyasetDunyaPool = trainSet.filter(item => {
+            if (item.category !== 'Siyaset') return false;
+            const dunyaHit = this.countKeywordHits(item.text, dunyaSignals);
+            const siyasetHit = this.countKeywordHits(item.text, siyasetSignals);
+            return dunyaHit >= 1 && siyasetHit >= 1;
+        });
+
+        const ekonomiTechPool = trainSet.filter(item => {
+            if (item.category !== 'Ekonomi') return false;
+            const teknoHit = this.countKeywordHits(item.text, teknolojiSignals);
+            const ekoHit = this.countKeywordHits(item.text, ekonomiSignals);
+            return teknoHit >= 1 && ekoHit >= 1;
+        });
+
 
 
         const injectFromPool = (pool: TrainingData[], target: number): number => {
@@ -197,16 +228,24 @@ export class MlCategorizationService implements INewsCategorizationService {
         const genelToSiyaset = injectFromPool(genelPool, 8); // Batch-15: 14→8 (smaller pool, reduce overfit risk)
         const siyasetToGenel = injectFromPool(siyasetPool, 10);
         const siyasetToTeknoloji = injectFromPool(siyasetTechPool, 8);
-        const siyasetToDunya = 0;
+        const dunyaToSiyaset = injectFromPool(dunyaSiyasetPool, 10);
+        const siyasetToDunya = injectFromPool(siyasetDunyaPool, 10);
+        const ekonomiToTeknoloji = injectFromPool(ekonomiTechPool, 8);
         const siyasetToEkonomi = 0;
 
         return {
             genelToSiyaset,
             siyasetToGenel,
             siyasetToTeknoloji,
-            siyasetToDunya,
+            siyasetToDunya: siyasetToDunya + dunyaToSiyaset,
             siyasetToEkonomi,
-            totalInjected: genelToSiyaset + siyasetToGenel + siyasetToTeknoloji
+            totalInjected:
+                genelToSiyaset +
+                siyasetToGenel +
+                siyasetToTeknoloji +
+                dunyaToSiyaset +
+                siyasetToDunya +
+                ekonomiToTeknoloji
         };
     }
 
@@ -808,7 +847,7 @@ export class MlCategorizationService implements INewsCategorizationService {
                 })
                 .map(news => ({
                     id: news.id,
-                    text: (news.baslik + ' ' + (news.metaAciklama || '') + ' ' + (news.icerik ? news.icerik.slice(0, 300) : '')).trim(),
+                    text: (news.baslik + ' ' + (news.metaAciklama || '') + ' ' + (news.icerik ? news.icerik.slice(0, 800) : '')).trim(),
                     category: news.kategori.ad,
                     publishedAt: news.yayinlanmaTarihi,
                     augmentedAt: (news as any).augmentedAt ?? null,
@@ -1096,7 +1135,11 @@ export class MlCategorizationService implements INewsCategorizationService {
                 'siyasi kriz', 'iktidar partisi',
             ],
             'Dünya': ['nato', 'bm', 'ukrayna', 'israil', 'iran', 'abd', 'avrupa birliği', 'uluslararası'],
-            'Sağlık': ['hastane', 'doktor', 'aşı', 'salgın', 'kanser', 'tedavi', 'sağlık', 'ameliyat'],
+            'Sağlık': [
+                'hastane', 'doktor', 'aşı', 'salgın', 'kanser', 'tedavi', 'sağlık', 'ameliyat',
+                'acil servis', 'yoğun bakım', 'sağlık bakanlığı', 'epidemi', 'hijyen', 'enfeksiyon',
+                'muayene', 'reçete', 'tıbbi', 'klinik', 'hemşire', 'ambulans'
+            ],
             'Genel': [
                 'son dakika', 'gündem', 'olay', 'açıklama',
                 // Kültür / sanat / eğlence
@@ -1125,8 +1168,8 @@ export class MlCategorizationService implements INewsCategorizationService {
         for (const [category, hints] of Object.entries(keywordHints)) {
             const hitCount = hints.reduce((acc, h) => acc + (normalized.includes(h) ? 1 : 0), 0);
             if (hitCount > 0) {
-                // Batch-16: Siyaset cap 0.20→0.13; asayiş kalkanı devredeyse Siyaset bonusu sıfır.
-                let cap = category === 'Siyaset' ? 0.13 : 0.18;
+                // Batch-16/Phase-1: Siyaset cap 0.20→0.08; asayiş kalkanı devredeyse Siyaset bonusu sıfır.
+                let cap = category === 'Siyaset' ? 0.08 : 0.18;
                 if (category === 'Siyaset' && asayisShield) cap = 0;
                 hintBonusByCategory[category] = Math.min(cap, hitCount * 0.06);
             }
