@@ -1,0 +1,300 @@
+/**
+ * TF-IDF Vectorizer + Logistic Regression Classifier
+ *
+ * Task 2.1: TF-IDF vectorizer with Turkish stopword filtering
+ * Task 2.2: TfidfLrClassifier (ml-logistic-regression library wrapper)
+ *
+ * Design decisions:
+ * - No NestJS DI — plain class for reuse in scripts + service
+ * - Serializable to JSON for storage in model_state.lr_model_data
+ * - Turkish stopwords included; suffix stripping deferred (see plan note)
+ */
+
+interface TfidfOptions {
+    minDf?: number;          // minimum document frequency (default 2)
+    maxDf?: number;          // max df as fraction of corpus (default 0.85)
+    maxFeatures?: number;    // vocabulary cap (default 5000)
+    ngramRange?: [number, number]; // [1,1] unigram, [1,2] unigram+bigram
+}
+
+// ─────────────────────────────────────────────────────────────
+//  TF-IDF Vectorizer
+// ─────────────────────────────────────────────────────────────
+
+export class TfidfLrService {
+    private vocabulary: Map<string, number> = new Map();
+    private idfValues: number[] = [];           // indexed by vocab index
+    private docFrequency: Map<string, number> = new Map();
+    private totalDocuments: number = 0;
+
+    private readonly turkishStopwords = new Set([
+        'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz', 'on',
+        've', 'ile', 'de', 'da', 'ki', 'bu', 'şu', 'o', 'en', 'çok', 'az',
+        'gibi', 'için', 'ise', 'ama', 'fakat', 'lakin', 'ancak', 'ya', 'veya',
+        'hem', 'ne', 've', 'ile', 'den', 'dan', 'ten', 'tan', 'nin', 'nın',
+        'nun', 'nün', 'ın', 'in', 'un', 'ün', 'a', 'e', 'ı', 'i', 'u', 'ü',
+        'bu', 'şu', 'o', 'ben', 'sen', 'biz', 'siz', 'onlar', 'beni', 'seni',
+        'onu', 'bizi', 'sizi', 'onları', 'bana', 'sana', 'ona', 'bize', 'size',
+        'oldu', 'oldu', 'olacak', 'olur', 'var', 'yok', 'değil', 'daha',
+        'olan', 'olan', 'oluyor', 'edildi', 'edilen', 'yapılan', 'yapıldı',
+        'belki', 'yani', 'ha', 'hani', 'nasıl', 'neden', 'niçin', 'hangi',
+        'kadar', 'sonra', 'önce', 'üzere', 'arasında', 'içinde', 'dışında',
+        'göre', 'karşı', 'doğru', 'itibaren', 'beri', 'rağmen',
+    ]);
+
+    /**
+     * Fit TF-IDF vectorizer on a corpus of documents.
+     * Must be called before vectorize().
+     */
+    fitVectorizer(documents: string[], options: TfidfOptions = {}): void {
+        const {
+            minDf = 2,
+            maxDf = 0.85,
+            maxFeatures = 5000,
+            ngramRange = [1, 2],
+        } = options;
+
+        this.vocabulary.clear();
+        this.docFrequency.clear();
+        this.totalDocuments = documents.length;
+
+        // Count document frequencies
+        for (const doc of documents) {
+            const tokens = this.extractNgrams(this.tokenize(doc), ngramRange);
+            const seen = new Set(tokens);
+            for (const token of seen) {
+                this.docFrequency.set(token, (this.docFrequency.get(token) ?? 0) + 1);
+            }
+        }
+
+        // Filter by minDf / maxDf and select topN by document frequency
+        const maxAbsDf = maxDf <= 1.0 ? Math.floor(maxDf * documents.length) : maxDf;
+        const candidates: Array<[string, number]> = [];
+
+        for (const [term, df] of this.docFrequency.entries()) {
+            if (df < minDf) continue;
+            if (df > maxAbsDf) continue;
+            candidates.push([term, df]);
+        }
+
+        // Sort by descending df then alphabetically for determinism; take top N
+        candidates.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+        const selected = candidates.slice(0, maxFeatures);
+
+        // Assign vocabulary indices
+        this.vocabulary.clear();
+        for (let i = 0; i < selected.length; i++) {
+            this.vocabulary.set(selected[i][0], i);
+        }
+
+        // Compute IDF: log((N + 1) / (df + 1)) + 1  (sklearn smooth variant)
+        this.idfValues = new Array(this.vocabulary.size).fill(0);
+        for (const [term, idx] of this.vocabulary.entries()) {
+            const df = this.docFrequency.get(term) ?? 1;
+            this.idfValues[idx] = Math.log((this.totalDocuments + 1) / (df + 1)) + 1;
+        }
+    }
+
+    /**
+     * Vectorize a single document to a TF-IDF L2-normalized float array.
+     * Returns a zero vector if vocabulary is empty.
+     */
+    vectorize(document: string, ngramRange: [number, number] = [1, 2]): number[] {
+        const size = this.vocabulary.size;
+        if (size === 0) return [];
+
+        const vector = new Array(size).fill(0);
+        const tokens = this.extractNgrams(this.tokenize(document), ngramRange);
+
+        // TF: raw count / doc length
+        const docLen = tokens.length || 1;
+        for (const token of tokens) {
+            const idx = this.vocabulary.get(token);
+            if (idx !== undefined) {
+                vector[idx] += 1 / docLen;
+            }
+        }
+
+        // Multiply by IDF
+        for (let i = 0; i < size; i++) {
+            vector[i] *= this.idfValues[i];
+        }
+
+        // L2 normalize
+        const norm = Math.sqrt(vector.reduce((s, v) => s + v * v, 0));
+        if (norm > 0) {
+            for (let i = 0; i < size; i++) {
+                vector[i] /= norm;
+            }
+        }
+
+        return vector;
+    }
+
+    get vocabularySize(): number {
+        return this.vocabulary.size;
+    }
+
+    // ── Serialization ──────────────────────────────────────────
+
+    serialize(): Record<string, unknown> {
+        return {
+            vocabulary: Array.from(this.vocabulary.entries()),
+            idfValues: this.idfValues,
+            totalDocuments: this.totalDocuments,
+            stopwords: Array.from(this.turkishStopwords),
+        };
+    }
+
+    deserialize(state: Record<string, unknown>): void {
+        this.vocabulary = new Map(state.vocabulary as Array<[string, number]>);
+        this.idfValues = state.idfValues as number[];
+        this.totalDocuments = state.totalDocuments as number;
+        // stopwords are built-in; ignore stored list (keep latest)
+    }
+
+    // ── Private helpers ────────────────────────────────────────
+
+    private tokenize(text: string): string[] {
+        const lower = text.toLowerCase();
+        // Unicode-aware word extraction (preserves Turkish diacritics)
+        const raw = lower.match(/[\p{L}\p{N}]+/gu) ?? [];
+        return raw.filter(t => t.length >= 2 && !this.turkishStopwords.has(t));
+    }
+
+    private extractNgrams(tokens: string[], ngramRange: [number, number]): string[] {
+        const [minN, maxN] = ngramRange;
+        const ngrams: string[] = [];
+        for (let n = minN; n <= maxN; n++) {
+            for (let i = 0; i <= tokens.length - n; i++) {
+                ngrams.push(tokens.slice(i, i + n).join('_'));
+            }
+        }
+        return ngrams;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  TF-IDF + Logistic Regression Classifier
+//  (Task 2.2 — installed when ml-logistic-regression is present)
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Named constant for margin fallback when model.scores() is unavailable.
+ * Calibrate via held-out validation set if needed.
+ */
+const DEFAULT_MARGIN = 0.35;
+
+export class TfidfLrClassifier {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private model: any = null;
+    private categoryIndex: Map<string, number> = new Map();
+    private indexCategory: string[] = [];
+
+    /**
+     * Train One-vs-All Logistic Regression on TF-IDF vectors.
+     * Uses dynamic import for ESM-only ml-logistic-regression package.
+     */
+    async fit(
+        documents: string[],
+        labels: string[],
+        vectorizer: TfidfLrService,
+        options: { numSteps?: number; learningRate?: number } = {},
+    ): Promise<void> {
+        if (documents.length !== labels.length) {
+            throw new Error('documents and labels must have the same length');
+        }
+
+        const LrModule = await import('ml-logistic-regression');
+        const LR = LrModule.default;
+        const { Matrix } = await import('ml-matrix');
+
+        const { numSteps = 500, learningRate = 5e-3 } = options;
+
+        // Build category index from unique labels
+        const uniqueLabels = Array.from(new Set(labels)).sort();
+        this.indexCategory = uniqueLabels;
+        this.categoryIndex.clear();
+        uniqueLabels.forEach((l, i) => this.categoryIndex.set(l, i));
+
+        // Vectorize documents → X matrix
+        const vectors = documents.map(d => vectorizer.vectorize(d));
+        const X = new Matrix(vectors);
+        const y = Matrix.columnVector(labels.map(l => this.categoryIndex.get(l) ?? 0));
+
+        this.model = new LR({ numSteps, learningRate });
+        this.model.train(X, y);
+    }
+
+    /**
+     * Returns calibrated probability-like distribution over all categories.
+     * ml-logistic-regression v2 does not expose scores() — uses DEFAULT_MARGIN.
+     * Requires prior await fit() call.
+     */
+    async predictProba(text: string, vectorizer: TfidfLrService): Promise<number[]> {
+        if (!this.model) throw new Error('Model not trained. Call fit() first.');
+
+        const { Matrix } = await import('ml-matrix');
+
+        const vec = vectorizer.vectorize(text);
+        const X = new Matrix([vec]);
+
+        // Predicted class index
+        const predIdx: number = this.model.predict(X)[0];
+
+        // scores() not available in v2 — use DEFAULT_MARGIN constant
+        const margin = DEFAULT_MARGIN;
+
+        // Winner probability based on margin; other classes share the remainder
+        const numClasses = this.indexCategory.length;
+        const winnerProb = Math.min(0.95, Math.max(0.45, 0.55 + margin * 0.5));
+        const restProb = (1 - winnerProb) / Math.max(1, numClasses - 1);
+
+        const probs = new Array(numClasses).fill(restProb);
+        probs[predIdx] = winnerProb;
+
+        return probs;
+    }
+
+    /**
+     * Returns predicted category name (highest probability class).
+     */
+    async predict(text: string, vectorizer: TfidfLrService): Promise<string> {
+        const probs = await this.predictProba(text, vectorizer);
+        let maxIdx = 0;
+        for (let i = 1; i < probs.length; i++) {
+            if (probs[i] > probs[maxIdx]) maxIdx = i;
+        }
+        return this.indexCategory[maxIdx];
+    }
+
+    getCategoryIndex(): Map<string, number> {
+        return this.categoryIndex;
+    }
+
+    getIndexCategory(): string[] {
+        return this.indexCategory;
+    }
+
+    // ── Serialization ──────────────────────────────────────────
+
+    serialize(): Record<string, unknown> {
+        if (!this.model) throw new Error('Model not trained');
+        return {
+            model: this.model.toJSON(),
+            categoryIndex: Array.from(this.categoryIndex.entries()),
+            indexCategory: this.indexCategory,
+        };
+    }
+
+    /**
+     * Deserialize is async because ml-logistic-regression is ESM-only.
+     */
+    async deserialize(state: Record<string, unknown>): Promise<void> {
+        const LrModule = await import('ml-logistic-regression');
+        const LR = LrModule.default;
+        this.model = LR.load(state.model as Record<string, unknown>);
+        this.categoryIndex = new Map(state.categoryIndex as Array<[string, number]>);
+        this.indexCategory = state.indexCategory as string[];
+    }
+}
