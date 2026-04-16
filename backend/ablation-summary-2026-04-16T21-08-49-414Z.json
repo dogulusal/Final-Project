@@ -1,0 +1,62 @@
+[
+  {
+    "scenario": "baseline",
+    "exitCode": 0,
+    "spawnError": "",
+    "accuracyPct": 75.65,
+    "dunyaToSiyaset": 27,
+    "genelToSiyaset": 11,
+    "logPath": "C:\\Users\\dogul\\Final-Project\\backend\\ablation-baseline-2026-04-16T21-08-49-414Z.log",
+    "deltaPositiveForTask": 0
+  },
+  {
+    "scenario": "no-task11",
+    "exitCode": 0,
+    "spawnError": "",
+    "accuracyPct": 76.26,
+    "dunyaToSiyaset": 30,
+    "genelToSiyaset": 19,
+    "logPath": "C:\\Users\\dogul\\Final-Project\\backend\\ablation-no-task11-2026-04-16T21-08-49-414Z.log",
+    "deltaPositiveForTask": -0.61
+  },
+  {
+    "scenario": "no-task12",
+    "exitCode": 0,
+    "spawnError": "",
+    "accuracyPct": 77.06,
+    "dunyaToSiyaset": 16,
+    "genelToSiyaset": 14,
+    "logPath": "C:\\Users\\dogul\\Final-Project\\backend\\ablation-no-task12-2026-04-16T21-08-49-414Z.log",
+    "deltaPositiveForTask": -1.41
+  },
+  {
+    "scenario": "no-task13",
+    "exitCode": 0,
+    "spawnError": "",
+    "accuracyPct": 78.67,
+    "dunyaToSiyaset": 17,
+    "genelToSiyaset": 10,
+    "logPath": "C:\\Users\\dogul\\Final-Project\\backend\\ablation-no-task13-2026-04-16T21-08-49-414Z.log",
+    "deltaPositiveForTask": -3.02
+  },
+  {
+    "scenario": "no-task14",
+    "exitCode": 0,
+    "spawnError": "",
+    "accuracyPct": 75.45,
+    "dunyaToSiyaset": 27,
+    "genelToSiyaset": 14,
+    "logPath": "C:\\Users\\dogul\\Final-Project\\backend\\ablation-no-task14-2026-04-16T21-08-49-414Z.log",
+    "deltaPositiveForTask": 0.2
+  },
+  {
+    "scenario": "no-task15",
+    "exitCode": 0,
+    "spawnError": "",
+    "accuracyPct": 75.25,
+    "dunyaToSiyaset": 34,
+    "genelToSiyaset": 17,
+    "logPath": "C:\\Users\\dogul\\Final-Project\\backend\\ablation-no-task15-2026-04-16T21-08-49-414Z.log",
+    "deltaPositiveForTask": 0.4
+  }
+]
