@@ -1,0 +1,12 @@
+[ML][HardNegative] Injected total=52 | Genel->Siyaset=8, Siyaset->Genel=10, Siyaset->Teknoloji=8, Siyaset->Dunya=20, Siyaset->Ekonomi=0
+[ML][HardNegative] Train size after injection: 3223
+[ML][Diagnostics] Accuracy=%77.28 Macro-F1=0.781 Train=3223 Test=493
+[ML][Diagnostics][TopPair 1] Genel -> Siyaset: 17
+[ML][Diagnostics][TopPair 2] D+-nya -> Siyaset: 16
+[ML][Diagnostics][TopPair 3] Ekonomi -> Siyaset: 11
+[ML][Diagnostics][TopPair 4] Genel -> Teknoloji: 7
+[ML][Diagnostics][TopPair 5] Siyaset -> D+-nya: 7
+[ML][Diagnostics][TopPair 6] Spor -> Genel: 7
+[ML][Diagnostics][TopPair 7] Ekonomi -> Genel: 6
+[ML][Diagnostics][TopPair 8] Sa¦þl¦-k -> Genel: 6
+Final Metrics: { accuracy: 0.7728194726166329, testSize: 493, trainSize: 3223 }
