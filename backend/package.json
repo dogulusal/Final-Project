@@ -16,7 +16,8 @@
         "status:db": "ts-node check-db-state.ts",
         "migration:sanitize": "ts-node src/scripts/sanitize-existing-news.ts",
         "training:generate": "ts-node src/scripts/generate-training-data.ts",
-        "ml:benchmark:faz5a": "ts-node scripts/benchmark-faz5a.ts"
+        "ml:benchmark:faz5a": "ts-node scripts/benchmark-faz5a.ts",
+        "evaluate:combined": "ts-node --project tsconfig.scripts.json src/scripts/evaluate-combined-model.ts"
     },
     "prisma": {
         "seed": "ts-node prisma/seed.ts"
