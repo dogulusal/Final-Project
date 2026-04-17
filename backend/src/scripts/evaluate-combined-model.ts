@@ -1,7 +1,7 @@
 /**
  * Task 2.5: Dry-Run Evaluator Script
- * Loads model from DB, runs NB / LR / Combined predictions on verified articles,
- * reports per-model accuracy, writes CSV to docs/evaluation-report-YYYYMMDD.csv
+ * Loads persisted model from DB, runs NB / LR / Combined predictions on verified articles,
+ * reports per-model accuracy, writes CSV to backend/evaluation-report-YYYY-MM-DD.csv
  */
 
 import * as fs from 'fs';
@@ -32,7 +32,10 @@ export async function runEvaluatorDry(): Promise<{
 }> {
     console.log('[Eval] Loading model from DB...');
     const mlService = new MlCategorizationService();
-    await mlService.loadAndTrainFromDB();
+    const loaded = await mlService.loadModelFromDb();
+    if (!loaded) {
+        throw new Error('Persisted model could not be loaded from DB. Refusing to retrain in dry-run evaluator.');
+    }
 
     const combined = mlService.useCombinedModel;
     console.log(`[Eval] useCombinedModel=${combined}`);
@@ -51,7 +54,7 @@ export async function runEvaluatorDry(): Promise<{
     let combinedCorrectCount = 0;
 
     for (const article of articles) {
-        const text = `${article.baslik} ${(article.icerik ?? '').slice(0, 800)}`;
+        const text = `${article.baslik} ${(article.icerik ?? '').slice(0, 300)}`;
         const trueCategory = article.kategori.ad;
 
         const nbPred = mlService.predictNbCategory(text);
@@ -85,10 +88,10 @@ export async function runEvaluatorDry(): Promise<{
     const combinedAccuracy = total > 0 ? combinedCorrectCount / total : 0;
 
     // Write CSV
-    const dateTag = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const dateTag = process.env.ML_REPORT_DATE_TAG || '2026-04-16';
     const reportPath = path.resolve(
         __dirname,
-        '../../../../docs',
+        '../..',
         `evaluation-report-${dateTag}.csv`
     );
     const header = 'articleId,title,trueCategory,nbPred,lrPred,combinedPred,nbCorrect,lrCorrect,combinedCorrect\n';
@@ -119,4 +122,9 @@ async function main() {
     }
 }
 
-main();
+main()
+    .then(() => process.exit(0))
+    .catch((error) => {
+        console.error(error);
+        process.exit(1);
+    });
