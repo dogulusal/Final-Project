@@ -37,6 +37,13 @@ export async function runEvaluatorDry(): Promise<{
         throw new Error('Persisted model could not be loaded from DB. Refusing to retrain in dry-run evaluator.');
     }
 
+    if (!mlService.useCombinedModel) {
+        throw new Error(
+            'BLOCKER: useCombinedModel=false — LR state DB\'de yok. ' +
+            'Faz2 doğrulaması yapılamaz. Önce train pipeline\'ı fix et.'
+        );
+    }
+
     const combined = mlService.useCombinedModel;
     console.log(`[Eval] useCombinedModel=${combined}`);
 
