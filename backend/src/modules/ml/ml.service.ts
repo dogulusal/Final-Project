@@ -319,15 +319,17 @@ export class MlCategorizationService implements INewsCategorizationService {
         // Prepare LR state if combined model is active
         // LR Serialization OUTSIDE transaction to avoid timeout
         let lrModelData: Prisma.InputJsonValue | null = null;
-        if (this.useCombinedModel && this.tfidfService && this.lrClassifier) {
+        if (this.useCombinedModel) {
+            if (!this.tfidfService || !this.lrClassifier) {
+                throw new Error('useCombinedModel=true but LR artifacts are missing. Refusing to save inconsistent state.');
+            }
             try {
                 lrModelData = {
                     vectorizer: this.tfidfService.serialize(),
                     classifier: this.lrClassifier.serialize(),
                 } as Prisma.InputJsonValue;
             } catch (e) {
-                console.warn('[ML Warn] LR serialization failed, saving NB-only state:', e);
-                lrModelData = null;
+                throw new Error(`[ML] LR serialization failed; aborting save. ${(e as Error)?.message ?? e}`);
             }
         }
 
@@ -335,7 +337,7 @@ export class MlCategorizationService implements INewsCategorizationService {
             where: { id: 1 },
             update: {
                 modelData,
-                ...(lrModelData !== null ? { lrModelData } : {}),
+                lrModelData,
                 accuracy,
                 sampleCount,
                 trainedAt: new Date(),
@@ -344,7 +346,7 @@ export class MlCategorizationService implements INewsCategorizationService {
             create: {
                 id: 1,
                 modelData,
-                ...(lrModelData !== null ? { lrModelData } : {}),
+                lrModelData,
                 accuracy,
                 sampleCount
             }
@@ -387,8 +389,23 @@ export class MlCategorizationService implements INewsCategorizationService {
                 ? savedModel.modelData
                 : JSON.stringify(savedModel.modelData);
 
-            const restore = (natural.BayesClassifier as unknown as { restore: (classifier: unknown) => natural.BayesClassifier }).restore;
-            this.classifier = restore(JSON.parse(serialized));
+            // BayesClassifier.restore() does not correctly reconstruct the inner
+            // classFeatures index, leading to degraded predictions (all → Siyaset).
+            // Fix: recreate the classifier from stored docs using fresh addDocument+train.
+            // PorterStemmer is idempotent so double-stemming stored tokens gives same result.
+            const modelData = JSON.parse(serialized);
+            const freshClassifier = new natural.BayesClassifier();
+            for (const doc of (modelData.docs || [])) {
+                if (doc.text && doc.label) {
+                    freshClassifier.addDocument(
+                        Array.isArray(doc.text) ? doc.text.join(' ') : String(doc.text),
+                        doc.label
+                    );
+                }
+            }
+            freshClassifier.train();
+            this.classifier = freshClassifier;
+            console.log(`[ML] NB classifier rebuilt from ${modelData.docs?.length ?? 0} stored docs`);
             this.isTrained = true;
             this.lastAccuracy = savedModel.accuracy ?? this.lastAccuracy;
             this.trainSize = savedModel.sampleCount;
@@ -691,7 +708,10 @@ export class MlCategorizationService implements INewsCategorizationService {
         const trainSet = shuffled.slice(0, splitIndex);
         const testSet = shuffled.slice(splitIndex);
 
-        return await this.trainWithSplit(trainSet, testSet);
+        const ok = await this.trainWithSplit(trainSet, testSet);
+        if (!ok) return false;
+
+        return true;
     }
 
     /**
@@ -782,7 +802,7 @@ export class MlCategorizationService implements INewsCategorizationService {
         }
 
         console.log(`[ML] ${this.classifierType.toUpperCase()} (${this.preprocessingMode}) başarıyla eğitildi. (Train: ${this.trainSize}, Test: ${this.testSize}, Accuracy: %${(this.lastAccuracy*100).toFixed(2)})`);
-        console.log(`[ML][Step] Test değerlendirmesi bitti, DB'ye kaydediliyor...`);
+        console.log(`[ML][Step] Test değerlendirmesi bitti, post-train kontrolleri tamamlanıyor...`);
         
         // Guard 4: Kalibrasyon Testi (Confidence-based predictions validation)
         // Tahminleri güven skorlarına göre filtrele ve bunların doğruluğunu kontrol et
@@ -794,11 +814,8 @@ export class MlCategorizationService implements INewsCategorizationService {
             console.log(`[ML Guard4] Kalibrasyon Testi: ${highConfidencePredictions.length} tahminler (Confidence >= 0.70) içinden %${(calibrationAccuracy*100).toFixed(2)} doğru.`);
             
             if (calibrationAccuracy < 0.70) {
-                console.error(`[ML Guard4] KALIBRE BAŞARISIZ: Güven skorları güvenilmez (calibration accuracy %${(calibrationAccuracy*100).toFixed(2)} < 70%). Model kaydedilmiyor.`);
-                if (options.persist ?? true) {
-                    // Skip save, but still update in-memory
-                    this.isTrained = true;
-                }
+                console.error(`[ML Guard4] KALIBRE BAŞARISIZ: Güven skorları güvenilmez (calibration accuracy %${(calibrationAccuracy*100).toFixed(2)} < 70%).`);
+                this.isTrained = true;
                 return false; // Guard rejected model
             } else {
                 console.log(`[ML Guard4] ✓ Kalibrasyon BAŞARILI: Güven skorları güvenilir. Modeli kaydet.`);
@@ -806,12 +823,8 @@ export class MlCategorizationService implements INewsCategorizationService {
         } else {
             console.warn(`[ML Guard4] Uyarı: Yeterli yüksek-güven tahmini yok (>= 0.70). Kalibrasyon testi atlanıyor.`);
         }
-        
-        if (options.persist ?? true) {
-            await this.saveModelToDb(this.lastAccuracy, this.trainSize);
-        }
-        console.log(`[ML][Step] DB kayıt tamamlandı.`);
-        return true; // Successfully trained and persisted
+        console.log(`[ML][Step] In-memory NB eğitim adımı tamamlandı.`);
+        return true; // Successfully trained in-memory; persistence handled by caller
     }
 
     /**
@@ -1092,29 +1105,54 @@ export class MlCategorizationService implements INewsCategorizationService {
             console.log(`[ML][HardNegative] Injected total=${hardNegativeSummary.totalInjected} | Genel->Siyaset=${hardNegativeSummary.genelToSiyaset}, Siyaset->Genel=${hardNegativeSummary.siyasetToGenel}, Siyaset->Teknoloji=${hardNegativeSummary.siyasetToTeknoloji}, Siyaset->Dunya=${hardNegativeSummary.siyasetToDunya}, Siyaset->Ekonomi=${hardNegativeSummary.siyasetToEkonomi}`);
             console.log(`[ML][HardNegative] Train size after injection: ${trainSet.length}`);
 
-            const trainSuccess = await this.trainWithSplit(trainSet, testSet, { persist: options.persist });
-
-            // Task 2.4: Train LR alongside NB (after NB training completes)
-            if (trainSuccess) {
-                try {
-                    console.log('[ML][LR] TF-IDF+LR eğitimi başlıyor...');
-                    const lrTexts = trainSet.map((a: TrainingData) => a.text);
-                    const lrLabels = trainSet.map((a: TrainingData) => a.category);
-                    const tfidf = new TfidfLrService();
-                    tfidf.fitVectorizer(lrTexts, { maxFeatures: 5000, ngramRange: [1, 2] });
-                    const lr = new TfidfLrClassifier();
-                    await lr.fit(lrTexts, lrLabels, tfidf, { numSteps: 300, learningRate: 5e-3 });
-                    this.tfidfService = tfidf;
-                    this.lrClassifier = lr;
-                    this.useCombinedModel = true;
-                    console.log(`[ML][LR] LR eğitimi tamamlandı. Vocab=${tfidf.vocabularySize} features`);
-                } catch (lrErr) {
-                    console.warn('[ML Warn] LR eğitimi başarısız, NB-only modda devam:', lrErr);
-                    this.useCombinedModel = false;
-                }
+            // 1) NB train (in-memory)
+            const trainSuccess = await this.trainWithSplit(trainSet, testSet, { persist: false });
+            if (!trainSuccess) {
+                return false;
             }
 
-            return trainSuccess;
+            // Reset combined state before LR phase to avoid stale in-memory references.
+            this.tfidfService = null;
+            this.lrClassifier = null;
+            this.useCombinedModel = false;
+
+            // 2) LR train (in-memory)
+            try {
+                const lrMaxFeatures = Number(process.env.ML_LR_MAX_FEATURES ?? 5000);
+                const lrNumSteps = Number(process.env.ML_LR_NUM_STEPS ?? 300);
+                const lrLearningRate = Number(process.env.ML_LR_LEARNING_RATE ?? 5e-3);
+
+                console.log(
+                    `[ML][LR] TF-IDF+LR eğitimi başlıyor... maxFeatures=${lrMaxFeatures} steps=${lrNumSteps} lr=${lrLearningRate}`
+                );
+                const lrTexts = trainSet.map((a: TrainingData) => a.text);
+                const lrLabels = trainSet.map((a: TrainingData) => a.category);
+                const tfidf = new TfidfLrService();
+                tfidf.fitVectorizer(lrTexts, { maxFeatures: lrMaxFeatures, ngramRange: [1, 2] });
+                const lr = new TfidfLrClassifier();
+                await lr.fit(lrTexts, lrLabels, tfidf, { numSteps: lrNumSteps, learningRate: lrLearningRate });
+
+                this.tfidfService = tfidf;
+                this.lrClassifier = lr;
+
+                // 3) set useCombinedModel=true only when both models are ready
+                this.useCombinedModel = true;
+                console.log(`[ML][LR] LR eğitimi tamamlandı. Vocab=${tfidf.vocabularySize} features`);
+            } catch (lrErr) {
+                console.error('[ML Error] LR eğitimi başarısız. Persist yapılmadan işlem sonlandırıldı:', lrErr);
+                this.useCombinedModel = false;
+                this.tfidfService = null;
+                this.lrClassifier = null;
+                return false;
+            }
+
+            // 4) saveModelToDb (both NB+LR ready)
+            if (options.persist ?? true) {
+                await this.saveModelToDb(this.lastAccuracy, this.trainSize);
+                console.log('[ML][Step] Atomic NB+LR DB kayıt tamamlandı.');
+            }
+
+            return true;
         } catch (error) {
             console.error('[ML Error] DB üzerinden veri seti oluşturulurken hata:', error);
             return false;
