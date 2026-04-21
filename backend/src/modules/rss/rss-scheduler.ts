@@ -250,6 +250,11 @@ export class RssScheduler {
 
                         const safeLink = this.normalizeText(item.link);
 
+                        // 0. Köşe yazısı filtresi — opinion columns are not news
+                        if (safeLink && /\/(yazarlar|yazar)\//i.test(safeLink)) {
+                            continue;
+                        }
+
                         // 1. Kalite Filtresi
                         const contentFallback = this.normalizeText(item.contentSnippet);
                         const quality = this.qualityFilter.validateQuality(safeTitle, contentFallback);
