@@ -7,6 +7,7 @@ import { ML_CONFIDENCE_THRESHOLD } from '../../config/constants';
 import { prisma } from '../../config/database';
 import { newsEventEmitter } from '../news/news.service';
 import { TfidfLrService, TfidfLrClassifier } from './tfidf-lr.service';
+import { StackingMetaClassifier } from './stacking-meta.service';
 
 type ClassifierType = 'naive-bayes' | 'logistic-regression';
 type PreprocessingMode = 'unigram' | 'unigram-bigram' | 'unigram-bigram-filtered';
@@ -47,6 +48,14 @@ interface TrainDiagnostics {
     confusionMatrix: any;
 }
 
+interface PersistedVerifiedEval {
+    combinedAccuracy: number;
+    total: number;
+    evaluatedAt?: string;
+}
+
+type AccuracySource = 'verified-eval' | 'training-snapshot';
+
 export class MlCategorizationService implements INewsCategorizationService {
     public classifier: any = null;
     public classifierType: ClassifierType = 'naive-bayes';
@@ -56,6 +65,9 @@ export class MlCategorizationService implements INewsCategorizationService {
     public lastAccuracy: number = 0;
     public trainSize: number = 0;
     public testSize: number = 0;
+    public lastVerifiedEvalAccuracy: number | null = null;
+    public lastVerifiedEvalSize: number = 0;
+    public lastVerifiedEvalAt: string | null = null;
     public lastConfusionMatrix: any = null;
     public lastDiagnostics: TrainDiagnostics | null = null;
     private readonly BATCH_TRAIN_THRESHOLD = 20;
@@ -66,8 +78,12 @@ export class MlCategorizationService implements INewsCategorizationService {
     private tfidfService: TfidfLrService | null = null;
     private lrClassifier: TfidfLrClassifier | null = null;
     public useCombinedModel: boolean = false;
-    private readonly NB_WEIGHT = 0.30;
-    private readonly LR_WEIGHT = 0.70;
+    private readonly NB_WEIGHT: number;
+    private readonly LR_WEIGHT: number;
+
+    // Task 2.6: Stacking meta-classifier (2nd-level LR on NB+LR probabilities)
+    private stackingMeta: StackingMetaClassifier | null = null;
+    public useStacking: boolean = false;
 
     private resolveClassifierType(classifierType?: ClassifierType): ClassifierType {
         if (classifierType === 'naive-bayes' || classifierType === 'logistic-regression') {
@@ -86,9 +102,42 @@ export class MlCategorizationService implements INewsCategorizationService {
         return 'naive-bayes';
     }
 
+    private resolveEnsembleWeights(): { nbWeight: number; lrWeight: number } {
+        const defaultNb = 0.60;
+        const defaultLr = 0.40;
+
+        const nbRaw = process.env.ML_NB_WEIGHT;
+        const lrRaw = process.env.ML_LR_WEIGHT;
+
+        if (!nbRaw && !lrRaw) {
+            return { nbWeight: defaultNb, lrWeight: defaultLr };
+        }
+
+        const nb = Number(nbRaw);
+        const lr = Number(lrRaw);
+        const bothValid = Number.isFinite(nb) && Number.isFinite(lr) && nb >= 0 && lr >= 0 && (nb + lr) > 0;
+
+        if (!bothValid) {
+            console.warn(
+                `[ML Warn] Invalid ML_NB_WEIGHT/ML_LR_WEIGHT values (nb="${nbRaw}", lr="${lrRaw}"). ` +
+                `Fallback to defaults nb=${defaultNb}, lr=${defaultLr}.`
+            );
+            return { nbWeight: defaultNb, lrWeight: defaultLr };
+        }
+
+        const sum = nb + lr;
+        const nbWeight = nb / sum;
+        const lrWeight = lr / sum;
+        console.log(`[ML] Ensemble weights: NB=${nbWeight.toFixed(2)} LR=${lrWeight.toFixed(2)}`);
+        return { nbWeight, lrWeight };
+    }
+
     constructor(classifierType?: ClassifierType, preprocessingMode: PreprocessingMode = 'unigram-bigram') {
         this.classifierType = this.resolveClassifierType(classifierType);
         this.preprocessingMode = preprocessingMode;
+        const { nbWeight, lrWeight } = this.resolveEnsembleWeights();
+        this.NB_WEIGHT = nbWeight;
+        this.LR_WEIGHT = lrWeight;
         this.initializeClassifier();
 
         // Faz 4: Oto-Öğrenim Pipeline Gözlemcisi (Observer)
@@ -291,9 +340,128 @@ export class MlCategorizationService implements INewsCategorizationService {
         });
     }
 
+    private extractPersistedMetrics(modelData: unknown): Record<string, unknown> | null {
+        if (!modelData || typeof modelData !== 'object' || Array.isArray(modelData)) {
+            return null;
+        }
+
+        const metrics = (modelData as Record<string, unknown>)._metrics;
+        if (!metrics || typeof metrics !== 'object' || Array.isArray(metrics)) {
+            return null;
+        }
+
+        return metrics as Record<string, unknown>;
+    }
+
+    private extractPersistedVerifiedEval(modelData: unknown): PersistedVerifiedEval | null {
+        const metrics = this.extractPersistedMetrics(modelData);
+        if (!metrics) {
+            return null;
+        }
+
+        const raw = metrics.lastVerifiedEval;
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+            return null;
+        }
+
+        const parsed = raw as Record<string, unknown>;
+        const combinedAccuracy = Number(parsed.combinedAccuracy);
+        const total = Number(parsed.total);
+        const evaluatedAt = typeof parsed.evaluatedAt === 'string' ? parsed.evaluatedAt : undefined;
+
+        if (!Number.isFinite(combinedAccuracy) || combinedAccuracy < 0 || combinedAccuracy > 1) {
+            return null;
+        }
+
+        if (!Number.isFinite(total) || total <= 0) {
+            return null;
+        }
+
+        return {
+            combinedAccuracy,
+            total,
+            evaluatedAt
+        };
+    }
+
+    private getEffectiveAccuracySnapshot(): {
+        accuracy: number;
+        testSize: number;
+        trainSize: number;
+        source: AccuracySource;
+        evaluatedAt: string | null;
+        snapshotAccuracy: number;
+    } {
+        if (this.lastVerifiedEvalAccuracy !== null && this.lastVerifiedEvalSize > 0) {
+            return {
+                accuracy: this.lastVerifiedEvalAccuracy,
+                testSize: this.lastVerifiedEvalSize,
+                trainSize: this.trainSize,
+                source: 'verified-eval',
+                evaluatedAt: this.lastVerifiedEvalAt,
+                snapshotAccuracy: this.lastAccuracy,
+            };
+        }
+
+        return {
+            accuracy: this.lastAccuracy,
+            testSize: this.testSize,
+            trainSize: this.trainSize,
+            source: 'training-snapshot',
+            evaluatedAt: null,
+            snapshotAccuracy: this.lastAccuracy,
+        };
+    }
+
+    private async hydrateVerifiedEvalFromDbIfNeeded(): Promise<void> {
+        const needsVerifiedEvalHydration =
+            this.lastVerifiedEvalAccuracy === null ||
+            this.lastVerifiedEvalSize <= 0 ||
+            !this.lastVerifiedEvalAt;
+
+        const needsSnapshotHydration = this.lastAccuracy <= 0 || this.trainSize <= 0;
+
+        if (!needsVerifiedEvalHydration && !needsSnapshotHydration) {
+            return;
+        }
+
+        try {
+            const modelStateRepo = (prisma as any).modelState;
+            if (!modelStateRepo) {
+                return;
+            }
+
+            const state = await modelStateRepo.findUnique({ where: { id: 1 } });
+            if (!state) {
+                return;
+            }
+
+            if (needsSnapshotHydration) {
+                const snapshotAccuracy = Number(state.accuracy);
+                if (Number.isFinite(snapshotAccuracy) && snapshotAccuracy >= 0) {
+                    this.lastAccuracy = snapshotAccuracy;
+                }
+                if (Number.isFinite(Number(state.sampleCount)) && Number(state.sampleCount) > 0) {
+                    this.trainSize = Number(state.sampleCount);
+                }
+            }
+
+            if (needsVerifiedEvalHydration) {
+                const persistedEval = this.extractPersistedVerifiedEval(state.modelData);
+                if (persistedEval) {
+                    this.lastVerifiedEvalAccuracy = persistedEval.combinedAccuracy;
+                    this.lastVerifiedEvalSize = persistedEval.total;
+                    this.lastVerifiedEvalAt = persistedEval.evaluatedAt ?? this.lastVerifiedEvalAt;
+                }
+            }
+        } catch (error) {
+            console.warn('[ML Warn] Verified eval hydration from DB failed:', error);
+        }
+    }
+
     async saveModelToDb(accuracy: number, sampleCount: number): Promise<void> {
         const serializedClassifier = JSON.stringify(this.classifier);
-        const modelData = JSON.parse(serializedClassifier) as Prisma.InputJsonValue;
+        const parsedModelData = JSON.parse(serializedClassifier) as Record<string, unknown>;
         const modelStateRepo = (prisma as any).modelState;
 
         if (!modelStateRepo) {
@@ -301,9 +469,12 @@ export class MlCategorizationService implements INewsCategorizationService {
             return;
         }
 
+        let preservedMetrics: Record<string, unknown> | null = null;
+
         // Guard 1: Accuracy drop rollback - 5pp threshold
         try {
             const currentState = await modelStateRepo.findUnique({ where: { id: 1 } });
+            preservedMetrics = this.extractPersistedMetrics(currentState?.modelData);
             if (currentState && currentState.accuracy) {
                 const curr = typeof currentState.accuracy === 'number' ? currentState.accuracy : parseFloat(currentState.accuracy as unknown as string);
                 const drop = curr - accuracy;
@@ -316,6 +487,12 @@ export class MlCategorizationService implements INewsCategorizationService {
             console.warn('[ML Guard1] Could not check accuracy, proceeding:', e);
         }
 
+        if (preservedMetrics && parsedModelData && typeof parsedModelData === 'object' && !Array.isArray(parsedModelData)) {
+            parsedModelData._metrics = preservedMetrics;
+        }
+
+        const modelData = parsedModelData as Prisma.InputJsonValue;
+
         // Prepare LR state if combined model is active
         // LR Serialization OUTSIDE transaction to avoid timeout
         let lrModelData: Prisma.InputJsonValue | null = null;
@@ -324,10 +501,15 @@ export class MlCategorizationService implements INewsCategorizationService {
                 throw new Error('useCombinedModel=true but LR artifacts are missing. Refusing to save inconsistent state.');
             }
             try {
-                lrModelData = {
+                const lrPayload: Record<string, unknown> = {
                     vectorizer: this.tfidfService.serialize(),
                     classifier: this.lrClassifier.serialize(),
-                } as Prisma.InputJsonValue;
+                };
+                // Persist meta-classifier when stacking is active
+                if (this.useStacking && this.stackingMeta && this.stackingMeta.isTrained()) {
+                    lrPayload.metaClassifier = this.stackingMeta.serialize();
+                }
+                lrModelData = lrPayload as Prisma.InputJsonValue;
             } catch (e) {
                 throw new Error(`[ML] LR serialization failed; aborting save. ${(e as Error)?.message ?? e}`);
             }
@@ -394,6 +576,7 @@ export class MlCategorizationService implements INewsCategorizationService {
             // Fix: recreate the classifier from stored docs using fresh addDocument+train.
             // PorterStemmer is idempotent so double-stemming stored tokens gives same result.
             const modelData = JSON.parse(serialized);
+            const persistedEval = this.extractPersistedVerifiedEval(modelData);
             const freshClassifier = new natural.BayesClassifier();
             for (const doc of (modelData.docs || [])) {
                 if (doc.text && doc.label) {
@@ -410,6 +593,9 @@ export class MlCategorizationService implements INewsCategorizationService {
             this.lastAccuracy = savedModel.accuracy ?? this.lastAccuracy;
             this.trainSize = savedModel.sampleCount;
             this.testSize = 0;
+            this.lastVerifiedEvalAccuracy = persistedEval?.combinedAccuracy ?? null;
+            this.lastVerifiedEvalSize = persistedEval?.total ?? 0;
+            this.lastVerifiedEvalAt = persistedEval?.evaluatedAt ?? null;
 
             // Load LR model if available (NB-only fallback if absent)
             if (savedModel.lrModelData) {
@@ -423,16 +609,38 @@ export class MlCategorizationService implements INewsCategorizationService {
                     await this.lrClassifier.deserialize(lrState.classifier);
                     this.useCombinedModel = true;
                     console.log('[ML] Combined NB+LR model loaded from DB');
+
+                    // Restore stacking meta-classifier if present
+                    if (lrState.metaClassifier) {
+                        try {
+                            this.stackingMeta = new StackingMetaClassifier();
+                            await this.stackingMeta.deserialize(lrState.metaClassifier);
+                            this.useStacking = true;
+                            console.log('[ML][Stacking] Meta-LR loaded from DB — stacking active');
+                        } catch (metaErr) {
+                            console.warn('[ML][Stacking] Meta-LR load failed — falling back to soft voting:', metaErr);
+                            this.stackingMeta = null;
+                            this.useStacking = false;
+                        }
+                    } else {
+                        this.stackingMeta = null;
+                        this.useStacking = false;
+                    }
                 } catch (lrErr) {
                     console.warn('[ML Warn] LR model load failed — falling back to NB-only mode:', lrErr);
                     this.useCombinedModel = false;
+                    this.useStacking = false;
                 }
             } else {
                 this.useCombinedModel = false;
+                this.useStacking = false;
                 console.warn('[ML] LR model data missing in DB — NB-only mode active');
             }
 
             console.log(`[ML] Model DB'den yüklendi. Accuracy=%${(this.lastAccuracy * 100).toFixed(1)} Sample=${this.trainSize}`);
+            if (this.lastVerifiedEvalAccuracy !== null && this.lastVerifiedEvalSize > 0) {
+                console.log(`[ML] Persisted verified evaluation bulundu. Combined=%${(this.lastVerifiedEvalAccuracy * 100).toFixed(2)} n=${this.lastVerifiedEvalSize}`);
+            }
             return true;
         } catch (error) {
             console.warn('[ML Warn] Model DB\'den yüklenemedi, yeniden eğitim yapılacak.', error);
@@ -445,6 +653,8 @@ export class MlCategorizationService implements INewsCategorizationService {
      */
     async getModelStatus() {
         let trainedAt: Date | null = null;
+        await this.hydrateVerifiedEvalFromDbIfNeeded();
+        const effectiveAccuracy = this.getEffectiveAccuracySnapshot();
         try {
             const modelStateRepo = (prisma as any).modelState;
             if (modelStateRepo) {
@@ -457,9 +667,15 @@ export class MlCategorizationService implements INewsCategorizationService {
 
         return {
             status: this.isTrained ? 'ready' : 'not_trained',
-            accuracy: this.lastAccuracy,
+            accuracy: effectiveAccuracy.accuracy,
             sample_count: this.trainSize,
+            train_sample_count: this.trainSize,
+            evaluation_sample_count: effectiveAccuracy.testSize,
+            accuracy_source: effectiveAccuracy.source,
+            snapshot_accuracy: effectiveAccuracy.snapshotAccuracy,
+            evaluation_accuracy: this.lastVerifiedEvalAccuracy,
             trained_at: trainedAt?.toISOString() || null,
+            evaluated_at: effectiveAccuracy.evaluatedAt,
             model_type: this.classifierType,
             preprocessing_mode: this.preprocessingMode
         };
@@ -1013,6 +1229,12 @@ export class MlCategorizationService implements INewsCategorizationService {
             let manualWeightedCount = 0;
             let regularWeightedCount = 0;
 
+            // Task 2.6 Stacking: separate base-train (60% of data) and meta-train (20% of data)
+            // ML_USE_STACKING=true enables the second-level meta-LR classifier.
+            const useStacking = process.env.ML_USE_STACKING === 'true';
+            const baseTrainSet: TrainingData[] = [];  // upsampled 60% — for first NB+LR pass
+            const metaTrainSetRaw: Array<{ text: string; category: string }> = [];  // raw 20% — unbiased meta-features
+
             // Upsampling hedefi: her kategoride en büyük kategoriye kap (test seti kirletilmez)
             // Not: slice(0, target) ile büyük kategoriler de kırpılır (downsampling)
             const maxTrainCount = Math.max(
@@ -1069,6 +1291,33 @@ export class MlCategorizationService implements INewsCategorizationService {
 
                 if (catTrain.length < 5) continue;
 
+                // ── [STACKING] Split catTrainBase into base (75%) and meta (25%) ──────────
+                // Ensures meta-train items are never seen during base NB+LR training.
+                if (useStacking && catTrainBase.length >= 4) {
+                    const metaStartIdx = Math.floor(catTrainBase.length * 0.75);
+                    // Collect raw meta-train items (no upsampling — needed for unbiased meta-features)
+                    catTrainBase.slice(metaStartIdx).forEach((e: any) => {
+                        metaTrainSetRaw.push({ text: e.text, category: e.category });
+                    });
+                    // Build upsampled base-train from first 75% of catTrainBase
+                    const catBaseForStacking = [...catTrainBase.slice(0, metaStartIdx), ...leakedFromTest, ...fromDisk];
+                    if (catBaseForStacking.length >= 3) {
+                        const baseWeighted: any[] = [];
+                        catBaseForStacking.forEach((sample: any) => {
+                            const repeat = sample.isManualValidated ? manualUpsampleMultiplier : upsampleMultiplier;
+                            for (let r = 0; r < repeat; r++) baseWeighted.push({ ...sample });
+                        });
+                        const baseTarget = Math.min(maxTrainCount, Math.ceil(catBaseForStacking.length * upsampleMultiplier));
+                        let bi = 0;
+                        const baseUpsampled = [...baseWeighted].sort(() => Math.random() - 0.5);
+                        while (baseUpsampled.length < baseTarget) {
+                            baseUpsampled.push({ ...baseWeighted[bi++ % baseWeighted.length] });
+                        }
+                        baseTrainSet.push(...baseUpsampled.slice(0, baseTarget).map(({ id: _id, publishedAt: _pub, augmentedAt: _aug, source: _src, ...rest }: any) => rest));
+                    }
+                }
+                // ─────────────────────────────────────────────────────────────────────────
+
                 // Manuel doğrulanan örnekleri daha yüksek ağırlıkla çoğalt (anchor etkisi)
                 const weightedTrain: Array<TrainingData & { id: number; publishedAt: Date; augmentedAt?: Date | null; source: 'db' | 'disk'; isManualValidated: boolean }> = [];
                 catTrain.forEach((sample: any) => {
@@ -1098,6 +1347,9 @@ export class MlCategorizationService implements INewsCategorizationService {
             }
 
             console.log(`[ML] DB'den ${approvedNews.length} haber yüklendi → train: ${trainSet.length} (upsampled), test: ${testSet.length} (temiz)`);
+            if (useStacking) {
+                console.log(`[ML][Stacking] baseTrainSet=${baseTrainSet.length} (upsampled 60%), metaTrainSetRaw=${metaTrainSetRaw.length} (raw 20%)`);
+            }
             console.log(`[ML] Leakage guard: ${leakageFilteredCount} örnek test setinden filtrelendi`);
             console.log(`[ML] Upsample weights: manual=${manualUpsampleMultiplier}x normal=${upsampleMultiplier}x | weightedManual=${manualWeightedCount} weightedRegular=${regularWeightedCount}`);
 
@@ -1105,8 +1357,17 @@ export class MlCategorizationService implements INewsCategorizationService {
             console.log(`[ML][HardNegative] Injected total=${hardNegativeSummary.totalInjected} | Genel->Siyaset=${hardNegativeSummary.genelToSiyaset}, Siyaset->Genel=${hardNegativeSummary.siyasetToGenel}, Siyaset->Teknoloji=${hardNegativeSummary.siyasetToTeknoloji}, Siyaset->Dunya=${hardNegativeSummary.siyasetToDunya}, Siyaset->Ekonomi=${hardNegativeSummary.siyasetToEkonomi}`);
             console.log(`[ML][HardNegative] Train size after injection: ${trainSet.length}`);
 
-            // 1) NB train (in-memory)
-            const trainSuccess = await this.trainWithSplit(trainSet, testSet, { persist: false });
+            // ── LR training parameters (shared between base and full pass) ─────────────
+            const lrMaxFeatures = Number(process.env.ML_LR_MAX_FEATURES ?? 5000);
+            const lrNumSteps = Number(process.env.ML_LR_NUM_STEPS ?? 300);
+            const lrLearningRate = Number(process.env.ML_LR_LEARNING_RATE ?? 5e-3);
+            const lrMaxDf = Number(process.env.ML_LR_MAX_DF ?? 0.70);
+
+            // ── Phase 1: train NB (and LR for stacking base pass) on first-pass data ──
+            // Stacking: use baseTrainSet (60%). Non-stacking: use full trainSet (80%).
+            const firstPassData = (useStacking && baseTrainSet.length > 0) ? baseTrainSet : trainSet;
+
+            const trainSuccess = await this.trainWithSplit(firstPassData, testSet, { persist: false });
             if (!trainSuccess) {
                 return false;
             }
@@ -1116,26 +1377,21 @@ export class MlCategorizationService implements INewsCategorizationService {
             this.lrClassifier = null;
             this.useCombinedModel = false;
 
-            // 2) LR train (in-memory)
+            // ── Phase 2: LR base pass ────────────────────────────────────────────────
             try {
-                const lrMaxFeatures = Number(process.env.ML_LR_MAX_FEATURES ?? 5000);
-                const lrNumSteps = Number(process.env.ML_LR_NUM_STEPS ?? 300);
-                const lrLearningRate = Number(process.env.ML_LR_LEARNING_RATE ?? 5e-3);
-
                 console.log(
                     `[ML][LR] TF-IDF+LR eğitimi başlıyor... maxFeatures=${lrMaxFeatures} steps=${lrNumSteps} lr=${lrLearningRate}`
                 );
-                const lrTexts = trainSet.map((a: TrainingData) => a.text);
-                const lrLabels = trainSet.map((a: TrainingData) => a.category);
+                const firstPassTexts = firstPassData.map((a: TrainingData) => a.text);
+                const firstPassLabels = firstPassData.map((a: TrainingData) => a.category);
                 const tfidf = new TfidfLrService();
-                tfidf.fitVectorizer(lrTexts, { maxFeatures: lrMaxFeatures, ngramRange: [1, 2] });
+                tfidf.fitVectorizer(firstPassTexts, { maxFeatures: lrMaxFeatures, maxDf: lrMaxDf, ngramRange: [1, 2] });
+                console.log(`[ML][LR] TF-IDF fitVectorizer: maxDf=${lrMaxDf}`);
                 const lr = new TfidfLrClassifier();
-                await lr.fit(lrTexts, lrLabels, tfidf, { numSteps: lrNumSteps, learningRate: lrLearningRate });
+                await lr.fit(firstPassTexts, firstPassLabels, tfidf, { numSteps: lrNumSteps, learningRate: lrLearningRate });
 
                 this.tfidfService = tfidf;
                 this.lrClassifier = lr;
-
-                // 3) set useCombinedModel=true only when both models are ready
                 this.useCombinedModel = true;
                 console.log(`[ML][LR] LR eğitimi tamamlandı. Vocab=${tfidf.vocabularySize} features`);
             } catch (lrErr) {
@@ -1146,7 +1402,66 @@ export class MlCategorizationService implements INewsCategorizationService {
                 return false;
             }
 
-            // 4) saveModelToDb (both NB+LR ready)
+            // ── Phase 3 (STACKING ONLY): collect meta-features → train meta-LR → retrain base ─
+            if (useStacking && metaTrainSetRaw.length >= 20) {
+                try {
+                    console.log(`[ML][Stacking] Meta-feature toplama başlıyor... ${metaTrainSetRaw.length} örnek`);
+                    const metaFeatures: number[][] = [];
+                    const metaLabels: string[] = [];
+                    const cats = this.indexCategory();
+
+                    for (const sample of metaTrainSetRaw) {
+                        const nbProbs = this.getNbProbabilities(sample.text);
+                        const lrProbs = await this.getLrProbabilities(sample.text);
+                        metaFeatures.push([...nbProbs, ...lrProbs]);
+                        metaLabels.push(sample.category);
+                    }
+
+                    this.stackingMeta = new StackingMetaClassifier();
+                    await this.stackingMeta.fit(metaFeatures, metaLabels, cats, {
+                        numSteps: 200,
+                        learningRate: 0.01,
+                    });
+                    this.useStacking = true;
+                    console.log(`[ML][Stacking] Meta-LR eğitimi tamamlandı. features=${metaFeatures[0]?.length} samples=${metaFeatures.length} classes=${cats.length}`);
+
+                    // Retrain NB+LR on full train set (80%) for production-quality base models.
+                    // Meta-LR stays fixed (trained on unbiased meta-train predictions).
+                    console.log('[ML][Stacking] Full retrain başlıyor (NB+LR full trainSet üzerinde)...');
+                    this.tfidfService = null;
+                    this.lrClassifier = null;
+                    this.useCombinedModel = false;
+
+                    const retrainSuccess = await this.trainWithSplit(trainSet, testSet, { persist: false });
+                    if (!retrainSuccess) {
+                        console.error('[ML][Stacking] Full retrain başarısız; stacking devre dışı.');
+                        this.stackingMeta = null;
+                        this.useStacking = false;
+                    } else {
+                        this.tfidfService = null;
+                        this.lrClassifier = null;
+                        this.useCombinedModel = false;
+                        const fullTexts = trainSet.map((a: TrainingData) => a.text);
+                        const fullLabels = trainSet.map((a: TrainingData) => a.category);
+                        const fullTfidf = new TfidfLrService();
+                        fullTfidf.fitVectorizer(fullTexts, { maxFeatures: lrMaxFeatures, maxDf: lrMaxDf, ngramRange: [1, 2] });
+                        const fullLr = new TfidfLrClassifier();
+                        await fullLr.fit(fullTexts, fullLabels, fullTfidf, { numSteps: lrNumSteps, learningRate: lrLearningRate });
+                        this.tfidfService = fullTfidf;
+                        this.lrClassifier = fullLr;
+                        this.useCombinedModel = true;
+                        console.log(`[ML][Stacking] Full retrain tamamlandı. Stacking aktif. Vocab=${fullTfidf.vocabularySize}`);
+                    }
+                } catch (stackErr) {
+                    console.error('[ML][Stacking] Meta-LR eğitimi başarısız; stacking devre dışı:', stackErr);
+                    this.stackingMeta = null;
+                    this.useStacking = false;
+                }
+            } else if (useStacking) {
+                console.warn(`[ML][Stacking] meta-train çok küçük (${metaTrainSetRaw.length} < 20); stacking atlandı.`);
+            }
+
+            // 4) saveModelToDb (NB+LR+meta ready)
             if (options.persist ?? true) {
                 await this.saveModelToDb(this.lastAccuracy, this.trainSize);
                 console.log('[ML][Step] Atomic NB+LR DB kayıt tamamlandı.');
@@ -1212,9 +1527,37 @@ export class MlCategorizationService implements INewsCategorizationService {
 
     /**
      * Soft vote combination: P_combined(k) = NB_W × P_NB(k) + LR_W × P_LR(k)
+     *
+     * When ML_USE_CLASS_ROUTING=true, applies per-class weights derived from
+     * per-category accuracy breakdown instead of a single global scalar pair.
+     * Per-class weights were determined from the 2026-04-17 evaluation:
+     *   Dünya/Ekonomi → balanced (both models roughly equal)
+     *   Genel/Sağlık/Teknoloji → NB dominant
+     *   Siyaset/Spor → LR dominant
      */
-    private softVoteCombine(nbProbs: number[], lrProbs: number[]): number[] {
+    private softVoteCombine(nbProbs: number[], lrProbs: number[], cats?: string[]): number[] {
         if (nbProbs.length !== lrProbs.length) return nbProbs;
+
+        const useClassRouting = process.env.ML_USE_CLASS_ROUTING === 'true';
+        if (useClassRouting && cats && cats.length === nbProbs.length) {
+            // Per-class NB weights (LR weight = 1 - nbW)
+            const CLASS_NB_WEIGHT: Record<string, number> = {
+                'Dünya':     0.50,
+                'Ekonomi':   0.50,
+                'Genel':     1.00,
+                'Sağlık':    0.80,
+                'Siyaset':   0.40,
+                'Spor':      0.20,
+                'Teknoloji': 0.80,
+            };
+            const combined = nbProbs.map((nb, i) => {
+                const nbW = CLASS_NB_WEIGHT[cats[i]] ?? this.NB_WEIGHT;
+                return nbW * nb + (1 - nbW) * lrProbs[i];
+            });
+            const sum = combined.reduce((a, b) => a + b, 0);
+            return sum > 0 ? combined.map(p => p / sum) : combined;
+        }
+
         const combined = nbProbs.map((nb, i) => this.NB_WEIGHT * nb + this.LR_WEIGHT * lrProbs[i]);
         const sum = combined.reduce((a, b) => a + b, 0);
         return sum > 0 ? combined.map(p => p / sum) : combined;
@@ -1237,8 +1580,15 @@ export class MlCategorizationService implements INewsCategorizationService {
         if (!this.useCombinedModel) return this.predictNbCategory(text);
         const nbProbs = this.getNbProbabilities(text);
         const lrProbs = await this.getLrProbabilities(text);
-        const combined = this.softVoteCombine(nbProbs, lrProbs);
+
+        // Stacking path: use meta-LR for final decision
+        if (this.useStacking && this.stackingMeta && this.stackingMeta.isTrained()) {
+            return this.stackingMeta.predict(nbProbs, lrProbs);
+        }
+
+        // Soft voting path (default, or with per-class routing)
         const cats = this.indexCategory();
+        const combined = this.softVoteCombine(nbProbs, lrProbs, cats);
         let maxIdx = 0;
         for (let i = 1; i < combined.length; i++) {
             if (combined[i] > combined[maxIdx]) maxIdx = i;
@@ -1414,6 +1764,133 @@ export class MlCategorizationService implements INewsCategorizationService {
             }
         });
 
+        // ── Guard katmanları başlamadan önce orijinal sonucu kaydet ──
+        const originalBestCategory = bestCategory;
+
+        // ── Katman 1: Sağlık Negatif Sinyal ──
+        if (process.env.GUARD_SAGLIK_ENABLED !== 'false' && bestCategory === 'Sağlık') {
+            const antiSaglikSignals: Record<string, string[]> = {
+                Spor: ['maç', 'lig', 'gol', 'futbol', 'basketbol', 'voleybol',
+                    'şampiyon', 'kupa', 'derbi', 'forvet', 'hakem', 'teknik direktör',
+                    'süper lig', 'tff', 'uefa', 'şampiyonlar ligi', 'play-off',
+                    'transfer', 'antrenör', 'stadyum'],
+                Siyaset: ['meclis', 'milletvekili', 'cumhurbaşkanı', 'seçim', 'parti',
+                    'muhalefet', 'iktidar', 'tbmm', 'kanun', 'anayasa',
+                    'chp', 'ak parti', 'mhp', 'dem parti', 'belediye başkanı',
+                    'vali', 'bakan', 'siyasi', 'siyaset', 'erdoğan',
+                    'milli savunma', 'kentsel dönüşüm', 'mağdur'],
+                Ekonomi: ['borsa', 'faiz', 'enflasyon', 'dolar', 'ihracat', 'piyasa',
+                    'banka', 'kredi', 'bütçe', 'vergi', 'yatırım'],
+                Teknoloji: ['yapay zeka', 'yazılım', 'siber', 'çip', 'nasa', 'uydu',
+                    'akıllı telefon', 'robot'],
+                Dünya: ['nato', 'bm', 'ukrayna', 'israil', 'iran', 'abd',
+                    'avrupa birliği', 'uluslararası', 'savaş', 'diplomasi',
+                    'filistin', 'gazze', 'yayılmacılık', 'ateşkes', 'barış görüşmesi'],
+            };
+            const saglikKeywordHits = (keywordHints['Sağlık'] as string[])
+                .reduce((acc, h) => acc + (normalized.includes(h) ? 1 : 0), 0);
+
+            let maxAntiCategory = '';
+            let maxAntiHits = 0;
+            for (const [cat, terms] of Object.entries(antiSaglikSignals)) {
+                const hits = terms.reduce((acc, t) => acc + (normalized.includes(t) ? 1 : 0), 0);
+                if (hits > maxAntiHits) {
+                    maxAntiHits = hits;
+                    maxAntiCategory = cat;
+                }
+            }
+
+            if (maxAntiHits >= 2 && saglikKeywordHits === 0 && maxAntiCategory
+                && Object.prototype.hasOwnProperty.call(scores, maxAntiCategory)) {
+                console.log(`[ML Guard] Sağlık negatif sinyal: "${title}" → ${maxAntiCategory} (anti-hit=${maxAntiHits})`);
+                const saglikPenalty = scores['Sağlık'] * 0.40;
+                scores['Sağlık'] -= saglikPenalty;
+                scores[maxAntiCategory] += saglikPenalty;
+
+                let newBest = bestCategory;
+                let newHighest = 0;
+                for (const [cat, score] of Object.entries(scores)) {
+                    if ((score as number) > newHighest) {
+                        newHighest = score as number;
+                        newBest = cat;
+                    }
+                }
+                bestCategory = newBest;
+                highestConfidence = newHighest;
+            }
+        }
+
+        // ── Katman 2: Boundary Guard (Genel/Siyaset/Dünya) ──
+        if (process.env.GUARD_BOUNDARY_ENABLED !== 'false') {
+            const boundaryTriangle = ['Genel', 'Siyaset', 'Dünya'];
+            if (boundaryTriangle.includes(bestCategory)) {
+                const siyasetSignals = [
+                    'meclis oturumu', 'tbmm', 'milletvekili', 'cumhurbaşkanı',
+                    'kanun teklifi', 'yasa tasarısı', 'seçim kampanyası',
+                    'parti kongresi', 'parti genel başkan', 'muhalefet partisi',
+                    'bakanlar kurulu', 'kabine toplantısı', 'siyasi kriz',
+                    'iktidar partisi', 'anayasa değişikliği',
+                ];
+                const dunyaSignals = [
+                    'nato', 'bm', 'birleşmiş milletler', 'avrupa birliği', 'ab komisyonu',
+                    'ukrayna', 'rusya', 'israil', 'filistin', 'iran', 'abd', 'çin',
+                    'uluslararası', 'diplomatik', 'büyükelçi', 'dışişleri bakanlığı',
+                    'bölgesel kriz', 'sınır ötesi', 'barış görüşmesi',
+                ];
+                const turkiyeAktorSignals = [
+                    'cumhurbaşkanı', 'dışişleri bakanı', 'ankara', 'türkiye',
+                    'erdoğan', 'büyükelçimiz', 'türk askeri', 'milli savunma bakanlığı',
+                    'ak parti', 'chp', 'mhp', 'dem parti', 'iyi parti',
+                    'tbmm', 'meclis başkanı', 'belediye başkanı', 'vali',
+                ];
+                const siyasetHits = siyasetSignals.reduce((acc, s) => acc + (normalized.includes(s) ? 1 : 0), 0);
+                const dunyaHits = dunyaSignals.reduce((acc, s) => acc + (normalized.includes(s) ? 1 : 0), 0);
+                const turkiyeAktorHits = turkiyeAktorSignals.reduce((acc, s) => acc + (normalized.includes(s) ? 1 : 0), 0);
+
+                // Kural 1: Genel → Siyaset
+                if (bestCategory === 'Genel' && siyasetHits >= 2 && dunyaHits === 0) {
+                    console.log(`[ML Guard] Boundary: Genel→Siyaset (siyaset-hit=${siyasetHits})`);
+                    bestCategory = 'Siyaset';
+                    highestConfidence *= 0.90;
+                }
+
+                // Kural 2: Genel/Siyaset → Dünya
+                // Türkiye aktörü varsa geçiş engellenir (Türk dış politikası = Siyaset)
+                if ((bestCategory === 'Genel' || bestCategory === 'Siyaset') && dunyaHits >= 2 && turkiyeAktorHits === 0) {
+                    console.log(`[ML Guard] Boundary: ${bestCategory}→Dünya (dunya-hit=${dunyaHits})`);
+                    bestCategory = 'Dünya';
+                    highestConfidence *= 0.90;
+                }
+
+                // Kural 3: Siyaset/Dünya → Genel (en riskli, ayrı flag)
+                const kural3Enabled = process.env.GUARD_BOUNDARY_KURAL3_ENABLED !== 'false';
+                if (kural3Enabled
+                    && (bestCategory === 'Siyaset' || bestCategory === 'Dünya')
+                    && siyasetHits === 0 && dunyaHits === 0) {
+                    const genelScore = scores['Genel'] || 0;
+                    const bestScore = scores[bestCategory] || 0;
+                    if (bestScore - genelScore < 0.10) {
+                        console.log(`[ML Guard] Boundary: ${bestCategory}→Genel (sinyal yok, margin dar)`);
+                        bestCategory = 'Genel';
+                        highestConfidence = genelScore;
+                    }
+                }
+            }
+        }
+
+        // ── Katman 3: Confidence Band ──
+        const wasGuardOverridden = bestCategory !== originalBestCategory;
+        const totalKeywordHitSum = Object.values(hintBonusByCategory).reduce((a, b) => a + b, 0);
+        type ConfidenceBand = 'HIGH' | 'MEDIUM' | 'LOW';
+        let confidenceBand: ConfidenceBand;
+        if (highestConfidence >= 0.85 && totalKeywordHitSum >= 0.01 && !wasGuardOverridden) {
+            confidenceBand = 'HIGH';
+        } else if (highestConfidence >= 0.60 || wasGuardOverridden) {
+            confidenceBand = 'MEDIUM';
+        } else {
+            confidenceBand = 'LOW';
+        }
+
         if (highestConfidence < ML_CONFIDENCE_THRESHOLD) {
             console.log(`[ML] Düşük Güven Skoru (${highestConfidence.toFixed(2)}): "${title}" -> Manuel İnceleme Kuyruğuna Eklenecek.`);
         }
@@ -1421,15 +1898,19 @@ export class MlCategorizationService implements INewsCategorizationService {
         return {
             kategori: bestCategory,
             confidence: highestConfidence,
+            confidenceBand,
+            guardOverride: wasGuardOverridden ? originalBestCategory : null,
             allScores: scores
         };
     }
 
     async getAccuracy(): Promise<{ accuracy: number; testSize: number; trainSize: number }> {
+        await this.hydrateVerifiedEvalFromDbIfNeeded();
+        const effectiveAccuracy = this.getEffectiveAccuracySnapshot();
         return {
-            accuracy: this.lastAccuracy,
-            testSize: this.testSize,
-            trainSize: this.trainSize
+            accuracy: effectiveAccuracy.accuracy,
+            testSize: effectiveAccuracy.testSize,
+            trainSize: effectiveAccuracy.trainSize
         };
     }
 

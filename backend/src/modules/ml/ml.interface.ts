@@ -5,6 +5,8 @@
 export interface CategoryResult {
     kategori: string;
     confidence: number;
+    confidenceBand?: 'HIGH' | 'MEDIUM' | 'LOW';
+    guardOverride?: string | null;
     allScores: Record<string, number>;
 }
 
