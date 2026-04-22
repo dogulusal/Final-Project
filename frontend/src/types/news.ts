@@ -20,4 +20,6 @@ export interface NewsItem {
     renkKodu: string;
     ikon: string | null;
   };
+  confidenceBand?: 'HIGH' | 'MEDIUM' | 'LOW';
+  guardOverride?: string | null;
 }
