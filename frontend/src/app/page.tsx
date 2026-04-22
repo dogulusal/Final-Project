@@ -12,6 +12,7 @@ import { NewsItem } from "@/types/news";
 import { useReadingHistory } from "@/hooks/useReadingHistory";
 import { personalizedSort } from "@/utils/personalizedSort";
 import LazySection from "@/components/LazySection";
+import StatsBar from "@/components/StatsBar";
 
 // Dynamic imports for heavy components
 const HeroCarousel = dynamic(() => import("@/components/HeroCarousel"), { loading: () => null });
@@ -217,13 +218,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* Dashboard Analytics Row — lazy-mounted via IntersectionObserver */}
-        {activeCategory === "Tümü" && !search && (
-          <LazySection minHeight="220px" className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12 animate-in fade-in slide-in-from-bottom-6 duration-700">
-            <SentimentBiasMap apiUrl={process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002"} />
-            <InterestRadar />
-          </LazySection>
-        )}
+        <StatsBar />
 
         {/* Ana İçerik */}
         <ErrorBoundary>
