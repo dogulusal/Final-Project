@@ -27,7 +27,7 @@ export default function Navbar() {
             initial={{ y: -40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.5 }}
-            className="sticky top-0 z-50 w-full border-b border-[var(--border-subtle)]"
+            className="sticky top-0 z-50 w-full border-b border-[var(--border-subtle)] neon-border-beam"
             style={{
                 transform: visible ? "translateY(0)" : "translateY(-100%)",
                 transition: "transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease, backdrop-filter 0.3s ease",
