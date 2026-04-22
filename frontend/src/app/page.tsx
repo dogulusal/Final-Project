@@ -147,7 +147,8 @@ export default function Home() {
   }, [fetchNews]);
 
   return (
-    <main className="min-h-screen bg-[var(--bg-primary)]">
+    <main className="min-h-screen bg-[var(--bg-primary)] relative">
+      <div className="dot-pattern" aria-hidden="true" />
       <Navbar />
       
       {/* Hero Carousel — Spotlight Haberler */}
