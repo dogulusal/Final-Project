@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { NewsItem } from "@/types/news";
 import Link from "next/link";
 import Image from "next/image";
+import { getNewsImage } from "@/utils/newsImage";
 
 interface HeroCarouselProps {
   news: NewsItem[];
@@ -67,7 +68,8 @@ export default function HeroCarousel({ news, autoPlayInterval = 5000 }: HeroCaro
         >
           {/* Optimized Next.js Image */}
           <Image
-            src="https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&h=600&fit=crop"
+            src={getNewsImage(item)}
+            unoptimized
             alt={item.baslik}
             fill
             priority={idx === currentIndex}

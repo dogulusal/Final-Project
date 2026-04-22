@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { NewsItem } from "@/types/news";
 import { useReadingHistory } from "@/hooks/useReadingHistory";
 import { getConfidenceBand } from "@/utils/confidence";
+import { getNewsImage } from "@/utils/newsImage";
 
 const BADGE_MAP: Record<string, string> = {
     Spor: "badge-spor",
@@ -64,7 +66,28 @@ export default function NewsCard({ news }: Props) {
 
     return (
         <Link href={`/haber/${news.slug}`} className="block h-full cursor-pointer" onClick={() => recordClick(news.kategoriId)}>
-            <article className={`news-card glass-panel p-5 flex flex-col h-full group ${glowClass} ${band === 'LOW' ? 'border-amber-500/30' : ''} relative overflow-hidden transition-all duration-300`}>
+            <article className={`news-card glass-panel flex flex-col h-full group ${glowClass} ${band === 'LOW' ? 'border-amber-500/30' : ''} relative overflow-hidden transition-all duration-300`}>
+                {/* Image */}
+                <div className="relative w-full h-40 overflow-hidden rounded-t-2xl">
+                    <div className="absolute inset-0 animate-pulse bg-white/5 rounded-t-2xl" />
+                    <Image
+                        src={getNewsImage(news)}
+                        alt={news.baslik}
+                        fill
+                        className="object-cover transition-opacity duration-500"
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                        unoptimized
+                        onLoad={(e) => {
+                            const img = e.currentTarget as HTMLImageElement;
+                            img.style.opacity = '1';
+                            img.previousElementSibling?.classList.add('hidden');
+                        }}
+                        style={{ opacity: 0 }}
+                    />
+                    <div className="news-card-image-overlay" />
+                </div>
+
+                <div className="p-5 flex flex-col flex-grow">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-3 relative z-10">
                     <span className={`neon-badge px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase`}>
@@ -117,6 +140,7 @@ export default function NewsCard({ news }: Props) {
                     <span className="text-[11px] text-[var(--accent-warm)] font-bold md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 tracking-wider">
                         HABERİ OKU →
                     </span>
+                </div>
                 </div>
             </article>
         </Link>
