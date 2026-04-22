@@ -57,7 +57,25 @@ export default function HeroCarousel({ news, autoPlayInterval = 5000 }: HeroCaro
   };
 
   return (
-    <div className="relative w-full h-[500px] md:h-[600px] rounded-2xl overflow-hidden group">
+    <div className="relative w-full h-[85vh] md:h-screen rounded-2xl overflow-hidden group">
+      {/* Mesh gradient blobs */}
+      <div className="absolute top-8 right-12 w-32 h-32 rounded-full opacity-20 blur-3xl pointer-events-none z-10"
+           style={{ background: 'radial-gradient(circle, var(--neon-purple), transparent)' }} />
+      <div className="absolute bottom-16 left-8 w-24 h-24 rounded-full opacity-15 blur-2xl pointer-events-none z-10"
+           style={{ background: 'radial-gradient(circle, var(--neon-cyan), transparent)' }} />
+
+      {/* Animated gradient orb */}
+      <div className="absolute right-[-5%] top-[10%] w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] pointer-events-none z-10">
+        <div className="w-full h-full rounded-full animate-orb-float"
+          style={{
+            background: `
+              radial-gradient(circle at 30% 30%, var(--neon-purple), transparent 60%),
+              radial-gradient(circle at 70% 70%, var(--neon-cyan), transparent 60%),
+              radial-gradient(circle at 50% 50%, rgba(124,58,237,0.3), transparent 70%)
+            `,
+            filter: 'blur(40px)',
+          }} />
+      </div>
       {/* Slides */}
       {displayNews.map((item, idx) => (
         <div
@@ -85,24 +103,24 @@ export default function HeroCarousel({ news, autoPlayInterval = 5000 }: HeroCaro
             <Link href={`/haber/${item.slug}`} className="group/card">
               {/* Kategori Badge */}
               <div className="flex items-center gap-3 mb-4">
-                <span className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-bold uppercase tracking-wider">
+                <span className="neon-badge animate-pulse">
                   {item.kategori?.ad || "Genel"}
                 </span>
                 {item.mlConfidence !== null && (
-                  <span className="px-2 py-1 bg-white/10 backdrop-blur-sm rounded text-xs">
-                    {Math.round((item.mlConfidence || 0) * 100)}% güven
+                  <span className="mono text-sm px-3 py-1 glass-card">
+                    %{Math.round((item.mlConfidence || 0) * 100)}
                   </span>
                 )}
               </div>
 
               {/* Başlık */}
-              <h2 className="text-3xl md:text-5xl font-bold mb-4 leading-tight group-hover/card:text-yellow-300 transition-colors line-clamp-3">
+              <h2 className="font-serif text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold leading-tight tracking-tight line-clamp-3 md:line-clamp-2 group-hover/card:text-yellow-300 transition-colors">
                 {item.baslik}
               </h2>
 
               {/* Meta Açıklama */}
               {item.metaAciklama && (
-                <p className="text-lg md:text-xl text-white/90 mb-6 line-clamp-2">
+                <p className="text-base md:text-lg text-white/60 mt-4 max-w-2xl line-clamp-2">
                   {item.metaAciklama}
                 </p>
               )}
@@ -125,7 +143,7 @@ export default function HeroCarousel({ news, autoPlayInterval = 5000 }: HeroCaro
             onClick={goToPrevious}
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 bg-white/20 hover:bg-white/40 backdrop-blur-sm rounded-full transition-all transform hover:scale-110"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 glass-card p-2 rounded-full border border-[var(--neon-purple)] hover:bg-[var(--neon-glow-purple)] transition-colors"
             aria-label="Önceki haber"
           >
             <ChevronLeft size={28} className="text-white" />
@@ -136,7 +154,7 @@ export default function HeroCarousel({ news, autoPlayInterval = 5000 }: HeroCaro
             onClick={goToNext}
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 bg-white/20 hover:bg-white/40 backdrop-blur-sm rounded-full transition-all transform hover:scale-110"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 glass-card p-2 rounded-full border border-[var(--neon-purple)] hover:bg-[var(--neon-glow-purple)] transition-colors"
             aria-label="Sonraki haber"
           >
             <ChevronRight size={28} className="text-white" />
@@ -152,8 +170,8 @@ export default function HeroCarousel({ news, autoPlayInterval = 5000 }: HeroCaro
                 onMouseLeave={() => setIsPaused(false)}
                 className={`transition-all ${
                   idx === currentIndex
-                    ? "w-8 h-2 bg-white"
-                    : "w-2 h-2 bg-white/50 hover:bg-white/80"
+                    ? "w-8 h-2.5 bg-[var(--neon-purple)] scale-125"
+                    : "w-2.5 h-2.5 bg-white/30 hover:bg-white/50"
                 } rounded-full`}
                 aria-label={`Slide ${idx + 1}`}
               />
@@ -163,8 +181,10 @@ export default function HeroCarousel({ news, autoPlayInterval = 5000 }: HeroCaro
       )}
 
       {/* Play/Pause Indicator */}
-      <div className="absolute top-4 right-4 z-20 text-xs text-white/70 font-medium">
-        {isPaused ? "⏸ Durduruldu" : "▶ Otomatik"}
+      <div className="absolute top-4 right-4 z-20">
+        <span className="glass-card px-3 py-1 text-xs flex items-center gap-1.5 text-white/70">
+          {isPaused ? "⏸ Durduruldu" : (<><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />Otomatik</>)}
+        </span>
       </div>
     </div>
   );
