@@ -3,7 +3,7 @@ import "./globals.css";
 import CookieConsent from "@/components/CookieConsent";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import DashboardShell from "@/ui/layout/DashboardShell";
-import { DM_Sans, DM_Serif_Display } from "next/font/google";
+import { DM_Sans, DM_Serif_Display, Fira_Code } from "next/font/google";
 import { cn } from "@/lib/utils";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -19,6 +19,13 @@ const dmSerifDisplay = DM_Serif_Display({
   variable: "--font-serif",
   weight: "400",
   style: ["normal", "italic"],
+});
+
+const firaCode = Fira_Code({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-fira-code",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -59,7 +66,7 @@ export default function RootLayout({
     <html
       lang="tr"
       suppressHydrationWarning
-      className={cn("font-sans", dmSans.variable, dmSerifDisplay.variable)}
+      className={cn("font-sans", dmSans.variable, dmSerifDisplay.variable, firaCode.variable)}
     >
       <body className="antialiased" suppressHydrationWarning>
         <ThemeProvider>

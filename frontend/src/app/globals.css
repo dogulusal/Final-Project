@@ -154,6 +154,14 @@
   --border:              oklch(1 0 0 / 9%);
   --input:               oklch(1 0 0 / 12%);
   --ring:                oklch(0.55 0 0);
+
+  /* --- Neon+Glass tokens (S0) --- */
+  --neon-purple: #7c3aed;
+  --neon-cyan: #06b6d4;
+  --neon-glow-purple: rgba(124, 58, 237, 0.15);
+  --neon-glow-cyan: rgba(6, 182, 212, 0.1);
+  --bg-glass-dark: rgba(255, 255, 255, 0.03);
+  --border-glass: rgba(255, 255, 255, 0.06);
 }
 
 /* ===== Base ===== */
@@ -527,6 +535,76 @@ body {
   border-color: var(--accent-primary);
 }
 .pagination-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ═══════ Neon+Glass Utility Classes (S0) ═══════ */
+
+.glass-card {
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+}
+.dark .glass-card {
+  background: var(--bg-glass-dark);
+}
+
+.glass-panel {
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+.dark .glass-panel {
+  background: var(--bg-glass-dark);
+}
+
+.neon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  border: 1px solid var(--neon-purple);
+  background: var(--neon-glow-purple);
+  color: var(--neon-purple);
+}
+
+.mono {
+  font-family: 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.neon-border-beam {
+  position: relative;
+}
+.neon-border-beam::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--neon-purple), var(--neon-cyan), transparent);
+  background-size: 200% 100%;
+  animation: beam 4s linear infinite;
+}
+
+@keyframes beam {
+  0%   { background-position: -100% 0; }
+  100% { background-position: 100% 0; }
+}
+
+.news-card-image-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, var(--bg-card), transparent);
+  opacity: 0.6;
+}
 
 /* ===== Tailwind inline theme ===== */
 @theme inline {
