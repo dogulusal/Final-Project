@@ -10,23 +10,22 @@ const CATEGORY_QUERIES: Record<string, string> = {
   Genel: "news,newspaper,media",
 };
 
-/**
- * Haberin görselini döner.
- * - gorselUrl varsa ve placeholder değilse onu kullanır.
- * - Yoksa picsum.photos üzerinden deterministik, her haber için farklı ama tutarlı bir görsel üretir.
- */
+function isValidImageUrl(url: string): boolean {
+  if (!url || url.length < 10) return false;
+  if (url.includes('placeholder')) return false;
+  if (url.includes('bbc.co.uk')) return false;
+  if (url === 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167') return false;
+  return true;
+}
+
 export function getNewsImage(item: NewsItem): string {
-  if (
-    item.gorselUrl &&
-    !item.gorselUrl.includes("placeholder") &&
-    !item.gorselUrl.includes("bbc.co.uk/images/") && // BBC genel placeholder'ı
-    !item.gorselUrl.includes("unsplash.com") // Backend'in eski hardcoded URL'leri
-  ) {
+  if (item.gorselUrl && isValidImageUrl(item.gorselUrl)) {
     return item.gorselUrl;
   }
-  // Picsum: API key gerektirmez, rate limit sorunu çok düşük, her seed için sabit görsel döner
-  const seed = item.id;
-  return `https://picsum.photos/seed/${seed}/800/450`;
+  const category = item.kategori?.ad || 'Genel';
+  const query = CATEGORY_QUERIES[category] || CATEGORY_QUERIES['Genel'];
+  const seed = item.id % 1000;
+  return `https://source.unsplash.com/800x450/?${query}&sig=${seed}`;
 }
 
 /**
