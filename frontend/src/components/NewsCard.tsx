@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { NewsItem } from "@/types/news";
 import { useReadingHistory } from "@/hooks/useReadingHistory";
+import { getConfidenceBand } from "@/utils/confidence";
 
 const BADGE_MAP: Record<string, string> = {
     Spor: "badge-spor",
@@ -48,6 +49,9 @@ export default function NewsCard({ news }: Props) {
     if (sentiment === "pozitif") glowClass = "sentiment-glow-pozitif";
     else if (sentiment === "negatif") glowClass = "sentiment-glow-negatif";
 
+    const band = getConfidenceBand(news.mlConfidence);
+    const bandColor = { HIGH: 'bg-green-500', MEDIUM: 'bg-yellow-500', LOW: 'bg-amber-500' }[band];
+
     // Bullet points parsing for Smart Card hover
     let bullets: string[] = [];
     if (news.icerik) {
@@ -60,10 +64,10 @@ export default function NewsCard({ news }: Props) {
 
     return (
         <Link href={`/haber/${news.slug}`} className="block h-full cursor-pointer" onClick={() => recordClick(news.kategoriId)}>
-            <article className={`news-card p-5 flex flex-col h-full group ${glowClass} relative overflow-hidden transition-all duration-300`}>
+            <article className={`news-card glass-panel p-5 flex flex-col h-full group ${glowClass} ${band === 'LOW' ? 'border-amber-500/30' : ''} relative overflow-hidden transition-all duration-300`}>
                 {/* Header */}
                 <div className="flex items-center justify-between mb-3 relative z-10">
-                    <span className={`${badgeClass} px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase`}>
+                    <span className={`neon-badge px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase`}>
                         {categoryName}
                     </span>
                     <span className="text-[11px] text-[var(--text-muted)]">
@@ -101,9 +105,15 @@ export default function NewsCard({ news }: Props) {
 
                 {/* Footer */}
                 <div className="flex items-center justify-between pt-4 mt-8 border-t border-[var(--border-subtle)] relative z-10">
-                    <span className="text-[11px] font-medium text-[var(--text-muted)]">
-                        {getHostname(news.kaynakUrl)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-medium text-[var(--text-muted)]">
+                            {getHostname(news.kaynakUrl)}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                            <span className={`w-2 h-2 rounded-full ${bandColor}`} />
+                            <span className="mono text-xs opacity-70">%{Math.round((news.mlConfidence || 0) * 100)}</span>
+                        </span>
+                    </div>
                     <span className="text-[11px] text-[var(--accent-warm)] font-bold md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 tracking-wider">
                         HABERİ OKU →
                     </span>
