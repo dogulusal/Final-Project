@@ -1,8 +1,9 @@
 "use client";
 
 import { Brain, TrendingUp, AlertCircle } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getAccessToken } from "@/lib/auth";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 interface Props {
   apiUrl?: string;
@@ -21,12 +22,23 @@ interface SentimentData {
   totalArticles: number;
 }
 
+const COLORS: Record<string, string> = {
+  Pozitif: "#22c55e",
+  "Nötr": "#eab308",
+  Negatif: "#ef4444",
+};
+
+const MUTED: Record<string, string> = {
+  Pozitif: "text-green-600 dark:text-green-400",
+  "Nötr": "text-yellow-600 dark:text-yellow-400",
+  Negatif: "text-red-500 dark:text-red-400",
+};
+
 export default function SentimentBiasMap({ apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002", autoFetch = true }: Props) {
   const [data, setData] = useState<SentimentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  const CIRCUMFERENCE = 2 * Math.PI * 38; // r=38 inside 100×100 viewbox
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
 
   useEffect(() => {
     if (!autoFetch) return;
@@ -53,7 +65,6 @@ export default function SentimentBiasMap({ apiUrl = process.env.NEXT_PUBLIC_API_
         }
       } catch (err) {
         console.error('[SentimentBiasMap] Fetch error:', err);
-        // Fallback to demo data on error
         setData({
           distribution: {
             'Pozitif': { count: 45, percentage: 45 },
@@ -71,6 +82,9 @@ export default function SentimentBiasMap({ apiUrl = process.env.NEXT_PUBLIC_API_
 
     fetchSentimentData();
   }, [apiUrl, autoFetch]);
+
+  const onPieEnter = useCallback((_: unknown, index: number) => setActiveIndex(index), []);
+  const onPieLeave = useCallback(() => setActiveIndex(-1), []);
 
   if (loading) {
     return (
@@ -101,21 +115,15 @@ export default function SentimentBiasMap({ apiUrl = process.env.NEXT_PUBLIC_API_
   const negativeData = data.distribution['Negatif'] || { count: 0, percentage: 0 };
 
   const sentimentItems = [
-    { key: "Pozitif", value: positiveData, color: "#22c55e", muted: "text-green-600 dark:text-green-400" },
-    { key: "Nötr", value: neutralData, color: "#60a5fa", muted: "text-blue-500 dark:text-blue-400" },
-    { key: "Negatif", value: negativeData, color: "#ef4444", muted: "text-red-500 dark:text-red-400" },
+    { name: "Pozitif", value: positiveData.percentage, count: positiveData.count, fill: COLORS.Pozitif },
+    { name: "Nötr", value: neutralData.percentage, count: neutralData.count, fill: COLORS["Nötr"] },
+    { name: "Negatif", value: negativeData.percentage, count: negativeData.count, fill: COLORS.Negatif },
   ];
 
-  const chartGradient = `conic-gradient(
-    ${sentimentItems[0].color} 0 ${sentimentItems[0].value.percentage}%,
-    ${sentimentItems[1].color} ${sentimentItems[0].value.percentage}% ${sentimentItems[0].value.percentage + sentimentItems[1].value.percentage}%,
-    ${sentimentItems[2].color} ${sentimentItems[0].value.percentage + sentimentItems[1].value.percentage}% 100%
-  )`;
-
-  const dominantSentiment = sentimentItems.reduce((a, b) => (a.value.percentage >= b.value.percentage ? a : b));
+  const dominantSentiment = sentimentItems.reduce((a, b) => (a.value >= b.value ? a : b));
 
   return (
-    <div className="glass-card p-6 flex flex-col h-full relative overflow-hidden">
+    <div className="glass-panel flex flex-col h-full relative overflow-hidden">
       <div className="flex items-center gap-2 mb-5">
         <Brain className="text-[var(--accent-warm)]" size={18} />
         <h3 className="font-bold text-[var(--text-primary)] tracking-wide">Gündem Duygu Haritası</h3>
@@ -128,62 +136,61 @@ export default function SentimentBiasMap({ apiUrl = process.env.NEXT_PUBLIC_API_
 
       {/* Donut + list */}
       <div className="flex items-center gap-5 flex-grow">
-        {/* SVG Donut */}
-        <div className="relative w-[96px] h-[96px] flex-shrink-0">
-          <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90" aria-hidden="true">
-            <circle cx="50" cy="50" r="38" fill="none" stroke="var(--bg-secondary)" strokeWidth="14" />
-            {sentimentItems.map((item, idx) => {
-              const dash = (item.value.percentage / 100) * CIRCUMFERENCE;
-              const offset = sentimentItems
-                .slice(0, idx)
-                .reduce((acc, s) => acc + (s.value.percentage / 100) * CIRCUMFERENCE, 0);
-              return (
-                <circle
-                  key={item.key}
-                  cx="50" cy="50" r="38"
-                  fill="none"
-                  stroke={item.color}
-                  strokeWidth="14"
-                  strokeDasharray={`${dash} ${CIRCUMFERENCE - dash}`}
-                  strokeDashoffset={-offset}
-                  strokeLinecap="butt"
-                />
-              );
-            })}
-          </svg>
+        {/* Recharts Donut */}
+        <div className="relative w-[110px] h-[110px] flex-shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={sentimentItems}
+                cx="50%"
+                cy="50%"
+                innerRadius={34}
+                outerRadius={48}
+                paddingAngle={2}
+                strokeWidth={0}
+                dataKey="value"
+                onMouseEnter={onPieEnter}
+                onMouseLeave={onPieLeave}
+              >
+                {sentimentItems.map((entry, idx) => (
+                  <Cell key={idx} fill={entry.fill} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
             <span className="text-[8px] uppercase tracking-[0.12em] text-[var(--text-muted)]">Baskın</span>
-            <span className="text-[11px] font-bold text-[var(--text-primary)] leading-tight">{dominantSentiment.key}</span>
-            <span className="text-[10px] text-[var(--text-secondary)]">%{dominantSentiment.value.percentage}</span>
+            <span className="text-[11px] font-bold text-[var(--text-primary)] leading-tight">{dominantSentiment.name}</span>
+            <span className="mono text-[10px] text-[var(--text-secondary)]">%{dominantSentiment.value}</span>
           </div>
         </div>
 
         {/* Legend list */}
         <div className="flex-grow space-y-3.5">
-          {sentimentItems.map((item) => (
+          {sentimentItems.map((item, idx) => (
             <button
-              key={item.key}
+              key={item.name}
               type="button"
-              onMouseEnter={() => setHoveredKey(item.key)}
-              onMouseLeave={() => setHoveredKey(null)}
+              onMouseEnter={() => setActiveIndex(idx)}
+              onMouseLeave={() => setActiveIndex(-1)}
               className="w-full text-left group/item"
-              aria-label={`${item.key} oranı`}
+              aria-label={`${item.name} oranı`}
             >
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className={`text-[11px] font-semibold ${item.muted}`}>{item.key}</span>
+                  <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.fill }} />
+                  <span className={`text-[11px] font-semibold ${MUTED[item.name]}`}>{item.name}</span>
                 </div>
-                <span className="text-[11px] text-[var(--text-muted)]">
-                  {hoveredKey === item.key
-                    ? `${item.value.count} haber`
-                    : `%${item.value.percentage}`}
+                <span className="mono text-[11px] text-[var(--text-muted)]">
+                  {activeIndex === idx
+                    ? `${item.count} haber`
+                    : `%${item.value}`}
                 </span>
               </div>
               <div className="h-1.5 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-1000 ease-out"
-                  style={{ width: `${item.value.percentage}%`, backgroundColor: item.color }}
+                  style={{ width: `${item.value}%`, backgroundColor: item.fill }}
                 />
               </div>
             </button>
@@ -202,8 +209,8 @@ export default function SentimentBiasMap({ apiUrl = process.env.NEXT_PUBLIC_API_
             </span>
             {" "}yönelimde
           </p>
-            </div>
-        <span className="text-[10px] text-[var(--text-muted)] flex-shrink-0 whitespace-nowrap">
+        </div>
+        <span className="mono text-[10px] text-[var(--text-muted)] flex-shrink-0 whitespace-nowrap">
           Güven %{data.confidence.average}
         </span>
       </div>
