@@ -140,7 +140,10 @@ export class LlmConsensusWorker {
             const llmKategoriId = kategoriMap.get(category.toLowerCase());
             if (!llmKategoriId) throw new Error(`Bilinmeyen LLM kategorisi: "${category}"`);
 
-            const isConsensus = article.nbKategoriId === llmKategoriId;
+            // LLM güven threshold: düşük güvenli LLM tahminleri dispute'a yönlendir
+            const LLM_GUVEN_THRESHOLD = parseFloat(process.env.LLM_GUVEN_THRESHOLD || '0.50');
+            const llmConfident = (confidence ?? 0) >= LLM_GUVEN_THRESHOLD;
+            const isConsensus = llmConfident && article.nbKategoriId === llmKategoriId;
 
             // Store in dispute_queue as well for admin view
             const llmGuvenSkoru = confidence ?? null;

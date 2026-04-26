@@ -56,7 +56,7 @@ model Haber {
   okumaSuresiDakika   Float?    @map("okuma_suresi_dakika")
   yayinlanmaTarihi    DateTime  @default(now()) @map("yayinlanma_tarihi")
   goruntulemeSayisi   Int       @default(0) @map("goruntulenme_sayisi")
-  durum               String    @default("ham") // ham | hazir | yayinda
+  durum               String    @default("ham") // ham | hazir | yayinda | inceleme
   mlConfidence        Float?    @map("ml_confidence")
   llmProvider         String?   @map("llm_provider") // 'pending' | 'gemini' | 'ollama' | 'failed' | 'dead' | 'none'
   kategoriDogrulandi  Boolean   @default(false) @map("kategori_dogrulandi")
