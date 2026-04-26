@@ -267,45 +267,63 @@ export class RssScheduler {
                         // URL kontrolü (Batch üzerinden)
                         if (safeLink && existingLinks.has(safeLink)) continue;
 
-                        // 3. ML Processing (Parallel) — başlık + özet ile daha güçlü kategorizasyon
+                        // 3. ML Processing (Parallel) — Combined NB+LR ensemble + sentiment
+                        const combinedText = `${safeTitle} ${contentFallback}`.trim();
                         const [catRes, sentRes] = await Promise.all([
-                            mlService.categorize(safeTitle, contentFallback).catch(() => null),
+                            mlService.predictCombinedCategory(combinedText).catch(() => null),
                             mlService.analyzeSentiment(safeTitle + " " + contentFallback).catch(() => null)
                         ]);
 
                         const genelCatId = kategoriMap.get('genel') ?? 1;
                         const sourceCatId = this.resolveCategoryId(source.category, kategoriMap) ?? genelCatId;
-                        const mlStrong = !!(catRes && catRes.confidence >= ML_CONFIDENCE_THRESHOLD);
-                        const mlCatId = mlStrong
-                            ? (this.resolveCategoryId(catRes!.kategori, kategoriMap) ?? null)
-                            : null;
-                        let finalCatId = sourceCatId;
 
-                        // ML sadece çok güvenli olduğunda ya da kaynak kategorisiyle aynıysa override etsin.
-                        if (mlStrong && mlCatId && (mlCatId === sourceCatId || catRes!.confidence >= 0.93)) {
-                            finalCatId = mlCatId;
+                        // 3-Tier karar ağacı (combined confidence'a göre)
+                        const COMBINED_HIGH = parseFloat(process.env.COMBINED_HIGH_THRESHOLD || '0.80');
+                        const COMBINED_LOW = parseFloat(process.env.COMBINED_LOW_THRESHOLD || '0.55');
+
+                        const mlCatId = catRes
+                            ? (this.resolveCategoryId(catRes.kategori, kategoriMap) ?? null)
+                            : null;
+                        let finalCatId = mlCatId ?? sourceCatId;
+
+                        // Tier kararı: HIGH → direkt yayınla, MID → LLM consensus, LOW → inceleme
+                        let durum: string;
+                        let llmProviderValue: string;
+                        let kategoriDogrulandi: boolean;
+
+                        if (catRes && catRes.confidence >= COMBINED_HIGH) {
+                            // HIGH: Direkt yayınla — %92.6 doğruluk
+                            durum = 'hazir';
+                            llmProviderValue = 'combined-high';
+                            kategoriDogrulandi = true;
+                        } else if (catRes && catRes.confidence >= COMBINED_LOW) {
+                            // MID: LLM consensus gerekli
+                            durum = 'ham';
+                            llmProviderValue = LLM_CONSENSUS_ENABLED ? 'pending' : 'none';
+                            kategoriDogrulandi = false;
+                        } else {
+                            // LOW: İnceleme kuyruğu (conf < 0.55 veya ML başarısız)
+                            durum = 'inceleme';
+                            llmProviderValue = 'low-confidence';
+                            kategoriDogrulandi = false;
+                            finalCatId = mlCatId ?? sourceCatId; // En iyi tahmin ama onaylanmamış
                         }
 
-                        // 4. Consensus Pipeline: LLM'i arka plan worker'a bırak
-                        // LLM_CONSENSUS_ENABLED=true  → llmProvider='pending' (worker işleyecek)
-                        // LLM_CONSENSUS_ENABLED=false → llmProvider='none'    (NB kategorisi final)
-                        const llmProviderValue = LLM_CONSENSUS_ENABLED ? 'pending' : 'none';
-
-                        // 5. DB Kayıt (Haber her zaman 'ham' başlar; worker consensus'u tamamlayınca 'hazir' olur)
+                        // 4. DB Kayıt
                         await this.newsService.createNews({
                             baslik: safeTitle,
                             icerik: contentFallback,
                             metaAciklama: contentFallback.substring(0, 150) + "...",
-                            kategoriId: finalCatId,          // NB tahmini (provisional)
-                            nbKategoriId: finalCatId,        // NB tahmini (frozen, asla değişmez)
-                            llmKategoriId: null,             // Worker dolduracak
+                            kategoriId: finalCatId,          // Combined tahmin (provisional)
+                            nbKategoriId: finalCatId,        // Combined tahmin (frozen)
+                            llmKategoriId: null,             // Worker dolduracak (MID tier)
                             sentiment: sentRes ? sentRes.label : 'Nötr',
                             mlConfidence: catRes ? catRes.confidence : undefined,
                             gorselUrl: item.imageUrl || undefined,
                             kaynakUrl: safeLink,
-                            durum: 'ham',
+                            durum,
                             llmProvider: llmProviderValue,
-                            kategoriDogrulandi: false,
+                            kategoriDogrulandi,
                             augmentedAt: undefined
                         });
 

@@ -1575,15 +1575,27 @@ export class MlCategorizationService implements INewsCategorizationService {
         return this.lrClassifier.predict(text, this.tfidfService);
     }
 
-    /** Combined soft-vote category prediction */
-    async predictCombinedCategory(text: string): Promise<string> {
-        if (!this.useCombinedModel) return this.predictNbCategory(text);
+    /** Combined soft-vote category prediction — returns full CategoryResult */
+    async predictCombinedCategory(text: string): Promise<CategoryResult> {
+        if (!this.useCombinedModel) {
+            return this.categorize(text);
+        }
         const nbProbs = this.getNbProbabilities(text);
         const lrProbs = await this.getLrProbabilities(text);
 
         // Stacking path: use meta-LR for final decision
         if (this.useStacking && this.stackingMeta && this.stackingMeta.isTrained()) {
-            return this.stackingMeta.predict(nbProbs, lrProbs);
+            const kategori = this.stackingMeta.predict(nbProbs, lrProbs);
+            const cats = this.indexCategory();
+            const combined = this.softVoteCombine(nbProbs, lrProbs, cats);
+            const idx = cats.indexOf(kategori);
+            const confidence = idx >= 0 ? combined[idx] : 0;
+            return {
+                kategori,
+                confidence,
+                confidenceBand: confidence >= 0.80 ? 'HIGH' : confidence >= 0.55 ? 'MEDIUM' : 'LOW',
+                allScores: Object.fromEntries(cats.map((c, i) => [c, combined[i]])),
+            };
         }
 
         // Soft voting path (default, or with per-class routing)
@@ -1593,7 +1605,13 @@ export class MlCategorizationService implements INewsCategorizationService {
         for (let i = 1; i < combined.length; i++) {
             if (combined[i] > combined[maxIdx]) maxIdx = i;
         }
-        return cats[maxIdx] ?? 'Bilinmeyen';
+        const confidence = combined[maxIdx];
+        return {
+            kategori: cats[maxIdx] ?? 'Bilinmeyen',
+            confidence,
+            confidenceBand: confidence >= 0.80 ? 'HIGH' : confidence >= 0.55 ? 'MEDIUM' : 'LOW',
+            allScores: Object.fromEntries(cats.map((c, i) => [c, combined[i]])),
+        };
     }
 
     /** Maps index → category name in LR model (required by CV script) */

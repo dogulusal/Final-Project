@@ -6,7 +6,7 @@ export interface CreateNewsDto {
     kaynakUrl?: string;
     gorselUrl?: string;
     sentiment?: string;
-    durum?: 'ham' | 'hazir' | 'yayinda';
+    durum?: 'ham' | 'hazir' | 'yayinda' | 'inceleme';
     mlConfidence?: number;
     llmProvider?: string;
     kategoriDogrulandi?: boolean;
