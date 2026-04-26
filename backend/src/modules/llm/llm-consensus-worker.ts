@@ -15,9 +15,10 @@ export const VALID_LLM_CATEGORIES = [
 
 export type LLMCategory = typeof VALID_LLM_CATEGORIES[number];
 
-const CATEGORY_SYSTEM_PROMPT = `Sen bir haber kategorizasyon sistemisinin. Sana bir haber başlığı ve özeti verilecek.
-Sadece aşağıdaki 7 kategoriden birini döndür. Başka hiçbir şey yazma.
-Geçerli kategoriler: Spor, Ekonomi, Teknoloji, Siyaset, Dünya, Sağlık, Genel
+const CATEGORY_SYSTEM_PROMPT = `Sen deneyimli bir Turkce haber editorusun ve makine ogrenmesi dogrulayicisisin.
+Sana bir haber basligi (ve varsa ozeti) verilecek. Haberi degerlendire ve su 7 kategoriden BIRINE ata:
+
+Gecerli kategoriler: Spor, Ekonomi, Teknoloji, Siyaset, Dunya, Saglik, Genel
 
 KATEGORİ TANIMLARI:
 - Spor: Futbol, basketbol, tenis, olimpiyat, maç sonucu, transfer, sporcu, lig, turnuva
@@ -28,7 +29,10 @@ KATEGORİ TANIMLARI:
 - Sağlık: Hastalık, tedavi, aşı, hastane, doktor, ilaç, kanser, salgın, medikal araştırma
 - Genel: Kaza, suç, cinayet, yangın, sel, deprem, sosyal olay, magazin, eğlence, yerel haber, insan ilgisi
 
-SADECE BİR KELİME YAZ. Örnek: "Spor"`;
+YANIT FORMATI (sadece gecerli JSON dondur, baska hicbir sey yazma):
+{"kategori": "KategoriAdi", "guven": 0.95}
+
+guven: 0.0 (cok belirsiz) ile 1.0 (tamamen emin) arasinda ondalik sayi.`;
 
 function buildUserPrompt(baslik: string, ozet: string): string {
     return `HABERİ KATEGORİZE ET:\nBaşlık: ${baslik}\nÖzet: ${ozet}`;
@@ -128,7 +132,7 @@ export class LlmConsensusWorker {
 
     protected async _processArticle(article: PendingArticle, kategoriMap: KategoriMap): Promise<void> {
         try {
-            const { category, provider } = await this._callLLM(
+            const { category, provider, confidence } = await this._callLLM(
                 article.baslik,
                 article.metaAciklama ?? article.baslik,
             );
@@ -137,6 +141,33 @@ export class LlmConsensusWorker {
             if (!llmKategoriId) throw new Error(`Bilinmeyen LLM kategorisi: "${category}"`);
 
             const isConsensus = article.nbKategoriId === llmKategoriId;
+
+            // Store in dispute_queue as well for admin view
+            const llmGuvenSkoru = confidence ?? null;
+            
+            // Create or update dispute_queue entry if mismatch
+            if (!isConsensus) {
+                await prisma.disputeQueue.upsert({
+                    where: { haberId: article.id },
+                    create: {
+                        haberId: article.id,
+                        nbKategoriId: article.nbKategoriId ?? null,
+                        llmKategoriId,
+                        nbGuvenSkoru: null,
+                        llmGuvenSkoru,
+                        batchNumber: 0,
+                        durum: 'bekliyor',
+                    },
+                    update: {
+                        llmKategoriId,
+                        llmGuvenSkoru,
+                        durum: 'bekliyor',
+                        adminKararKategoriId: null,
+                        resolvedAt: null,
+                        resolvedBy: null,
+                    },
+                });
+            }
 
             await prisma.haber.update({
                 where: { id: article.id },
@@ -191,24 +222,63 @@ export class LlmConsensusWorker {
         }
     }
 
-    protected async _callLLM(baslik: string, ozet: string): Promise<{ category: string; provider: 'gemini' | 'ollama' }> {
+    protected async _callLLM(baslik: string, ozet: string): Promise<{ category: string; provider: 'gemini' | 'ollama'; confidence?: number }> {
         const userPrompt = buildUserPrompt(baslik, ozet);
         try {
             const response = await this.geminiProvider.generateContent(userPrompt, CATEGORY_SYSTEM_PROMPT);
-            return { category: this._parseCategory(response.content), provider: 'gemini' };
+            const { category, confidence } = this._parseJsonResponse(response.content);
+            return { 
+                category, 
+                provider: 'gemini',
+                confidence
+            };
         } catch {
             const response = await this.ollamaProvider.generateContent(userPrompt, CATEGORY_SYSTEM_PROMPT);
-            return { category: this._parseCategory(response.content), provider: 'ollama' };
+            const { category, confidence } = this._parseJsonResponse(response.content);
+            return { 
+                category, 
+                provider: 'ollama',
+                confidence
+            };
         }
     }
 
-    protected _parseCategory(raw: string): string {
+    protected _parseJsonResponse(raw: string): { category: string; confidence?: number } {
+        try {
+            const cleaned = raw.trim()
+                .replace(/^```json?\s*/i, '')
+                .replace(/\s*```$/, '')
+                .trim();
+            const parsed = JSON.parse(cleaned);
+            
+            if (typeof parsed.kategori === 'string' && typeof parsed.guven === 'number') {
+                const category = this._validateCategory(parsed.kategori);
+                const confidence = Math.min(1, Math.max(0, parsed.guven));
+                return { category, confidence };
+            }
+            throw new Error('Yanıt JSON formatında ama kategori veya guven alanı eksik');
+        } catch (err) {
+            // Fallback: eski format (sadece kategori adı)
+            try {
+                const category = this._validateCategory(raw);
+                return { category };
+            } catch {
+                throw new InvalidLLMCategoryError(raw);
+            }
+        }
+    }
+
+    protected _validateCategory(raw: string): string {
         const trimmed = raw.trim().replace(/^["']|["']$/g, '');
         const found = (VALID_LLM_CATEGORIES as readonly string[]).find(
             cat => cat.localeCompare(trimmed, 'tr', { sensitivity: 'base' }) === 0,
         );
         if (!found) throw new InvalidLLMCategoryError(trimmed);
         return found;
+    }
+
+    protected _parseCategory(raw: string): string {
+        return this._validateCategory(raw);
     }
 
     getStatus(): WorkerStats {

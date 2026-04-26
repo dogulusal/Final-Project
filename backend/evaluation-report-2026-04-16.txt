@@ -4,20 +4,11 @@
 
 [Redis] Connecting to localhost:6379...
 [Eval] Loading model from DB...
-[Redis] Connected successfully
 prisma:info Starting a postgresql pool with 13 connections.
+[Redis] Connected successfully
 prisma:query SELECT "public"."model_state"."id", "public"."model_state"."version", "public"."model_state"."model_data", "public"."model_state"."lr_model_data", "public"."model_state"."accuracy", "public"."model_state"."trained_at", "public"."model_state"."sample_count" FROM "public"."model_state" WHERE ("public"."model_state"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
 [ML] LR model data missing in DB — NB-only mode active
 [ML] Model DB'den yüklendi. Accuracy=%71.3 Sample=940
-[Eval] useCombinedModel=false
-[Eval] Fetching verified articles...
-[Eval] Total verified articles: 2488
-
-=== EVALUATION RESULTS ===
-{
-  "total": 2488,
-  "nbAccuracy": "14.79%",
-  "lrAccuracy": "14.79%",
-  "combinedAccuracy": "14.79%",
-  "reportPath": "C:\\Users\\dogul\\Final-Project\\backend\\evaluation-report-2026-04-16.csv"
-}
+Error: BLOCKER: useCombinedModel=false — LR state DB'de yok. Faz2 doğrulaması yapılamaz. Önce train pipeline'ı fix et.
+    at runEvaluatorDry (C:\Users\dogul\Final-Project\backend\src\scripts\evaluate-combined-model.ts:41:15)
+    at async main (C:\Users\dogul\Final-Project\backend\src\scripts\evaluate-combined-model.ts:118:24)

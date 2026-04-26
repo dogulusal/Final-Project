@@ -12,6 +12,7 @@ export interface ParsedRssItem {
     contentSnippet: string;
     source: string;
     category: string;
+    imageUrl?: string;
 }
 
 export interface IRssParserService {

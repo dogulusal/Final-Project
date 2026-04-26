@@ -1,24 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import HeroSection from "@/components/HeroSection";
 import NewsFeed from "@/features/news/ui/NewsFeed";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { Search, Target } from "lucide-react";
+import { Search } from "lucide-react";
 import { NewsItem } from "@/types/news";
 import { useReadingHistory } from "@/hooks/useReadingHistory";
 import { personalizedSort } from "@/utils/personalizedSort";
-import LazySection from "@/components/LazySection";
-import StatsBar from "@/components/StatsBar";
 
-// Dynamic imports for heavy components
-const HeroCarousel = dynamic(() => import("@/components/HeroCarousel"), { loading: () => null });
 const PersonalizedHeroCarousel = dynamic(() => import("@/components/PersonalizedHeroCarousel"), { loading: () => null });
-const SentimentBiasMap = dynamic(() => import("@/components/SentimentBiasMap"), { loading: () => null });
-const InterestRadar = dynamic(() => import("@/components/InterestRadar"), { loading: () => null });
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
@@ -54,12 +48,14 @@ const CATEGORIES = [
 export default function Home() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [activeCategory, setActive] = useState("Tümü");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebounced] = useState("");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const limit = 20;
+  const [hasMore, setHasMore] = useState(true);
+  const limit = 9;
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const { getInterests, isPersonalized } = useReadingHistory();
   const interests = useMemo(() => getInterests(), [getInterests]);
@@ -78,54 +74,69 @@ export default function Home() {
     const t = setTimeout(() => {
       setDebounced(search);
       setPage(1);
+      setNews([]);
+      setHasMore(true);
     }, 500);
     return () => clearTimeout(t);
   }, [search]);
 
-  const fetchNews = useCallback(async () => {
+  // Reset on category change
+  const handleCategoryChange = useCallback((catName: string) => {
+    setActive(catName);
+    setPage(1);
+    setNews([]);
+    setHasMore(true);
+  }, []);
+
+  // Fetch news — appends when page > 1
+  const fetchNews = useCallback(async (pageNum: number, append: boolean) => {
     try {
-      setLoading(true);
+      if (append) setLoadingMore(true); else setLoading(true);
       const category = CATEGORIES.find(c => c.name === activeCategory);
       const catSlug = category?.slug;
       
-      let url = `${API_BASE}/api/news?page=${page}&limit=${limit}&status=hazir`;
+      let url = `${API_BASE}/api/news?page=${pageNum}&limit=${limit}&status=hazir`;
       if (catSlug && catSlug !== "Tümü") url += `&category=${catSlug}`;
       if (debouncedSearch) url += `&search=${encodeURIComponent(debouncedSearch)}`;
       
-      console.log("[fetchNews] Fetching from:", url);
       const res = await fetch(url, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'omit'
       });
       
-      if (!res.ok) {
-        console.error(`[fetchNews] HTTP Error: ${res.status} ${res.statusText}`);
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      }
-      
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      console.log("[fetchNews] API Response:", data);
       
       if (data.success) {
-        setNews(dedupeNewsItems(data.data));
-        setTotalPages(data.totalPages || 1);
+        const newItems = dedupeNewsItems(data.data);
+        if (append) {
+          setNews(prev => dedupeNewsItems([...prev, ...newItems]));
+        } else {
+          setNews(newItems);
+        }
+        const totalPages = data.totalPages || 1;
+        setHasMore(pageNum < totalPages);
       } else {
-        console.warn("[fetchNews] API başarısız:", data);
-        setNews([]);
+        if (!append) setNews([]);
+        setHasMore(false);
       }
-    } catch (error) {
-      console.error("[fetchNews] Error:", error);
-      setNews([]);
+    } catch {
+      if (!append) setNews([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [page, debouncedSearch, activeCategory]);
+  }, [debouncedSearch, activeCategory]);
 
+  // Initial fetch + fetch on filter change
   useEffect(() => {
-    fetchNews();
-    
-    // SSE for real-time updates
+    fetchNews(page, page > 1);
+  }, [page, fetchNews]);
+
+  // SSE — stable connection, independent of pagination
+  useEffect(() => {
     const eventSource = new EventSource(`${API_BASE}/api/news/live`);
     eventSource.onmessage = (event) => {
       try {
@@ -135,29 +146,39 @@ export default function Home() {
             if (prev.some(n => n.id === newItem.id || makeNewsIdentity(n) === makeNewsIdentity(newItem))) {
               return prev;
             }
-            return dedupeNewsItems([newItem, ...prev]).slice(0, limit);
+            return dedupeNewsItems([newItem, ...prev]);
           });
         }
-      } catch (e) {
-        console.error("SSE parse error", e);
+      } catch {
+        // silent
       }
     };
-
     return () => eventSource.close();
-  }, [fetchNews]);
+  }, []);
+
+  // Infinite scroll — IntersectionObserver on sentinel
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          setPage(p => p + 1);
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore]);
 
   return (
     <main className="min-h-screen bg-[var(--bg-primary)] relative">
       <div className="dot-pattern" aria-hidden="true" />
       <Navbar />
       
-      {/* Hero Carousel — Spotlight Haberler */}
-      {!loading && news.length > 0 && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <HeroCarousel news={news} autoPlayInterval={6000} />
-        </div>
-      )}
-
+      {/* Haberleri Keşfet */}
       <HeroSection />
 
       {/* Sizin İçin Seçilenler Carousel */}
@@ -173,7 +194,7 @@ export default function Home() {
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.name}
-                onClick={() => { setActive(cat.name); setPage(1); }}
+                onClick={() => handleCategoryChange(cat.name)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
                   activeCategory === cat.name
                     ? "bg-[var(--accent-primary)] text-[var(--text-inverse)] shadow-lg"
@@ -199,28 +220,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Canlı Akış Göstergesi */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-            </span>
-            <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">
-              Gerçek Zamanlı Akış
-            </span>
-          </div>
-          
-          {canShowPersonalized && activeCategory === "Tümü" && (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--surface-warm)] border border-[var(--accent-warm)]/20 animate-in fade-in slide-in-from-right-4 duration-500">
-              <Target size={14} className="text-[var(--accent-warm)]" />
-              <span className="text-[10px] font-bold text-[var(--accent-warm)] uppercase tracking-wider">🎯 Senin İçin Kişiselleştirildi</span>
-            </div>
-          )}
-        </div>
-
-        <StatsBar />
-
         {/* Ana İçerik */}
         <ErrorBoundary>
             <NewsFeed 
@@ -229,27 +228,22 @@ export default function Home() {
             />
         </ErrorBoundary>
 
-        {/* Sayfalama */}
-        {!loading && totalPages > 1 && (
-          <div className="flex items-center justify-center gap-4 mt-16">
-            <button
-              disabled={page === 1}
-              onClick={() => setPage(p => p - 1)}
-              className="px-6 py-2 rounded-xl border border-[var(--border-subtle)] text-sm font-semibold disabled:opacity-30 hover:bg-[var(--bg-secondary)] transition-colors"
-            >
-              ← Önceki
-            </button>
-            <span className="text-sm font-bold text-[var(--text-muted)]">
-              {page} / {totalPages}
-            </span>
-            <button
-              disabled={page === totalPages}
-              onClick={() => setPage(p => p + 1)}
-              className="px-6 py-2 rounded-xl border border-[var(--border-subtle)] text-sm font-semibold disabled:opacity-30 hover:bg-[var(--bg-secondary)] transition-colors"
-            >
-              Sonraki →
-            </button>
+        {/* Infinite scroll sentinel */}
+        <div ref={sentinelRef} className="h-px" />
+        {loadingMore && (
+          <div className="flex justify-center py-8">
+            <div className="flex items-center gap-3">
+              <div className="h-1.5 w-24 bg-[var(--bg-secondary)] rounded-full overflow-hidden">
+                <div className="h-full w-1/2 bg-[var(--neon-purple)]/30 animate-pulse rounded-full" />
+              </div>
+              <span className="text-xs text-[var(--text-muted)] mono">Yükleniyor...</span>
+            </div>
           </div>
+        )}
+        {!hasMore && news.length > 0 && (
+          <p className="text-center text-xs text-[var(--text-muted)] py-8 mono">
+            Tüm haberler yüklendi
+          </p>
         )}
       </div>
 

@@ -1,0 +1,35 @@
+
+> ai-news-agency-backend@0.1.0 evaluate:combined
+> ts-node --project tsconfig.scripts.json src/scripts/evaluate-combined-model.ts
+
+[Redis] Connecting to localhost:6379...
+[Eval] Loading model from DB...
+[Redis] Connected successfully
+prisma:info Starting a postgresql pool with 13 connections.
+prisma:query SELECT "public"."model_state"."id", "public"."model_state"."version", "public"."model_state"."model_data", "public"."model_state"."lr_model_data", "public"."model_state"."accuracy", "public"."model_state"."trained_at", "public"."model_state"."sample_count" FROM "public"."model_state" WHERE ("public"."model_state"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+[ML] NB classifier rebuilt from 3465 stored docs
+[ML] Combined NB+LR model loaded from DB
+[ML][Stacking] Meta-LR loaded from DB — stacking active
+[ML] Model DB'den yüklendi. Accuracy=%80.3 Sample=3465
+[Eval] useCombinedModel=true useStacking=true
+[Eval] Fetching verified articles...
+[Eval] Total verified articles: 2556
+
+=== EVALUATION RESULTS ===
+{
+  "total": 2556,
+  "nbAccuracy": "84.23%",
+  "lrAccuracy": "82.39%",
+  "combinedAccuracy": "83.76%",
+  "useStacking": true,
+  "reportPath": "C:\\Users\\dogul\\Final-Project\\backend\\evaluation-report-2026-04-17-stacking-0.70.csv"
+}
+
+=== PER-CLASS BREAKDOWN ===
+  ✓comb Dünya        NB= 84.9% LR= 83.5% Combined= 86.7% (n=345)
+  ✓comb Ekonomi      NB= 68.9% LR= 68.0% Combined= 74.3% (n=366)
+    NB  Genel        NB= 86.7% LR= 81.3% Combined= 83.7% (n=626)
+    NB  Sağlık       NB= 90.5% LR= 87.7% Combined= 89.9% (n=179)
+    LR  Siyaset      NB= 82.1% LR= 82.7% Combined= 78.7% (n=352)
+    LR  Spor         NB= 93.2% LR= 95.3% Combined= 94.9% (n=234)
+    NB  Teknoloji    NB= 87.2% LR= 85.7% Combined= 85.0% (n=454)

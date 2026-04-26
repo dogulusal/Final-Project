@@ -62,7 +62,15 @@ router.post('/login', loginLimiter, async (req: Request, res: Response) => {
  */
 router.get('/stats', verifyJwtToken, requireRole([UserRole.ADMIN]), cacheMiddleware(30), async (_req: Request, res: Response) => {
     try {
-        const [totalNews, activeCategories, newsByDurum, newsByLlmProvider] = await Promise.all([
+        const [
+            totalNews,
+            activeCategories,
+            newsByDurum,
+            newsByLlmProvider,
+            verifiedRecords,
+            pendingRecords,
+            disputedRecords
+        ] = await Promise.all([
             prisma.haber.count(),
             prisma.kategori.count(),
             prisma.haber.groupBy({
@@ -72,6 +80,22 @@ router.get('/stats', verifyJwtToken, requireRole([UserRole.ADMIN]), cacheMiddlew
             prisma.haber.groupBy({
                 by: ['llmProvider'],
                 _count: { id: true }
+            }),
+            prisma.haber.count({
+                where: {
+                    kategoriDogrulandi: true
+                } as any
+            }),
+            prisma.haber.count({
+                where: {
+                    durum: 'ham',
+                    kategoriDogrulandi: false
+                } as any
+            }),
+            prisma.disputeQueue.count({
+                where: {
+                    durum: 'bekliyor'
+                } as any
             })
         ]);
 
@@ -80,13 +104,20 @@ router.get('/stats', verifyJwtToken, requireRole([UserRole.ADMIN]), cacheMiddlew
             _avg: {
                 mlConfidence: true
             },
+            _count: {
+                mlConfidence: true
+            },
             where: {
-                mlConfidence: { not: null }
+                mlConfidence: { not: null },
+                durum: 'hazir'
             }
         });
 
         // Gerçek ML Doğruluğu
         const mlPerformance = await mlService.getAccuracy();
+        const verificationRate = totalNews > 0
+            ? Math.round((verifiedRecords / totalNews) * 100)
+            : 0;
 
         // Son Kategorizasyon İşlemleri (Gerçek Veri)
         const recentCategorizations = await prisma.haber.findMany({
@@ -121,7 +152,16 @@ router.get('/stats', verifyJwtToken, requireRole([UserRole.ADMIN]), cacheMiddlew
                 mlAccuracy: (mlPerformance.accuracy * 100).toFixed(1),
                 mlTrainSize: mlPerformance.trainSize,
                 mlTestSize: mlPerformance.testSize,
+                avgPredictionConfidence: confidenceStats._avg.mlConfidence ? (confidenceStats._avg.mlConfidence * 100).toFixed(1) : 0,
+                confidenceSampleSize: confidenceStats._count?.mlConfidence ?? 0,
                 avgConfidence: confidenceStats._avg.mlConfidence ? (confidenceStats._avg.mlConfidence * 100).toFixed(1) : 0,
+                mlVerification: {
+                    totalRecords: totalNews,
+                    verifiedRecords,
+                    verificationRate,
+                    pendingRecords,
+                    disputedRecords,
+                },
                 abTestCount,
                 recentCategorizations: recentCategorizations.map(h => ({
                     id: h.id,

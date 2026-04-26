@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { NewsItem } from "@/types/news";
+import { getNewsImage } from "@/utils/newsImage";
 import { ChevronRight, ChevronLeft, Target, TrendingUp } from "lucide-react";
 
 interface Props {
@@ -76,12 +78,25 @@ export default function PersonalizedHeroCarousel({ newsItems }: Props) {
       </div>
 
       <div className={`relative h-[240px] md:h-[300px] w-full rounded-2xl overflow-hidden shadow-2xl ${cfg.glow} bg-[var(--bg-secondary)] border-2 ${cfg.border} transition-all duration-500`} aria-live="polite">
-        {/* Background */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg-card)] via-[var(--bg-card)] to-transparent z-0 opacity-95 dark:opacity-90 transition-colors duration-500" />
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src={getNewsImage(currentNews)}
+            alt=""
+            fill
+            className="object-cover transition-opacity duration-700"
+            sizes="(max-width: 768px) 100vw, 1280px"
+            unoptimized
+            priority
+          />
+        </div>
+        {/* Gradient overlay for readability */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg-card)] via-[var(--bg-card)]/95 to-[var(--bg-card)]/40 z-[1] transition-colors duration-500" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg-card)]/80 via-transparent to-transparent z-[1]" />
 
         {/* Animated blobs — sentiment-aware */}
-        <div className={`absolute top-[-50%] right-[-10%] w-[300px] h-[300px] rounded-full opacity-15 blur-3xl z-0 transition-all duration-700 ${cfg.blob1}`} />
-        <div className={`absolute bottom-[-50%] left-[-10%] w-[200px] h-[200px] rounded-full opacity-15 blur-3xl z-0 transition-all duration-700 ${cfg.blob2}`} />
+        <div className={`absolute top-[-50%] right-[-10%] w-[300px] h-[300px] rounded-full opacity-10 blur-3xl z-[2] transition-all duration-700 ${cfg.blob1}`} />
+        <div className={`absolute bottom-[-50%] left-[-10%] w-[200px] h-[200px] rounded-full opacity-10 blur-3xl z-[2] transition-all duration-700 ${cfg.blob2}`} />
 
         {/* Progress bar across top */}
         <div className="absolute top-0 left-0 right-0 h-[3px] z-30 bg-transparent">

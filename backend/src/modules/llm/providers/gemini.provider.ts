@@ -2,12 +2,22 @@ import { ILLMProvider, LLMResponse } from '../llm.interface';
 import { LLM_API_KEY, LLM_API_KEYS, LLM_MODEL_NAME } from '../../../config/constants';
 import { llmUsageService } from '../llm-usage';
 
+/** 429 quota-exhausted hataları için özel sınıf (retry yerine key rotate tetikler) */
+export class GeminiQuotaExhaustedError extends Error {
+    retryAfterMs: number;
+    constructor(message: string, retryAfterMs = 60_000) {
+        super(message);
+        this.name = 'GeminiQuotaExhaustedError';
+        this.retryAfterMs = retryAfterMs;
+    }
+}
+
 export class GeminiProvider implements ILLMProvider {
     name = 'Gemini (Google)';
     private baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
     private keyIndex = 0;
 
-    constructor() {
+    constructor(private modelOverride?: string) {
         if (LLM_API_KEYS.length === 0) {
             console.warn('[Gemini] LLM_API_KEY (Gemini API Key) bulunamadı!');
         } else if (LLM_API_KEYS.length > 1) {
@@ -38,17 +48,23 @@ export class GeminiProvider implements ILLMProvider {
         }
 
         const apiKey = this.nextKey();
-        const modelName = LLM_MODEL_NAME || 'gemini-1.5-flash';
+        const modelName = this.modelOverride || LLM_MODEL_NAME || 'gemini-1.5-flash';
         const url = `${this.baseUrl}/${modelName}:generateContent?key=${apiKey}`;
 
         const combinedPrompt = systemPrompt ? `${systemPrompt}\n\n${userPrompt}` : userPrompt;
+
+        // JSON kategorize istekleri için temperature düşük tutulur (deterministic)
+        // Standart içerik üretimi için yüksek kalır (0.7)
+        const isCategorizationRequest = combinedPrompt.includes('KATEGORİZE ET') ||
+            combinedPrompt.includes('{"kategori"');
+        const temperature = isCategorizationRequest ? 0.1 : 0.7;
 
         const body = {
             contents: [{
                 parts: [{ text: combinedPrompt }]
             }],
             generationConfig: {
-                temperature: 0.7,
+                temperature,
                 responseMimeType: "application/json"
             }
         };
@@ -64,7 +80,28 @@ export class GeminiProvider implements ILLMProvider {
 
             if (!response.ok) {
                 const errorData = await response.text();
-                throw new Error(`Gemini API Hatası: ${response.status} ${response.statusText} - ${errorData}`);
+                const status = response.status;
+
+                // 429 quota exhausted → özel hata sınıfı (caller key rotate uygulayabilir)
+                if (status === 429) {
+                    let retryAfterMs = 60_000;
+                    try {
+                        const errBody = JSON.parse(errorData);
+                        const retryInfo = errBody?.error?.details?.find(
+                            (d: any) => d['@type']?.includes('RetryInfo')
+                        );
+                        if (retryInfo?.retryDelay) {
+                            const secs = parseFloat(retryInfo.retryDelay.replace('s', ''));
+                            if (!isNaN(secs)) retryAfterMs = Math.ceil(secs * 1000) + 2000;
+                        }
+                    } catch { /* JSON parse hatası — varsayılan süreyi kullan */ }
+                    throw new GeminiQuotaExhaustedError(
+                        `Gemini API Hatası: ${status} ${response.statusText} - ${errorData}`,
+                        retryAfterMs,
+                    );
+                }
+
+                throw new Error(`Gemini API Hatası: ${status} ${response.statusText} - ${errorData}`);
             }
 
             const data = await response.json() as any;

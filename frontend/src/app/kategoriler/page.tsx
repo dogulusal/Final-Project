@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -10,6 +10,7 @@ import Footer from "@/components/Footer";
 import { NewsItem } from "@/types/news";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
+const PAGE_SIZE = 9;
 
 interface Kategori {
     id: number;
@@ -17,6 +18,12 @@ interface Kategori {
     slug: string;
     renkKodu: string;
     ikon: string | null;
+}
+
+interface CategoryCount {
+    slug: string;
+    ad: string;
+    count: number;
 }
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -31,6 +38,12 @@ function KategorilerContent() {
     const [news, setNews] = useState<NewsItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeCategory, setActiveCategory] = useState<string | null>(initialCat);
+    const [categories, setCategories] = useState<Kategori[]>([]);
+    const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+    const [totalCount, setTotalCount] = useState(0);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [filteredTotal, setFilteredTotal] = useState(0);
 
     const dedupe = (items: NewsItem[]) => {
         const seen = new Set<string>();
@@ -42,36 +55,69 @@ function KategorilerContent() {
         });
     };
 
+    // Fetch categories + counts on mount
     useEffect(() => {
-        fetchNews();
+        (async () => {
+            try {
+                const catRes = await fetch(`${API_BASE}/api/news/categories`);
+                const catData = await catRes.json();
+                if (catData.success && Array.isArray(catData.data)) {
+                    setCategories(catData.data);
+                    
+                    // Fetch count for each category + total
+                    const countPromises = catData.data.map(async (cat: Kategori) => {
+                        const r = await fetch(`${API_BASE}/api/news?limit=1&status=hazir&category=${cat.slug}`);
+                        const d = await r.json();
+                        return { slug: cat.slug, ad: cat.ad, count: d.total || 0 };
+                    });
+                    const totalRes = await fetch(`${API_BASE}/api/news?limit=1&status=hazir`);
+                    const totalData = await totalRes.json();
+                    setTotalCount(totalData.total || 0);
+
+                    const counts = await Promise.all(countPromises);
+                    const countMap: Record<string, number> = {};
+                    counts.forEach((c: CategoryCount) => { countMap[c.ad] = c.count; });
+                    setCategoryCounts(countMap);
+                }
+            } catch {
+                // silent
+            }
+        })();
     }, []);
 
-    const fetchNews = async () => {
+    // Fetch news for current page + category
+    const fetchNews = useCallback(async () => {
+        setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/api/news?limit=1500&status=hazir`);
+            let url = `${API_BASE}/api/news?page=${page}&limit=${PAGE_SIZE}&status=hazir`;
+            if (activeCategory) {
+                const cat = categories.find(c => c.ad === activeCategory);
+                if (cat) url += `&category=${cat.slug}`;
+            }
+            const res = await fetch(url);
             const data = await res.json();
-            if (data.success) setNews(dedupe(data.data));
+            if (data.success) {
+                setNews(dedupe(data.data));
+                setTotalPages(data.totalPages || 1);
+                setFilteredTotal(data.total || 0);
+            }
         } catch {
-            // API erişim hatası
+            setNews([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, [page, activeCategory, categories]);
 
-    const categories: Kategori[] = [];
-    const seenIds = new Set<number>();
-    for (const n of news) {
-        if (n.kategori && !seenIds.has(n.kategori.id)) {
-            seenIds.add(n.kategori.id);
-            categories.push(n.kategori);
+    useEffect(() => {
+        if (categories.length > 0 || activeCategory === null) {
+            fetchNews();
         }
-    }
+    }, [fetchNews, categories]);
 
-    const filteredNews = activeCategory
-        ? news.filter(n => n.kategori?.ad === activeCategory)
-        : news;
-
-    const categoryCount = (catName: string) => news.filter(n => n.kategori?.ad === catName).length;
+    const handleCategoryChange = (catName: string | null) => {
+        setActiveCategory(catName);
+        setPage(1);
+    };
 
     return (
         <main className="min-h-screen">
@@ -94,23 +140,23 @@ function KategorilerContent() {
                     {/* Category Cards */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 mb-10">
                         <button
-                            onClick={() => setActiveCategory(null)}
+                            onClick={() => handleCategoryChange(null)}
                             className={`glass-card p-4 text-left transition-all duration-200 ${!activeCategory ? "ring-2 ring-[var(--accent-blue)]" : ""}`}
                         >
                             <span className="text-xl block mb-1">🔥</span>
                             <span className="text-sm font-bold block">Tümü</span>
-                            <span className="text-[10px] text-[var(--text-muted)]">{news.length} haber</span>
+                            <span className="text-[10px] text-[var(--text-muted)]">{totalCount} haber</span>
                         </button>
 
                         {categories.map(cat => (
                             <button
                                 key={cat.id}
-                                onClick={() => setActiveCategory(cat.ad)}
+                                onClick={() => handleCategoryChange(cat.ad)}
                                 className={`glass-card p-4 text-left transition-all duration-200 ${activeCategory === cat.ad ? "ring-2 ring-[var(--accent-blue)]" : ""}`}
                             >
                                 <span className="text-xl block mb-1">{CATEGORY_ICONS[cat.ad] || "📄"}</span>
                                 <span className="text-sm font-bold block">{cat.ad}</span>
-                                <span className="text-[10px] text-[var(--text-muted)]">{categoryCount(cat.ad)} haber</span>
+                                <span className="text-[10px] text-[var(--text-muted)]">{categoryCounts[cat.ad] ?? "—"} haber</span>
                             </button>
                         ))}
                     </div>
@@ -120,10 +166,33 @@ function KategorilerContent() {
                         <h2 className="text-xl font-bold">
                             {activeCategory || "Tüm"} Haberleri
                         </h2>
-                        <span className="text-xs text-[var(--text-muted)]">{filteredNews.length} sonuç</span>
+                        <span className="text-xs text-[var(--text-muted)]">{filteredTotal} sonuç</span>
                     </div>
 
-                    <NewsGrid news={filteredNews} loading={loading} />
+                    <NewsGrid news={news} loading={loading} />
+
+                    {/* Pagination */}
+                    {!loading && totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-3 mt-10">
+                            <button
+                                disabled={page === 1}
+                                onClick={() => setPage(p => p - 1)}
+                                className="px-5 py-2 rounded-xl border border-[var(--border-subtle)] text-sm font-semibold disabled:opacity-30 hover:bg-[var(--bg-secondary)] transition-colors"
+                            >
+                                ← Önceki
+                            </button>
+                            <span className="text-sm font-bold text-[var(--text-muted)]">
+                                {page} / {totalPages}
+                            </span>
+                            <button
+                                disabled={page === totalPages}
+                                onClick={() => setPage(p => p + 1)}
+                                className="px-5 py-2 rounded-xl border border-[var(--border-subtle)] text-sm font-semibold disabled:opacity-30 hover:bg-[var(--bg-secondary)] transition-colors"
+                            >
+                                Sonraki →
+                            </button>
+                        </div>
+                    )}
                 </motion.div>
             </section>
             <Footer />

@@ -22,10 +22,9 @@ export function getNewsImage(item: NewsItem): string {
   if (item.gorselUrl && isValidImageUrl(item.gorselUrl)) {
     return item.gorselUrl;
   }
-  const category = item.kategori?.ad || 'Genel';
-  const query = CATEGORY_QUERIES[category] || CATEGORY_QUERIES['Genel'];
-  const seed = item.id % 1000;
-  return `https://source.unsplash.com/800x450/?${query}&sig=${seed}`;
+  // picsum.photos — fast, reliable, no rate limit
+  const seed = item.id ?? 0;
+  return `https://picsum.photos/seed/${seed}/800/450`;
 }
 
 /**
