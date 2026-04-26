@@ -1,17 +1,24 @@
 import { Router, Request, Response } from 'express';
 import { MlCategorizationService } from './ml.service';
 import { prisma } from '../../config/database';
+import { bridgeHamVerifiedToDisputeQueue } from './dispute-queue.service';
 
 const mlService = new MlCategorizationService('naive-bayes', 'unigram-bigram');
 
 // Sisteme başladığında DB'den manual-only Records ile eğitir (Batch-21d: quality upgrade)
-// PRODUCTION: Use manual-only validated records (71.56% benchmark)
-// Auto-training trigger every 20 validated news with manualOnlyVerified: true
+// PRODUCTION startup order:
+// 1) Load persisted production model from DB
+// 2) If load fails, fallback to retraining paths
 void (async () => {
-    const trained = await mlService.loadAndTrainFromDB({ manualOnlyVerified: true });
+    const loadedFromDb = await mlService.loadModelFromDb();
+    if (loadedFromDb) {
+        console.log('[ML Controller] Model DB\'den yüklendi ve gelen isteklere açık.');
+        return;
+    }
 
+    const trained = await mlService.loadAndTrainFromDB({ manualOnlyVerified: true });
     if (trained) {
-        console.log('[ML Controller] Model manual-only records ile eğitildi ve gelen isteklere açık. (🎯 71.56% beklenen)');
+        console.log('[ML Controller] DB model yüklenemedi, manual-only records ile retrain edildi.');
         return;
     }
 
@@ -29,19 +36,208 @@ const protectedRouter = Router();
 
 protectedRouter.post('/train', async (_req: Request, res: Response) => {
     try {
-        // PRODUCTION: Use dataset.json pure by default
-        // To enable DB batch verify: set ?useDb=true OR wait for Sprint 3 manual validation
-        const useDb = _req.query.useDb === 'true';
-        const success = useDb 
-            ? await mlService.loadAndTrainFromDB({ manualOnlyVerified: true })
-            : await mlService.loadAndTrainFromDiskFallback();
+        // PRODUCTION: Default = full DB verified dataset (3000+ records).
+        // ?source=disk  → legacy dataset.json fallback
+        // ?source=manual → manual-only verified subset (Sprint-3 era, Guard4-prone)
+        const source = (_req.query.source as string) || (_req.query.useDb === 'true' ? 'db' : 'db');
+        let success: boolean;
+        let message: string;
+
+        switch (source) {
+            case 'disk':
+                success = await mlService.loadAndTrainFromDiskFallback();
+                message = 'Model dataset.json ile eğitildi.';
+                break;
+            case 'manual':
+                success = await mlService.loadAndTrainFromDB({ manualOnlyVerified: true });
+                message = 'Model manual-only verified ile eğitildi.';
+                break;
+            default: // 'db' — full verified DB path (recommended)
+                success = await mlService.loadAndTrainFromDB({ manualOnlyVerified: false });
+                message = 'Model DB verified dataset ile eğitildi.';
+                break;
+        }
+
         if (success) {
-            res.json({ success: true, message: useDb ? 'Model DB batch ile eğitildi.' : 'Model dataset.json ile eğitildi.' });
+            res.json({ success: true, message });
         } else {
             res.status(500).json({ success: false, message: 'Model eğitimi başarısız oldu.' });
         }
     } catch (error) {
-        res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Bilinmeyen hata' });    }
+        res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Bilinmeyen hata' });
+    }
+});
+
+/**
+ * GET /disputes/pending
+ * Dispute merkezi için tek kaynak: dispute_queue (durum=bekliyor)
+ */
+protectedRouter.get('/disputes/pending', async (req: Request, res: Response) => {
+    try {
+        // Haberler tablosunda ham+verified kalan kayıtları queue'ya köprüle.
+        await bridgeHamVerifiedToDisputeQueue(prisma, { take: 1000 });
+
+        const limit = Math.min(Math.max(parseInt(req.query.limit as string, 10) || 50, 1), 200);
+
+        const [pendingCount, disputes] = await Promise.all([
+            prisma.disputeQueue.count({ where: { durum: 'bekliyor' } }),
+            prisma.disputeQueue.findMany({
+                where: { durum: 'bekliyor' },
+                include: {
+                    haber: {
+                        select: {
+                            id: true,
+                            baslik: true,
+                            yayinlanmaTarihi: true,
+                            mlConfidence: true,
+                        },
+                    },
+                    nbKategori: { select: { id: true, ad: true } },
+                    llmKategori: { select: { id: true, ad: true } },
+                },
+                orderBy: { createdAt: 'asc' },
+                take: limit,
+            }),
+        ]);
+
+        return res.json({
+            success: true,
+            data: {
+                pendingCount,
+                items: disputes,
+            },
+        });
+    } catch (error) {
+        console.error('[Disputes Pending] Error:', error);
+        return res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Internal server error',
+        });
+    }
+});
+
+/**
+ * PUT /resolve-disputes-batch
+ * Dispute kayıtlarını queue üzerinden çözer ve haberi hazir+verified yapar.
+ */
+protectedRouter.put('/resolve-disputes-batch', async (req: Request, res: Response) => {
+    try {
+        const { decisions } = req.body as {
+            decisions: Array<{
+                disputeId: number;
+                chosenKategoriId: number;
+                reason?: string;
+            }>;
+        };
+
+        if (!Array.isArray(decisions) || decisions.length === 0) {
+            return res.status(400).json({ success: false, error: 'Geçersiz payload: decisions zorunlu.' });
+        }
+
+        for (const d of decisions) {
+            if (!Number.isInteger(d.disputeId) || !Number.isInteger(d.chosenKategoriId)) {
+                return res.status(400).json({ success: false, error: 'disputeId ve chosenKategoriId integer olmalı.' });
+            }
+        }
+
+        const uniqueIds = Array.from(new Set(decisions.map(d => d.disputeId)));
+        if (uniqueIds.length !== decisions.length) {
+            return res.status(400).json({ success: false, error: 'Aynı disputeId birden fazla kez gönderildi.' });
+        }
+
+        const decidedBy = String(req.userId ?? 'admin');
+
+        const pendingRows = await prisma.disputeQueue.findMany({
+            where: {
+                id: { in: uniqueIds },
+                durum: 'bekliyor',
+            },
+            select: { id: true, haberId: true },
+        });
+
+        if (pendingRows.length !== uniqueIds.length) {
+            return res.status(404).json({
+                success: false,
+                error: 'Bazı dispute kayıtları bulunamadı veya bekleyen durumda değil.',
+            });
+        }
+
+        const rowById = new Map(pendingRows.map(r => [r.id, r.haberId]));
+        const now = new Date();
+
+        await prisma.$transaction(
+            decisions.flatMap(d => {
+                const haberId = rowById.get(d.disputeId)!;
+
+                return [
+                    prisma.haber.update({
+                        where: { id: haberId },
+                        data: {
+                            kategoriId: d.chosenKategoriId,
+                            kategoriDogrulandi: true,
+                            durum: 'hazir',
+                        },
+                    }),
+                    prisma.disputeQueue.update({
+                        where: { id: d.disputeId },
+                        data: {
+                            durum: 'cozuldu',
+                            adminKararKategoriId: d.chosenKategoriId,
+                            resolvedAt: now,
+                            resolvedBy: decidedBy,
+                        },
+                    }),
+                    (prisma as any).manuelValidasyon.create({
+                        data: {
+                            haberId,
+                            eskiKategoriId: null,
+                            yeniKategoriId: d.chosenKategoriId,
+                            dogrulayanEmail: decidedBy,
+                            kararTuru: 'correct',
+                            batchId: `dispute-resolve-${now.getTime()}`,
+                            notlar: `dispute_queue_resolve: ${d.reason ?? 'manual-review'}`,
+                        },
+                    }),
+                ];
+            })
+        );
+
+        return res.json({
+            success: true,
+            resolved: decisions.length,
+            message: `${decisions.length} dispute kaydı çözüldü.`,
+        });
+    } catch (error) {
+        console.error('[Resolve Disputes Batch] Error:', error);
+        return res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Internal server error',
+        });
+    }
+});
+
+/**
+ * POST /disputes/sync
+ * Ham+verified haberleri dispute_queue'ya köprülemek için manuel tetikleme.
+ */
+protectedRouter.post('/disputes/sync', async (req: Request, res: Response) => {
+    try {
+        const ids = Array.isArray(req.body?.haberIds)
+            ? req.body.haberIds.filter((v: unknown) => Number.isInteger(v))
+            : undefined;
+
+        const result = await bridgeHamVerifiedToDisputeQueue(prisma, {
+            onlyIds: ids && ids.length > 0 ? ids : undefined,
+            take: ids ? undefined : 5000,
+        });
+
+        return res.json({ success: true, ...result });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Internal server error',
+        });
+    }
 });
 
 /**
@@ -226,7 +422,7 @@ protectedRouter.post('/evaluate', async (_req: Request, res: Response) => {
         // Return metrics from last training session
         // In Faz 5, these will be calculated from actual test set evaluation
         const metricsData = {
-            overall_accuracy: mlService.lastAccuracy || 0.8199,
+            overall_accuracy: status.accuracy || 0.8199,
             per_category_metrics: {
                 'Genel': { precision: 0.823, recall: 0.651, f1: 0.729, support: 45 },
                 'Spor': { precision: 0.912, recall: 0.923, f1: 0.918, support: 52 },
@@ -253,7 +449,9 @@ protectedRouter.post('/evaluate', async (_req: Request, res: Response) => {
                 type: status.model_type,
                 preprocessing: status.preprocessing_mode,
                 trained_at: status.trained_at,
-                sample_count: status.sample_count
+                sample_count: status.sample_count,
+                evaluation_sample_count: status.evaluation_sample_count,
+                accuracy_source: status.accuracy_source
             },
             evaluated_at: new Date().toISOString()
         };
@@ -277,6 +475,7 @@ protectedRouter.post('/evaluate', async (_req: Request, res: Response) => {
  */
 protectedRouter.post('/roc-auc', async (_req: Request, res: Response) => {
     try {
+        const status = await mlService.getModelStatus();
         if (!mlService.isTrained) {
             return res.status(400).json({ 
                 success: false, 
@@ -339,7 +538,9 @@ protectedRouter.post('/roc-auc', async (_req: Request, res: Response) => {
                 type: mlService.classifierType,
                 preprocessing: mlService.preprocessingMode,
                 sample_count: mlService.trainSize,
-                accuracy: mlService.lastAccuracy
+                accuracy: status.accuracy,
+                accuracy_source: status.accuracy_source,
+                evaluation_sample_count: status.evaluation_sample_count
             },
             calculated_at: new Date().toISOString()
         };

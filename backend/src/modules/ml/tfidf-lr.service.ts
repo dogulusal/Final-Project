@@ -1,14 +1,17 @@
 /// <reference path="../../types/ml-logistic-regression.d.ts" />
+import { turkishStem } from './turkish-stemmer';
+
 /**
  * TF-IDF Vectorizer + Logistic Regression Classifier
  *
- * Task 2.1: TF-IDF vectorizer with Turkish stopword filtering
+ * Task 2.1: TF-IDF vectorizer with Turkish stopword filtering + Turkish stemming
  * Task 2.2: TfidfLrClassifier (ml-logistic-regression library wrapper)
  *
  * Design decisions:
  * - No NestJS DI — plain class for reuse in scripts + service
  * - Serializable to JSON for storage in model_state.lr_model_data
- * - Turkish stopwords included; suffix stripping deferred (see plan note)
+ * - Turkish stopwords included; Turkish Snowball stemming applied to each token
+ * - Aligns LR tokenization with NB preprocessing pipeline for feature parity
  */
 
 interface TfidfOptions {
@@ -160,7 +163,10 @@ export class TfidfLrService {
         const lower = text.toLowerCase();
         // Unicode-aware word extraction (preserves Turkish diacritics)
         const raw = lower.match(/[\p{L}\p{N}]+/gu) ?? [];
-        return raw.filter(t => t.length >= 2 && !this.turkishStopwords.has(t));
+        // Filter stopwords, then apply Turkish stemming to align with NB preprocessing
+        return raw
+            .filter(t => t.length >= 2 && !this.turkishStopwords.has(t))
+            .map(t => turkishStem(t)); // Apply Turkish Snowball stemmer
     }
 
     private extractNgrams(tokens: string[], ngramRange: [number, number]): string[] {
@@ -179,12 +185,6 @@ export class TfidfLrService {
 //  TF-IDF + Logistic Regression Classifier
 //  (Task 2.2 — installed when ml-logistic-regression is present)
 // ─────────────────────────────────────────────────────────────
-
-/**
- * Named constant for margin fallback when model.scores() is unavailable.
- * Calibrate via held-out validation set if needed.
- */
-const DEFAULT_MARGIN = 0.35;
 
 export class TfidfLrClassifier {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -230,31 +230,25 @@ export class TfidfLrClassifier {
     }
 
     /**
-     * Returns calibrated probability-like distribution over all categories.
-     * ml-logistic-regression v2 does not expose scores() — uses DEFAULT_MARGIN.
-     * Requires prior await fit() call.
+     * Returns a probability distribution derived from OvA LR logits.
+     * The upstream library trains each binary classifier as "class k = 0, rest = 1",
+     * so the raw score is negated before softmax to recover "belongs to class k".
      */
     async predictProba(text: string, vectorizer: TfidfLrService): Promise<number[]> {
         if (!this.model) throw new Error('Model not trained. Call fit() first.');
-
-        const { Matrix } = await import('ml-matrix');
-
         const vec = vectorizer.vectorize(text);
-        const X = new Matrix([vec]);
+        const logits = this.getOneVsAllLogits(vec);
+        const probs = this.softmax(logits.map((logit) => -logit));
 
-        // Predicted class index
-        const predIdx: number = this.model.predict(X)[0];
-
-        // scores() not available in v2 — use DEFAULT_MARGIN constant
-        const margin = DEFAULT_MARGIN;
-
-        // Winner probability based on margin; other classes share the remainder
-        const numClasses = this.indexCategory.length;
-        const winnerProb = Math.min(0.95, Math.max(0.45, 0.55 + margin * 0.5));
-        const restProb = (1 - winnerProb) / Math.max(1, numClasses - 1);
-
-        const probs = new Array(numClasses).fill(restProb);
-        probs[predIdx] = winnerProb;
+        // Guard the polarity assumption: softmax argmax should align with hard prediction.
+        const hardPredIdx = this.getPredictedClassIndex(vec);
+        const probaPredIdx = this.argmax(probs);
+        if (hardPredIdx !== probaPredIdx) {
+            const fallback = this.softmax(logits);
+            if (this.argmax(fallback) === hardPredIdx) {
+                return fallback;
+            }
+        }
 
         return probs;
     }
@@ -301,5 +295,81 @@ export class TfidfLrClassifier {
         this.model = LR.load(state.model as Record<string, unknown>);
         this.categoryIndex = new Map(state.categoryIndex as Array<[string, number]>);
         this.indexCategory = state.indexCategory as string[];
+    }
+
+    // ── Private helpers ────────────────────────────────────────
+
+    private getOneVsAllLogits(features: number[]): number[] {
+        const classifiers = this.getModelClassifiers();
+        return classifiers.map((classifier) => {
+            const weights = this.extractWeights(classifier);
+            const usableLength = Math.min(weights.length, features.length);
+            let score = 0;
+            for (let index = 0; index < usableLength; index++) {
+                score += weights[index] * features[index];
+            }
+            return score;
+        });
+    }
+
+    private getPredictedClassIndex(features: number[]): number {
+        const logits = this.getOneVsAllLogits(features);
+        let minIdx = 0;
+        for (let index = 1; index < logits.length; index++) {
+            if (logits[index] < logits[minIdx]) minIdx = index;
+        }
+        return minIdx;
+    }
+
+    private getModelClassifiers(): unknown[] {
+        const classifiers = this.model?.classifiers;
+        if (!Array.isArray(classifiers) || classifiers.length === 0) {
+            throw new Error('LR classifiers are missing or invalid');
+        }
+        return classifiers;
+    }
+
+    private extractWeights(classifier: unknown): number[] {
+        const weights = (classifier as { weights?: unknown })?.weights;
+        if (!weights) {
+            throw new Error('LR classifier weights are missing');
+        }
+
+        if (typeof (weights as { to1DArray?: () => number[] }).to1DArray === 'function') {
+            return (weights as { to1DArray: () => number[] }).to1DArray();
+        }
+
+        if (typeof (weights as { getRow?: (row: number) => number[] }).getRow === 'function') {
+            return (weights as { getRow: (row: number) => number[] }).getRow(0);
+        }
+
+        if (Array.isArray(weights)) {
+            if (Array.isArray(weights[0])) {
+                return weights[0] as number[];
+            }
+            return weights as number[];
+        }
+
+        const rowZero = (weights as Record<string, unknown>)['0'];
+        if (Array.isArray(rowZero)) {
+            return rowZero as number[];
+        }
+
+        throw new Error('Unsupported LR weight structure');
+    }
+
+    private softmax(values: number[]): number[] {
+        const maxValue = Math.max(...values);
+        const exponentials = values.map((value) => Math.exp(value - maxValue));
+        const total = exponentials.reduce((sum, value) => sum + value, 0);
+        return total > 0 ? exponentials.map((value) => value / total) : values.map(() => 0);
+    }
+
+    private argmax(values: number[]): number {
+        let bestIndex = 0;
+        for (let index = 1; index < values.length; index++) {
+            if (values[index] > values[bestIndex]) bestIndex = index;
+        }
+        return bestIndex;
     }
 }

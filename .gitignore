@@ -70,5 +70,8 @@ backend/listmodels.js
 # Runtime logs
 backend/backfill_log.txt
 
+# Brainstorm companion sessions
+.superpowers/
+
 
 

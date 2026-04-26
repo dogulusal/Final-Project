@@ -65,8 +65,7 @@ export default function NewsFeedCard({ news, layout = "standard" }: NewsFeedCard
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                         <span
-                            className="text-[10px] font-bold uppercase tracking-wider"
-                            style={{ color: effectiveCategoryName === "Genel" ? 'var(--accent-warm)' : (news.kategori?.renkKodu || 'var(--accent-warm)') }}
+                            className="neon-badge px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
                         >
                             {effectiveCategoryName}
                         </span>

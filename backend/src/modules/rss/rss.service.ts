@@ -40,7 +40,42 @@ export class RssParserService implements IRssParserService {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AI-News-Agency-Bot',
             },
+            customFields: {
+                item: [
+                    ['media:content', 'media'],
+                    ['media:thumbnail', 'mediaThumbnail'],
+                ],
+            },
         });
+    }
+
+    private extractImageUrl(item: Record<string, any>): string | undefined {
+        // 1. enclosure (most RSS feeds)
+        const encUrl = item.enclosure?.url;
+        if (encUrl && typeof encUrl === 'string' && /\.(jpg|jpeg|png|webp|gif)/i.test(encUrl)) {
+            return encUrl;
+        }
+        // enclosure without extension but with image type
+        if (encUrl && item.enclosure?.type?.startsWith('image/')) {
+            return encUrl;
+        }
+        // 2. media:content
+        const mediaUrl = item.media?.$?.url || item.media?.url;
+        if (mediaUrl && typeof mediaUrl === 'string') {
+            return mediaUrl;
+        }
+        // 3. media:thumbnail
+        const thumbUrl = item.mediaThumbnail?.$?.url || item.mediaThumbnail?.url;
+        if (thumbUrl && typeof thumbUrl === 'string') {
+            return thumbUrl;
+        }
+        // 4. Parse from content HTML (img src)
+        const content = item['content:encoded'] || item.content || '';
+        if (typeof content === 'string') {
+            const imgMatch = content.match(/<img[^>]+src=["']([^"']+\.(jpg|jpeg|png|webp))[^"']*["']/i);
+            if (imgMatch) return imgMatch[1];
+        }
+        return undefined;
     }
 
     async fetchFeed(source: IRssSource): Promise<ParsedRssItem[]> {
@@ -55,6 +90,7 @@ export class RssParserService implements IRssParserService {
                 contentSnippet: this.normalizeText(item.contentSnippet || item.content || (item as any).summary),
                 source: source.name,
                 category: source.category,
+                imageUrl: this.extractImageUrl(item as Record<string, any>),
             }));
 
             console.log(`[RSS] ${source.name}: ${items.length} haber okundu.`);

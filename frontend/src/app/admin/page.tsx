@@ -5,11 +5,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { Activity, BarChart3, Database, FileText, CheckCircle2, TrendingUp, Zap, Clock } from "lucide-react";
-import { getAccessToken, isLoggedIn, apiFetch } from "@/lib/auth";
+import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, FileText, RefreshCw, TrendingUp, Zap } from "lucide-react";
+import { getAccessToken, isLoggedIn, apiFetch, clearTokens } from "@/lib/auth";
 
 // env-only — compile-time constants, safe at module scope
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
 interface SchedulerStatus {
     isRunning: boolean;
@@ -23,8 +23,69 @@ interface MLVerificationMetrics {
     totalRecords: number;
     verifiedRecords: number;
     verificationRate: number;
-    lastBatchChanged: number;
-    lastBatchToGenel: number;
+    pendingRecords: number;
+    disputedRecords: number;
+}
+
+interface DisputeCategory {
+    id: number;
+    ad: string;
+}
+
+interface DisputeItem {
+    id: number;
+    haberId: number;
+    nbKategoriId: number | null;
+    llmKategoriId: number | null;
+    nbGuvenSkoru: number | null;
+    llmGuvenSkoru?: number | null;
+    haber: {
+        id: number;
+        baslik: string;
+    };
+    nbKategori: DisputeCategory | null;
+    llmKategori: DisputeCategory | null;
+}
+
+interface DisputeBucket {
+    key: string;
+    count: number;
+}
+
+interface DisputeSummary {
+    total: number;
+    byPair: DisputeBucket[];
+    byNb: DisputeBucket[];
+    byLlm: DisputeBucket[];
+}
+
+function buildDisputeSummary(items: DisputeItem[]): DisputeSummary {
+    const pairCounts = new Map<string, number>();
+    const nbCounts = new Map<string, number>();
+    const llmCounts = new Map<string, number>();
+
+    for (const item of items) {
+        const nbLabel = item.nbKategori?.ad || "—";
+        const llmLabel = item.llmKategori?.ad || "—";
+        const pairKey = `${nbLabel} -> ${llmLabel}`;
+
+        pairCounts.set(pairKey, (pairCounts.get(pairKey) || 0) + 1);
+        nbCounts.set(nbLabel, (nbCounts.get(nbLabel) || 0) + 1);
+        llmCounts.set(llmLabel, (llmCounts.get(llmLabel) || 0) + 1);
+    }
+
+    const toSortedBuckets = (counts: Map<string, number>): DisputeBucket[] => (
+        Array.from(counts.entries())
+            .map(([key, count]) => ({ key, count }))
+            .sort((left, right) => right.count - left.count || left.key.localeCompare(right.key, "tr"))
+    );
+
+    return {
+        total: items.length,
+        byPair: toSortedBuckets(pairCounts),
+        byNb: toSortedBuckets(nbCounts),
+        byLlm: toSortedBuckets(llmCounts),
+    };
 }
 
 export default function AdminDashboardPage() {
@@ -33,7 +94,8 @@ export default function AdminDashboardPage() {
         totalNews: 0,
         activeCategories: 7,
         mlAccuracy: 85,
-        avgConfidence: 89.4,
+        avgPredictionConfidence: 89.4,
+        confidenceSampleSize: 0,
         mlTrainSize: 0,
         mlTestSize: 0,
         abTestCount: 0,
@@ -41,10 +103,88 @@ export default function AdminDashboardPage() {
         breakdown: {} as Record<string, number>,
         llmBreakdown: {} as Record<string, number>,
         pipeline: { enabled: false, dailyQuota: 100 },
-        mlVerification: { totalRecords: 0, verifiedRecords: 0, verificationRate: 0, lastBatchChanged: 0, lastBatchToGenel: 0 } as MLVerificationMetrics
+        mlVerification: { totalRecords: 0, verifiedRecords: 0, verificationRate: 0, pendingRecords: 0, disputedRecords: 0 } as MLVerificationMetrics
     });
     const [scheduler, setScheduler] = useState<SchedulerStatus | null>(null);
     const [loading, setLoading] = useState(true);
+    const [disputes, setDisputes] = useState<DisputeItem[]>([]);
+    const [disputeSummary, setDisputeSummary] = useState<DisputeSummary | null>(null);
+    const [categories, setCategories] = useState<DisputeCategory[]>([]);
+    const [selectedDecisions, setSelectedDecisions] = useState<Record<number, number>>({});
+    const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+    const [resolving, setResolving] = useState(false);
+    const [disputeError, setDisputeError] = useState<string | null>(null);
+
+    const handleUnauthorized = () => {
+        clearTokens();
+        router.push('/login');
+    };
+
+    const fetchDisputes = async () => {
+        const token = getAccessToken();
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        };
+
+        const [disputesRes, categoriesRes] = await Promise.all([
+            fetch(`${API}/api/ml/disputes/pending?limit=100`, { headers }),
+            fetch(`${API}/api/news/categories`),
+        ]);
+
+        if (disputesRes.status === 401) {
+            handleUnauthorized();
+            return;
+        }
+
+        const disputesData = await disputesRes.json();
+        const categoriesData = categoriesRes.ok ? await categoriesRes.json() : { success: false };
+
+        const items = disputesData.success ? (disputesData.data?.items || []) as DisputeItem[] : [];
+        setDisputes(items);
+        setDisputeSummary(buildDisputeSummary(items));
+
+        if (categoriesData.success && Array.isArray(categoriesData.data)) {
+            setCategories(categoriesData.data.map((category: DisputeCategory) => ({ id: category.id, ad: category.ad })));
+        }
+    };
+
+    const resolveSelectedDisputes = async () => {
+        const decisions = Object.entries(selectedDecisions).map(([disputeId, chosenKategoriId]) => ({
+            disputeId: Number(disputeId),
+            chosenKategoriId,
+            reason: 'admin-panel-manual-review',
+        }));
+
+        if (decisions.length === 0) {
+            setDisputeError('Önce en az bir dispute için karar seçin.');
+            return;
+        }
+
+        setResolving(true);
+        setDisputeError(null);
+
+        try {
+            const response = await apiFetch(`${API}/api/ml/resolve-disputes-batch`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decisions }),
+            });
+
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || `HTTP ${response.status}`);
+            }
+
+            setSelectedDecisions({});
+            setOpenMenuId(null);
+            await fetchDisputes();
+        } catch (error) {
+            setDisputeError(error instanceof Error ? error.message : 'Dispute çözümünde hata oluştu.');
+        } finally {
+            setResolving(false);
+        }
+    };
 
     useEffect(() => {
         // Login kontrolü
@@ -68,9 +208,7 @@ export default function AdminDashboardPage() {
 
                 // Auth hatası — logout yap
                 if (statsRes.status === 401 || schedulerRes.status === 401) {
-                    localStorage.removeItem('accessToken');
-                    localStorage.removeItem('refreshToken');
-                    router.push('/login');
+                    handleUnauthorized();
                     return;
                 }
 
@@ -81,7 +219,8 @@ export default function AdminDashboardPage() {
                         totalNews: statsData.stats.totalNews,
                         activeCategories: statsData.stats.activeCategories,
                         mlAccuracy: statsData.stats.mlAccuracy,
-                        avgConfidence: parseFloat(statsData.stats.avgConfidence),
+                        avgPredictionConfidence: parseFloat(statsData.stats.avgPredictionConfidence ?? statsData.stats.avgConfidence ?? 0),
+                        confidenceSampleSize: statsData.stats.confidenceSampleSize || 0,
                         mlTrainSize: statsData.stats.mlTrainSize || 0,
                         mlTestSize: statsData.stats.mlTestSize || 0,
                         abTestCount: statsData.stats.abTestCount,
@@ -90,15 +229,16 @@ export default function AdminDashboardPage() {
                         llmBreakdown: statsData.stats.llmBreakdown || {},
                         pipeline: statsData.stats.pipeline || { enabled: false, dailyQuota: 100 },
                         mlVerification: {
-                            totalRecords: statsData.stats.totalNews || 0,
-                            verifiedRecords: statsData.stats.mlTrainSize || 0,
-                            verificationRate: statsData.stats.totalNews > 0 ? Math.round(((statsData.stats.mlTrainSize || 0) / statsData.stats.totalNews) * 100) : 0,
-                            lastBatchChanged: 623,
-                            lastBatchToGenel: 188
+                            totalRecords: statsData.stats.mlVerification?.totalRecords || statsData.stats.totalNews || 0,
+                            verifiedRecords: statsData.stats.mlVerification?.verifiedRecords || 0,
+                            verificationRate: statsData.stats.mlVerification?.verificationRate || 0,
+                            pendingRecords: statsData.stats.mlVerification?.pendingRecords || 0,
+                            disputedRecords: statsData.stats.mlVerification?.disputedRecords || 0,
                         }
                     });
                 }
                 if (schedulerData.success) setScheduler(schedulerData.data);
+                await fetchDisputes();
             } catch (error) {
                 console.error("Admin fetch error:", error);
             } finally {
@@ -111,8 +251,8 @@ export default function AdminDashboardPage() {
     const cards = [
         { title: "Toplam Haber", value: stats.totalNews.toLocaleString('tr-TR'), icon: <FileText size={20} className="text-blue-500" />, trend: `Hazır: ${stats.breakdown['hazir'] ?? 0}` },
         { title: "Aktif Kategori", value: stats.activeCategories, icon: <Database size={20} className="text-purple-500" />, trend: "Sabit" },
-        { title: "ML Doğruluk", value: `%${stats.mlAccuracy}`, icon: <CheckCircle2 size={20} className="text-emerald-500" />, trend: stats.mlTrainSize > 0 ? `Eğitim: ${stats.mlTrainSize}` : "Model aktif" },
-        { title: "Güven Skoru", value: `%${stats.avgConfidence}`, icon: <TrendingUp size={20} className="text-rose-500" />, trend: stats.mlTestSize > 0 ? `Test: ${stats.mlTestSize}` : "Ortalama" },
+        { title: "ML Doğruluk", value: `%${stats.mlAccuracy}`, icon: <CheckCircle2 size={20} className="text-emerald-500" />, trend: stats.mlTestSize > 0 ? `Doğrulanan test: ${stats.mlTestSize}` : "Model aktif" },
+        { title: "Ort. Tahmin Güveni", value: `%${stats.avgPredictionConfidence}`, icon: <TrendingUp size={20} className="text-rose-500" />, trend: stats.confidenceSampleSize > 0 ? `Hazır haber: ${stats.confidenceSampleSize}` : "Tahmin ortalaması" },
     ];
 
     return (
@@ -351,9 +491,10 @@ export default function AdminDashboardPage() {
                             <p className="text-xs text-[var(--text-secondary)] mt-1">%{stats.mlVerification.verificationRate}</p>
                         </div>
                         <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
-                            <p className="text-[var(--text-muted)] text-sm mb-1">Last Batch (623 record)</p>
+                            <p className="text-[var(--text-muted)] text-sm mb-1">Kalan / Bekleyen</p>
                             <div className="flex items-center gap-2 mt-2">
-                                <span className="text-emerald-500 font-bold">→ Genel: {stats.mlVerification.lastBatchToGenel}</span>
+                                <span className="text-amber-500 font-bold">Kalan: {stats.mlVerification.pendingRecords}</span>
+                                <span className="text-rose-500 font-bold">• Dispute: {stats.mlVerification.disputedRecords}</span>
                             </div>
                         </div>
                     </div>
@@ -369,6 +510,199 @@ export default function AdminDashboardPage() {
                         <p className="text-xs text-[var(--text-muted)] mt-2">
                             ✅ Başarıyla doğrulanmış haberler eğitim setinde kullanılıyor. Sistem doğruluk ve güvenirliği artıyor.
                         </p>
+                    </div>
+                </motion.div>
+
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="glass-card p-6 mt-8"
+                >
+                    <div className="flex items-center gap-2 mb-6">
+                        <AlertTriangle className="text-amber-500" />
+                        <h2 className="text-xl font-bold">Dispute Çözüm Merkezi</h2>
+                        <div className="ml-auto flex items-center gap-2">
+                            {disputes.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const nextSelections: Record<number, number> = {};
+                                        disputes.forEach((item) => {
+                                            if (item.llmKategoriId) {
+                                                nextSelections[item.id] = item.llmKategoriId;
+                                            }
+                                        });
+                                        setSelectedDecisions(nextSelections);
+                                        setDisputeError(null);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white"
+                                >
+                                    Tümünü LLM Seç
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => { void fetchDisputes(); }}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border border-[var(--border-subtle)] hover:bg-[var(--bg-secondary)]"
+                            >
+                                <RefreshCw size={14} /> Yenile
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+                            <p className="text-[var(--text-muted)] text-sm mb-1">Bekleyen Dispute</p>
+                            <p className="text-2xl font-bold text-amber-500">{disputeSummary?.total ?? 0}</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+                            <p className="text-[var(--text-muted)] text-sm mb-1">En Sık Çift</p>
+                            <p className="text-sm font-bold text-[var(--text-primary)] truncate" title={disputeSummary?.byPair[0]?.key || '—'}>
+                                {disputeSummary?.byPair[0]?.key || '—'}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">{disputeSummary?.byPair[0]?.count ?? 0} kayıt</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+                            <p className="text-[var(--text-muted)] text-sm mb-1">NB+LR En Sık</p>
+                            <p className="text-sm font-bold text-[var(--text-primary)] truncate" title={disputeSummary?.byNb[0]?.key || '—'}>
+                                {disputeSummary?.byNb[0]?.key || '—'}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">{disputeSummary?.byNb[0]?.count ?? 0} kayıt</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+                            <p className="text-[var(--text-muted)] text-sm mb-1">LLM En Sık</p>
+                            <p className="text-sm font-bold text-[var(--text-primary)] truncate" title={disputeSummary?.byLlm[0]?.key || '—'}>
+                                {disputeSummary?.byLlm[0]?.key || '—'}
+                            </p>
+                            <p className="text-xs text-[var(--text-muted)]">{disputeSummary?.byLlm[0]?.count ?? 0} kayıt</p>
+                        </div>
+                    </div>
+
+                    {disputeError && (
+                        <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm">
+                            {disputeError}
+                        </div>
+                    )}
+
+                    <div className="overflow-x-auto border border-[var(--border-subtle)] rounded-xl">
+                        <table className="w-full text-left text-sm border-collapse">
+                            <thead className="bg-[var(--bg-secondary)]">
+                                <tr className="border-b border-[var(--border-subtle)] text-[var(--text-muted)]">
+                                    <th className="p-3 font-medium">Haber</th>
+                                    <th className="p-3 font-medium">NB+LR</th>
+                                    <th className="p-3 font-medium">LLM</th>
+                                    <th className="p-3 font-medium text-center">Karar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {disputes.length > 0 ? disputes.map((item) => {
+                                    const selectedCategoryId = selectedDecisions[item.id];
+                                    const nbSelected = selectedCategoryId === item.nbKategoriId;
+                                    const llmSelected = selectedCategoryId === item.llmKategoriId;
+
+                                    return (
+                                        <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0">
+                                            <td className="p-3 align-top">
+                                                <p className="font-semibold text-[var(--text-primary)] line-clamp-2" title={item.haber.baslik}>
+                                                    {item.haber.baslik}
+                                                </p>
+                                                <p className="text-xs text-[var(--text-muted)] mt-1">
+                                                    Dispute #{item.id} • Haber #{item.haberId}
+                                                </p>
+                                            </td>
+                                            <td className="p-3 align-top">
+                                                <p className="font-semibold">{item.nbKategori?.ad || '—'}</p>
+                                                <p className="text-xs text-[var(--text-muted)]">
+                                                    Güven: {typeof item.nbGuvenSkoru === 'number' ? `%${Math.round(item.nbGuvenSkoru * 100)}` : '—'}
+                                                </p>
+                                            </td>
+                                            <td className="p-3 align-top">
+                                                <p className="font-semibold">{item.llmKategori?.ad || '—'}</p>
+                                                <p className="text-xs text-[var(--text-muted)]">
+                                                    Güven: {typeof item.llmGuvenSkoru === 'number' ? `%${Math.round(item.llmGuvenSkoru * 100)}` : '—'}
+                                                </p>
+                                            </td>
+                                            <td className="p-3 align-top">
+                                                <div className="flex flex-col items-center gap-1.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (item.nbKategoriId) {
+                                                                    setSelectedDecisions((prev) => ({ ...prev, [item.id]: item.nbKategoriId as number }));
+                                                                    setDisputeError(null);
+                                                                }
+                                                            }}
+                                                            disabled={!item.nbKategoriId}
+                                                            className={`px-3 py-1 rounded-lg text-xs font-semibold border ${nbSelected ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'border-[var(--border-subtle)] hover:bg-[var(--bg-secondary)]'}`}
+                                                        >
+                                                            NB+LR'yi Seç
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (item.llmKategoriId) {
+                                                                    setSelectedDecisions((prev) => ({ ...prev, [item.id]: item.llmKategoriId as number }));
+                                                                    setDisputeError(null);
+                                                                }
+                                                            }}
+                                                            disabled={!item.llmKategoriId}
+                                                            className={`px-3 py-1 rounded-lg text-xs font-semibold border ${llmSelected ? 'bg-blue-500/20 border-blue-500 text-blue-400' : 'border-[var(--border-subtle)] hover:bg-[var(--bg-secondary)]'}`}
+                                                        >
+                                                            LLM'i Seç
+                                                        </button>
+                                                    </div>
+                                                    <div className="relative">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setOpenMenuId(openMenuId === item.id ? null : item.id)}
+                                                            className={`px-3 py-1 rounded-lg text-xs font-semibold border ${!nbSelected && !llmSelected && selectedCategoryId ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'border-[var(--border-subtle)] hover:bg-[var(--bg-secondary)] text-[var(--text-muted)]'}`}
+                                                        >
+                                                            {nbSelected || llmSelected || !selectedCategoryId ? 'Diğer ▾' : categories.find((category) => category.id === selectedCategoryId)?.ad ?? 'Diğer'}
+                                                        </button>
+                                                        {openMenuId === item.id && (
+                                                            <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--bg-primary)] border border-[var(--border-subtle)] rounded-xl shadow-lg py-1 min-w-[130px]">
+                                                                {categories.map((category) => (
+                                                                    <button
+                                                                        key={category.id}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setSelectedDecisions((prev) => ({ ...prev, [item.id]: category.id }));
+                                                                            setOpenMenuId(null);
+                                                                        }}
+                                                                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-[var(--bg-secondary)] text-[var(--text-primary)]"
+                                                                    >
+                                                                        {category.ad}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                }) : (
+                                    <tr>
+                                        <td colSpan={4} className="p-8 text-center text-[var(--text-muted)] italic text-xs">
+                                            Bekleyen dispute kaydı yok.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-end gap-3">
+                        <span className="text-xs text-[var(--text-muted)]">Seçili: {Object.keys(selectedDecisions).length}</span>
+                        <button
+                            type="button"
+                            onClick={() => { void resolveSelectedDisputes(); }}
+                            disabled={resolving || Object.keys(selectedDecisions).length === 0}
+                            className="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {resolving ? 'Çözülüyor...' : 'Seçilenleri Çöz'}
+                        </button>
                     </div>
                 </motion.div>
             </div>

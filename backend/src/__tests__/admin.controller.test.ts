@@ -40,11 +40,18 @@ jest.mock('../config/database', () => ({
         kategori: {
             count: jest.fn(),
         },
+        disputeQueue: {
+            count: jest.fn(),
+        },
         llmKullanim: {
             groupBy: jest.fn(),
             aggregate: jest.fn(),
         }
     }
+}));
+
+jest.mock('../modules/ml/dispute-queue.service', () => ({
+    bridgeHamVerifiedToDisputeQueue: jest.fn().mockResolvedValue({ synced: 0 }),
 }));
 
 jest.mock('../modules/rss/rss-scheduler', () => ({
@@ -151,8 +158,12 @@ describe('Admin Controller', () => {
         });
 
         it('should return stats with valid JWT token', async () => {
-            (prisma.haber.count as jest.Mock).mockResolvedValue(100);
+            (prisma.haber.count as jest.Mock)
+                .mockResolvedValueOnce(100)
+                .mockResolvedValueOnce(70)
+                .mockResolvedValueOnce(20);
             (prisma.kategori.count as jest.Mock).mockResolvedValue(5);
+            (prisma.disputeQueue.count as jest.Mock).mockResolvedValue(10);
             (prisma.haber.groupBy as jest.Mock)
                 .mockResolvedValueOnce([
                     { durum: 'hazir', _count: { id: 80 } },
@@ -162,7 +173,7 @@ describe('Admin Controller', () => {
                     { llmProvider: 'gemini', _count: { id: 60 } },
                     { llmProvider: null, _count: { id: 40 } }
                 ]);
-            (prisma.haber.aggregate as jest.Mock).mockResolvedValue({ _avg: { mlConfidence: 0.85 } });
+            (prisma.haber.aggregate as jest.Mock).mockResolvedValue({ _avg: { mlConfidence: 0.85 }, _count: { mlConfidence: 80 } });
             (mlService.getAccuracy as jest.Mock).mockResolvedValue({ accuracy: 0.92, trainSize: 1000, testSize: 200 });
             (prisma.haber.findMany as jest.Mock).mockResolvedValue([]);
 

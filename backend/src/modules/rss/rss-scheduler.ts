@@ -301,7 +301,7 @@ export class RssScheduler {
                             llmKategoriId: null,             // Worker dolduracak
                             sentiment: sentRes ? sentRes.label : 'Nötr',
                             mlConfidence: catRes ? catRes.confidence : undefined,
-                            gorselUrl: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167",
+                            gorselUrl: item.imageUrl || undefined,
                             kaynakUrl: safeLink,
                             durum: 'ham',
                             llmProvider: llmProviderValue,

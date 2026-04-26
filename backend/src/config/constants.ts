@@ -123,7 +123,6 @@ export const RSS_SOURCES: IRssSource[] = [
     { id: 'ntv-saglik', name: 'NTV Sağlık', url: 'https://www.ntv.com.tr/saglik.rss', category: 'Sağlık' },
     { id: 'cnnturk-saglik', name: 'CNN Türk Sağlık', url: 'https://www.cnnturk.com/feed/rss/saglik/news', category: 'Sağlık' },
     { id: 'ensonhaber-saglik', name: 'Ensonhaber Sağlık', url: 'https://www.ensonhaber.com/rss/saglik.xml', category: 'Sağlık' },
-    { id: 'aksam-saglik', name: 'Akşam Sağlık', url: 'https://www.aksam.com.tr/rss/rss.asp?cat=saglik', category: 'Sağlık' },
     { id: 'takvim-saglik', name: 'Takvim Sağlık', url: 'https://www.takvim.com.tr/rss/saglik.xml', category: 'Sağlık' },
     { id: 'cnnturk-anasayfa', name: 'CNN Türk', url: 'https://www.cnnturk.com/feed/rss/all/news', category: 'Genel' },
     { id: 'milliyet-anasayfa', name: 'Milliyet Sondakika', url: 'https://www.milliyet.com.tr/rss/rssnew/sondakikarss.xml', category: 'Genel' },

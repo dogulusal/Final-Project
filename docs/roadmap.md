@@ -125,6 +125,12 @@ Kullanıcı      ──► Frontend       ──► GET /api/news ──► Habe
 | 11 | Admin dashboard | 4 sa | İstatistik paneli |
 | 12 | Kullanıcı sistemi | 6 sa | JWT auth + kişisel akış |
 
+### 🔴 Backlog — Teknik Borç
+
+| # | Görev | Öncelik | Açıklama |
+|---|-------|---------|----------|
+| B1 | ML Train endpoint async job queue | Yüksek | `/api/ml/train` sync HTTP isteği LR fazında ~30 dk sürüyor. Load balancer timeout (genelde 60-120s), client retry storm, health check failure riski var. **Çözüm:** Bull/BullMQ job queue ile async eğitim + SSE/WebSocket ile progress stream. Endpoint hemen `202 Accepted` + `jobId` dönsün, client progress'i poll etsin veya SSE ile dinlesin. |
+
 ---
 
 ## 5. Risk Matrisi

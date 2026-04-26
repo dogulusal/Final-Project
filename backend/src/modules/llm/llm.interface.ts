@@ -8,6 +8,7 @@ export interface LLMResponse {
     tokensUsed: number;
     provider: string;
     model: string;
+    confidence?: number;  // LLM'in belirlediği kategori güven skoru (0.0-1.0)
 }
 
 export interface ILLMProvider {

@@ -1,0 +1,25 @@
+
+> ai-news-agency-backend@0.1.0 evaluate:combined
+> ts-node --project tsconfig.scripts.json src/scripts/evaluate-combined-model.ts
+
+[Redis] Connecting to localhost:6379...
+[Eval] Loading model from DB...
+[ML] Ensemble weights: NB=0.65 LR=0.35
+prisma:info Starting a postgresql pool with 13 connections.
+[Redis] Connected successfully
+prisma:query SELECT "public"."model_state"."id", "public"."model_state"."version", "public"."model_state"."model_data", "public"."model_state"."lr_model_data", "public"."model_state"."accuracy", "public"."model_state"."trained_at", "public"."model_state"."sample_count" FROM "public"."model_state" WHERE ("public"."model_state"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+[ML] NB classifier rebuilt from 3390 stored docs
+[ML] Combined NB+LR model loaded from DB
+[ML] Model DB'den yüklendi. Accuracy=%79.6 Sample=3390
+[Eval] useCombinedModel=true
+[Eval] Fetching verified articles...
+[Eval] Total verified articles: 2536
+
+=== EVALUATION RESULTS ===
+{
+  "total": 2536,
+  "nbAccuracy": "84.90%",
+  "lrAccuracy": "81.78%",
+  "combinedAccuracy": "84.90%",
+  "reportPath": "C:\\Users\\dogul\\Final-Project\\backend\\evaluation-report-2026-04-16.csv"
+}

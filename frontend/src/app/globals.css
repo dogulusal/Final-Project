@@ -66,6 +66,14 @@
   --gradient-hero:  linear-gradient(135deg, #1e2035 0%, #a38068 100%);
   --gradient-warm:  linear-gradient(180deg, rgba(163,128,104,0.12) 0%, transparent 100%);
 
+  /* --- Neon+Glass tokens (light) --- */
+  --neon-purple: #7c3aed;
+  --neon-cyan: #0891b2;
+  --neon-glow-purple: rgba(124, 58, 237, 0.12);
+  --neon-glow-cyan: rgba(6, 182, 212, 0.08);
+  --bg-glass-dark: rgba(0, 0, 0, 0.02);
+  --border-glass: rgba(0, 0, 0, 0.06);
+
   /* Radius */
   --radius-sm:  6px;
   --radius-md:  10px;

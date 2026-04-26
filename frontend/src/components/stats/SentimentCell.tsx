@@ -78,8 +78,8 @@ export default function SentimentCell() {
 
   return (
     <div className="glass-panel h-full flex flex-col justify-center gap-2 px-4 py-3">
-      <div className="h-8">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-8 min-w-[60px]">
+        <ResponsiveContainer width="100%" height="100%" minWidth={60} minHeight={30}>
           <BarChart data={chartData} layout="vertical" barCategoryGap={2}>
             <XAxis type="number" hide domain={[0, 100]} />
             <Bar dataKey="value" radius={[4, 4, 4, 4]} barSize={8}>

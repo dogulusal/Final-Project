@@ -44,7 +44,7 @@ export default function NewsFeed({ newsItems, loading = false }: NewsFeedProps) 
         );
     }
 
-    // İlk haberi hero yap, diğerlerini listele
+    // İlk haberi hero yap, diğerlerini grid'de göster
     const heroNews = newsItems[0];
     const restNews = newsItems.slice(1);
 
@@ -57,19 +57,15 @@ export default function NewsFeed({ newsItems, loading = false }: NewsFeedProps) 
                 </div>
             )}
 
-            {/* Standard Grid & Compact Mode Mix */}
-            {restNews.map((item, index) => {
-                // Sona doğru olanları Compact mode gösterebiliriz (Örn: İlk 6 sonrası)
-                const isCompactList = index >= 6;
-                return (
-                    <div 
-                        key={item.id} 
-                        className={isCompactList ? "md:col-span-4 lg:col-span-8" : "md:col-span-2 lg:col-span-4"}
-                    >
-                        <NewsFeedCard news={item} layout={isCompactList ? "compact" : "standard"} />
-                    </div>
-                );
-            })}
+            {/* Standard Grid */}
+            {restNews.map((item) => (
+                <div 
+                    key={item.id} 
+                    className="md:col-span-2 lg:col-span-4"
+                >
+                    <NewsFeedCard news={item} layout="standard" />
+                </div>
+            ))}
         </div>
     );
 }

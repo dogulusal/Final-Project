@@ -12,6 +12,7 @@ jest.mock('../config/database', () => ({
 
 jest.mock('../modules/ml/ml.service', () => ({
     MlCategorizationService: jest.fn().mockImplementation(() => ({
+        loadModelFromDb: jest.fn().mockResolvedValue(false),
         loadAndTrainFromDB: jest.fn().mockResolvedValue(true),
         loadAndTrainFromDiskFallback: jest.fn().mockResolvedValue(true),
     })),
