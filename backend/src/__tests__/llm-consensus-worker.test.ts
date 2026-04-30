@@ -20,6 +20,9 @@ jest.mock('../config/database', () => ({
                 { id: 7, ad: 'Genel' },
             ]),
         },
+        disputeQueue: {
+            upsert: jest.fn().mockResolvedValue({}),
+        },
     },
 }));
 
@@ -40,10 +43,11 @@ import { prisma } from '../config/database';
 import { ILLMProvider, LLMResponse } from '../modules/llm/llm.interface';
 
 // Helper: geçerli bir ILLMProvider mock'u oluşturur
-function makeMockProvider(content: string): jest.Mocked<ILLMProvider> {
+function makeMockProvider(category: string): jest.Mocked<ILLMProvider> {
+    const jsonContent = JSON.stringify({ kategori: category, guven: 0.85 });
     return {
         name: 'mock',
-        generateContent: jest.fn().mockResolvedValue({ content, tokensUsed: 1, provider: 'mock', model: 'mock' } as LLMResponse),
+        generateContent: jest.fn().mockResolvedValue({ content: jsonContent, tokensUsed: 1, provider: 'mock', model: 'mock' } as LLMResponse),
         isAvailable: jest.fn().mockResolvedValue(true),
         estimateCost: jest.fn().mockReturnValue(0),
     };
@@ -118,7 +122,7 @@ describe('LlmConsensusWorker', () => {
             const worker = new TestableWorker(gemini, ollama);
 
             const result = await worker.testCallLLM('Galatasaray maçı', 'Özet');
-            expect(result).toEqual({ category: 'Spor', provider: 'gemini' });
+            expect(result).toEqual({ category: 'Spor', provider: 'gemini', confidence: 0.85 });
             expect(gemini.generateContent).toHaveBeenCalledTimes(1);
             expect(ollama.generateContent).not.toHaveBeenCalled();
         });
@@ -130,7 +134,7 @@ describe('LlmConsensusWorker', () => {
             const worker = new TestableWorker(gemini, ollama);
 
             const result = await worker.testCallLLM('Yapay zeka', 'Özet');
-            expect(result).toEqual({ category: 'Teknoloji', provider: 'ollama' });
+            expect(result).toEqual({ category: 'Teknoloji', provider: 'ollama', confidence: 0.85 });
             expect(ollama.generateContent).toHaveBeenCalledTimes(1);
         });
     });

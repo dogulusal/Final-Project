@@ -68,7 +68,8 @@ export async function runEvaluatorDry(): Promise<{
 
         const nbPred = mlService.predictNbCategory(text);
         const lrPred = await mlService.predictLrCategory(text);
-        const combinedPred = await mlService.predictCombinedCategory(text);
+        const combinedResult = await mlService.predictCombinedCategory(text);
+        const combinedPred = combinedResult.kategori;
 
         const nbCorrect = nbPred === trueCategory;
         const lrCorrect = lrPred === trueCategory;

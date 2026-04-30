@@ -1,7 +1,0 @@
-scenario,accuracyPct,deltaPositiveForTask,dunyaToSiyaset,genelToSiyaset,exitCode,logPath
-baseline,75.65,0,27,11,0,C:\Users\dogul\Final-Project\backend\ablation-baseline-2026-04-16T21-08-49-414Z.log
-no-task11,76.26,-0.61,30,19,0,C:\Users\dogul\Final-Project\backend\ablation-no-task11-2026-04-16T21-08-49-414Z.log
-no-task12,77.06,-1.41,16,14,0,C:\Users\dogul\Final-Project\backend\ablation-no-task12-2026-04-16T21-08-49-414Z.log
-no-task13,78.67,-3.02,17,10,0,C:\Users\dogul\Final-Project\backend\ablation-no-task13-2026-04-16T21-08-49-414Z.log
-no-task14,75.45,0.2,27,14,0,C:\Users\dogul\Final-Project\backend\ablation-no-task14-2026-04-16T21-08-49-414Z.log
-no-task15,75.25,0.4,34,17,0,C:\Users\dogul\Final-Project\backend\ablation-no-task15-2026-04-16T21-08-49-414Z.log

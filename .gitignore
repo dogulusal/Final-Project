@@ -70,6 +70,9 @@ backend/listmodels.js
 # Runtime logs
 backend/backfill_log.txt
 
+# Archive (batch logs, one-off SQL/JS scripts, reports)
+_archive/
+
 # Brainstorm companion sessions
 .superpowers/
 
