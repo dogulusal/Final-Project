@@ -40,7 +40,7 @@ async function setupScheduler(consensusEnabled: boolean): Promise<SchedulerTestS
 
     jest.doMock('../modules/ml/ml.controller', () => ({
         mlService: {
-            categorize: jest.fn().mockResolvedValue({ kategori: 'Genel', confidence: 0.45 }),
+            predictCombinedCategory: jest.fn().mockResolvedValue({ kategori: 'Genel', confidence: 0.60 }),
             analyzeSentiment: jest.fn().mockResolvedValue({ label: 'Nötr' }),
         },
     }));

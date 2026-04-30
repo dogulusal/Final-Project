@@ -287,7 +287,7 @@ export class RssScheduler {
                         let finalCatId = mlCatId ?? sourceCatId;
 
                         // Tier kararı: HIGH → direkt yayınla, MID → LLM consensus, LOW → inceleme
-                        let durum: string;
+                        let durum: 'ham' | 'hazir' | 'yayinda' | 'inceleme';
                         let llmProviderValue: string;
                         let kategoriDogrulandi: boolean;
 
